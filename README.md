@@ -30,6 +30,13 @@ uv run radar update --amendements            # archive lourde, ~300 Mo
 uv run radar amendements -k 20
 uv run radar amendements --par-groupe
 
+# Selon l'enjeu politique du scrutin
+uv run radar portees
+
+# Alliances de travail : qui cosigne les amendements de qui
+uv run radar cosignatures --par-groupe
+uv run radar courtiers
+
 # Classements
 uv run radar participation --pire
 uv run radar dissidence
@@ -43,8 +50,24 @@ uv run radar rapport --semaine 2026-06-15 --pdf
 Le PDF est produit par reportlab, sans dépendance système : pas besoin
 d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 
-Le notebook [`notebooks/demo.ipynb`](notebooks/demo.ipynb) parcourt l'ensemble
-avec les graphiques.
+## Les notebooks
+
+| Notebook | Ce qu'il établit |
+|---|---|
+| [`01_prise_en_main`](notebooks/01_prise_en_main.ipynb) | La visite guidée : proximités, cohésion, carte, sujets, amendements, alertes. |
+| [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb) | Tous les votes ne se valent pas. L'accord LFI↔SOC passe de 79 % à 63 % selon l'enjeu du scrutin, RN↔DR de 67 % à 86 %. Avec contre-épreuve sur la taille d'échantillon. |
+| [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb) | Voter ensemble n'est pas travailler ensemble. LFI et ECOS votent à 88 % et échangent 0,1 % de leurs cosignatures ; DR et UDDPLR votent à 74 % avec zéro amendement commun. |
+
+Les notebooks 02 et 03 sont écrits en hypothèse → méthode → résultat →
+contre-épreuve, et documentent les biais rencontrés plutôt que de présenter
+seulement les conclusions.
+
+Ils sont **générés**, pas édités à la main :
+
+```bash
+uv run python notebooks/_generer.py
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
+```
 
 ## Les données
 
@@ -54,7 +77,7 @@ avec les graphiques.
 | `scrutins` | un scrutin public par ligne, avec son sort | 8 434 |
 | `votes` | (scrutin × député) → position de vote | 1 270 476 |
 | `positions_groupe` | ligne majoritaire de chaque groupe, **recalculée** | 91 996 |
-| `amendements` | amendements déposés, auteur, sort | 123 224 |
+| `amendements` | amendements déposés, auteur, **cosignataires**, sort | 123 224 |
 | `organes`, `mandats` | groupes, commissions, historique des mandats | — |
 
 Volumes constatés sur la 17ᵉ législature au 11 août 2026. Tout est stocké en
@@ -63,7 +86,30 @@ Parquet dans `data/tables/`, reconstruit par `radar build`.
 Le téléchargement est conditionnel (`If-Modified-Since`) : l'Assemblée republie
 ses archives plusieurs fois par jour, on ne retélécharge que ce qui a changé.
 
-## Trois décisions qui changent les chiffres
+## La portée du scrutin, la décision la plus lourde
+
+86 % des scrutins publics portent sur un **amendement**. Les agréger avec les
+245 votes qui engagent politiquement — vote sur l'ensemble d'un texte, motion de
+censure — revient à mesurer surtout de la tactique parlementaire.
+
+| Paire | Amendements | Vote sur l'ensemble |
+|---|---|---|
+| LFI-NFP ↔ SOC | 79 % | **63 %** |
+| RN ↔ DR | 67 % | **86 %** |
+| EPR ↔ DR | 71 % | **83 %** |
+
+Les deux blocs fonctionnent à l'inverse l'un de l'autre : la gauche se défait
+quand l'enjeu monte, la droite se resserre. Vérifié par rééchantillonnage — ce
+n'est pas un effet de taille d'échantillon (`analyze.test_taille_echantillon`).
+
+```python
+analyze.build_cube(portee="texte")     # les votes qui engagent
+analyze.build_cube(portee="detail")    # la vie des amendements
+```
+
+Détail complet dans [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb).
+
+## Trois autres décisions qui changent les chiffres
 
 **La ligne du groupe est recalculée, pas lue.** L'Assemblée publie un champ
 `positionMajoritaire` par groupe et par scrutin. Il diverge du dépouillement
@@ -109,10 +155,15 @@ src/radar/
     analyze.py    accord, cohésion, dissidence, participation, carte
     topics.py     corpus hebdomadaire et détection des poussées
     alerts.py     détecteurs d'anomalies de la semaine
+    cosign.py     réseau de cosignatures d'amendements
     viz.py        graphiques matplotlib
     pdf.py        rendu PDF du bulletin (reportlab)
     cli.py        interface en ligne de commande
-notebooks/demo.ipynb
+notebooks/
+    _generer.py                  source des trois notebooks
+    01_prise_en_main.ipynb
+    02_portee_des_scrutins.ipynb
+    03_reseau_de_cosignatures.ipynb
 tests/
 ```
 
@@ -153,7 +204,14 @@ législatif (voir ci-dessous) serait plus robuste que l'approche lexicale.
   législature renvoie 404 ; le chemin exact reste à trouver.
 - **Dossiers législatifs.** Rattacher chaque scrutin à son dossier donnerait des
   séries par texte plutôt que par mot-clé — plus robuste que la détection
-  lexicale actuelle.
+  lexicale actuelle, et permettrait de pondérer par l'importance du texte au
+  lieu des trois niveaux de portée actuels.
+- **Modèle de points idéaux** (W-NOMINATE, IDEAL bayésien) à la place de l'ACP :
+  intervalles d'incertitude par député, ligne de coupe par scrutin, test de
+  dimensionnalité. À faire sur les votes de portée `texte`, où le premier axe
+  capte 39 % de la variance contre 24 % sur l'ensemble des scrutins.
+- **Dynamique temporelle.** Tout est statique sur deux ans ; une fenêtre
+  glissante dirait *quand* les alliances se sont nouées ou défaites.
 - **API CIVIX.** Elle expose les mêmes données sous forme d'API REST
   (`https://www.civix.fr/api`). Le radar attaque directement les archives de
   l'Assemblée, ce qui évite toute dépendance à un tiers, mais CIVIX peut être

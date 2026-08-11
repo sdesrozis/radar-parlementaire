@@ -17,7 +17,9 @@ Tables produites dans `data/tables/` :
 
 from __future__ import annotations
 
+import html
 import json
+import re
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -303,6 +305,58 @@ _BUCKETS = {
 }
 
 
+# --------------------------------------------------------------------------
+# Classement des scrutins par portée politique
+# --------------------------------------------------------------------------
+
+#: Motifs appliqués au titre du scrutin, dans l'ordre. Les titres de l'AN
+#: suivent une syntaxe très régulière (« l'ensemble de… », « l'amendement n° … »),
+#: ce qui rend ce classement fiable : 99,7 % des 8 434 scrutins sont reconnus.
+CATEGORIES: tuple[tuple[str, str], ...] = (
+    ("motion_censure", r"^la motion de censure"),
+    ("motion_procedure", r"^la motion de (rejet|renvoi)|^la motion référendaire"),
+    ("ensemble", r"^l.ensemble\b"),
+    ("amendement", r"^(l.|les )(sous.)?amendements?\b|^le sous.amendement"),
+    ("article", r"^(l.|les )articles?\b"),
+    ("declaration", r"^la déclaration|^la demande"),
+)
+
+#: Portée = enjeu politique du vote, en trois niveaux ordonnés.
+#:
+#: C'est *la* dimension à ne pas ignorer. 86 % des scrutins publics portent sur
+#: un amendement : agréger sans distinguer revient à noyer les votes qui
+#: engagent politiquement sous la tactique parlementaire. Mesuré sur la 17ᵉ
+#: législature, l'accord LFI↔SOC passe de 79 % (amendements) à 60 % (votes sur
+#: l'ensemble) et 54 % (scrutins solennels), pendant que RN↔DR monte de 67 % à
+#: 86 %. Ce n'est pas un détail de réglage : c'est un changement de conclusion.
+PORTEES: dict[str, str] = {
+    "motion_censure": "texte",
+    "ensemble": "texte",
+    "motion_procedure": "intermediaire",
+    "article": "intermediaire",
+    "declaration": "intermediaire",
+    "amendement": "detail",
+    "autre": "intermediaire",
+}
+
+#: Ordre croissant d'enjeu, pour trier les tableaux et les graphiques.
+ORDRE_PORTEES = ("detail", "intermediaire", "texte")
+
+
+def _categoriser(titres: pl.Expr) -> pl.Expr:
+    """Attribue une catégorie à chaque scrutin d'après son titre."""
+    expr = pl.lit("autre")
+    # On construit la chaîne à l'envers pour que le premier motif de CATEGORIES
+    # l'emporte, comme dans une cascade de `if`.
+    for nom, motif in reversed(CATEGORIES):
+        expr = (
+            pl.when(titres.str.contains("(?i)" + motif))
+            .then(pl.lit(nom))
+            .otherwise(expr)
+        )
+    return expr
+
+
 def _scrutin_row(s: dict) -> dict:
     dec = dig(s, "syntheseVote", "decompte") or {}
     return {
@@ -358,6 +412,18 @@ def build_scrutins() -> tuple[pl.DataFrame, pl.DataFrame]:
         pl.DataFrame(scrutins, schema=SCRUTIN_SCHEMA)
         .unique(subset="scrutin_uid")
         .with_columns(pl.col("date").str.to_date(strict=False).alias("date_d"))
+        .with_columns(_categoriser(pl.col("titre").fill_null("")).alias("categorie"))
+        .with_columns(
+            pl.col("categorie").replace_strict(PORTEES, default="intermediaire")
+            .alias("portee"),
+            # Contestation : part de la position minoritaire parmi les suffrages
+            # pour/contre. Sert à repérer les votes joués d'avance, qui gonflent
+            # artificiellement l'accord entre tous les députés.
+            (
+                pl.min_horizontal("n_pour", "n_contre")
+                / (pl.col("n_pour") + pl.col("n_contre")).clip(lower_bound=1)
+            ).alias("contestation"),
+        )
         .sort("numero")
     )
     df_v = pl.DataFrame(votes, schema=VOTE_SCHEMA).unique(
@@ -382,7 +448,17 @@ AMENDEMENT_SCHEMA = {
     "auteur_uid": pl.Utf8,
     "auteur_groupe_uid": pl.Utf8,
     "auteur_type": pl.Utf8,
+    # Un amendement déposé au nom d'une commission par son rapporteur. C'est un
+    # acte institutionnel, pas politique : deux co-rapporteurs de groupes
+    # opposés cosignent des dizaines d'amendements rédactionnels sans la moindre
+    # affinité. À écarter de toute analyse d'alliances.
+    "auteur_rapporteur": pl.Boolean,
     "nb_cosignataires": pl.Int64,
+    # La liste, et pas seulement son cardinal : c'est elle qui porte le réseau
+    # d'alliances. Cosigner est un acte volontaire et public, distinct du vote —
+    # on peut voter avec son groupe par discipline, on ne cosigne pas par
+    # discipline.
+    "cosignataires": pl.List(pl.Utf8),
     "division_titre": pl.Utf8,
     "division_article": pl.Utf8,
     "dispositif": pl.Utf8,
@@ -390,20 +466,33 @@ AMENDEMENT_SCHEMA = {
 }
 
 
+_BALISE = re.compile(r"<[^>]+>")
+_ESPACES = re.compile(r"\s+")
+
+
 def _strip_html(x: Any) -> str | None:
+    """Nettoie un champ HTML de l'AN : entités décodées, balises retirées.
+
+    Les exposés sommaires arrivent doublement encodés : `R&#x00E9;dactionnel`
+    plutôt que `Rédactionnel`, dans 99 % des cas. Sans `html.unescape`, la
+    détection de sujets tokenise « dactionnel » et compte des mots qui
+    n'existent pas.
+    """
     v = text(x)
     if v is None:
         return None
-    import re
-
-    return re.sub(r"<[^>]+>", " ", v).replace("&nbsp;", " ").strip() or None
+    v = html.unescape(v)
+    v = _BALISE.sub(" ", v)
+    # Une seconde passe attrape les entités qui étaient elles-mêmes encodées.
+    v = html.unescape(v).replace("\xa0", " ")
+    return _ESPACES.sub(" ", v).strip() or None
 
 
 def _amendement_row(a: dict) -> dict:
     ident = a.get("identification", a)
     auteurs = as_list(dig(a, "signataires", "auteur")) or as_list(a.get("auteur"))
     auteur = auteurs[0] if auteurs else {}
-    cosign = as_list(dig(a, "signataires", "cosignataires", "acteurRef"))
+    cosign = [c for c in (text(x) for x in as_list(dig(a, "signataires", "cosignataires", "acteurRef"))) if c]
     return {
         "amendement_uid": text(a.get("uid")),
         "numero": text(dig(ident, "numeroLong")) or text(dig(ident, "numeroOrdreDepot")),
@@ -417,7 +506,9 @@ def _amendement_row(a: dict) -> dict:
         "auteur_uid": text(auteur.get("acteurRef")),
         "auteur_groupe_uid": text(auteur.get("groupePolitiqueRef")),
         "auteur_type": text(auteur.get("typeAuteur")),
+        "auteur_rapporteur": text(auteur.get("auteurRapporteurOrganeRef")) is not None,
         "nb_cosignataires": len(cosign),
+        "cosignataires": cosign,
         "division_titre": text(dig(a, "pointeurFragmentTexte", "division", "titre")),
         "division_article": text(dig(a, "pointeurFragmentTexte", "division", "articleDesignationCourte")),
         "dispositif": _strip_html(dig(a, "corps", "contenuAuteur", "dispositif")),

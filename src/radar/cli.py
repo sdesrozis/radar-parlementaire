@@ -153,6 +153,71 @@ def dissidence(k: int = typer.Option(15, "-k")) -> None:
     )
 
 
+@app.command()
+def portees(
+    paires: str = typer.Option(
+        "LFI-NFP:SOC,RN:DR,EPR:DR,EPR:SOC",
+        help="Paires de groupes à suivre, séparées par des virgules.",
+    ),
+) -> None:
+    """Compare l'accord entre groupes selon l'enjeu politique du scrutin.
+
+    86 % des scrutins publics portent sur un amendement. Agréger sans distinguer
+    revient à mesurer surtout de la tactique parlementaire.
+    """
+    lot = [tuple(p.split(":")) for p in paires.split(",") if ":" in p]
+    d = analyze.comparer_portees(lot)  # type: ignore[arg-type]
+    _table(
+        d.select("groupe_a", "groupe_b", "portee", "n_scrutins", "accord", "inertie_axe1"),
+        "Accord entre groupes selon l'enjeu du vote",
+        {"accord": "{:.1%}", "inertie_axe1": "{:.1%}"},
+    )
+
+
+@app.command()
+def cosignatures(
+    k: int = typer.Option(15, "-k"),
+    par_groupe: bool = typer.Option(False, help="Vue par groupe plutôt que par binôme."),
+    meme_groupe: bool = typer.Option(False, help="Inclure les binômes d'un même groupe."),
+    max_signataires: int = typer.Option(
+        10, help="Plafond de signataires : au-delà, c'est un dépôt de groupe."
+    ),
+) -> None:
+    """Qui cosigne les amendements de qui — la carte des alliances de travail."""
+    from . import cosign
+
+    reseau = cosign.build_reseau(max_signataires=max_signataires)
+    if par_groupe:
+        d = (
+            cosign.cosignatures_entre_groupes(reseau)
+            .filter(pl.col("part") > 0.005)
+            .sort("part", descending=True)
+            .head(k)
+        )
+        _table(d, "Cosignatures entre groupes", {"part": "{:.1%}", "liens": "{:.0f}"})
+    else:
+        d = cosign.paires_cosignataires(
+            reseau, k=k, inter_groupes=not meme_groupe, min_signatures=10, min_communs=5
+        )
+        _table(d, "Binômes de cosignataires", {"affinite": "{:.1%}"})
+
+
+@app.command()
+def courtiers(
+    k: int = typer.Option(15, "-k"),
+    max_signataires: int = typer.Option(10),
+) -> None:
+    """Députés qui cosignent hors de leur groupe plus que le hasard ne le prédit."""
+    from . import cosign
+
+    reseau = cosign.build_reseau(max_signataires=max_signataires)
+    _table(
+        cosign.courtiers(reseau, k=k),
+        "Courtiers entre groupes",
+        {"part_hors_groupe": "{:.1%}", "part_attendue": "{:.1%}", "ratio": "{:.2f}"},
+    )
+
+
 # --------------------------------------------------------------------------
 # Sujets, amendements, alertes
 # --------------------------------------------------------------------------

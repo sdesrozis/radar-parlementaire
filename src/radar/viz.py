@@ -382,6 +382,150 @@ def barres_emphase(d: pl.DataFrame, valeur: str, etiquette: str, *,
     return ax
 
 
+def pente_portees(comparaison: pl.DataFrame, paires: list[tuple[str, str]],
+                  ax=None, ordre: tuple[str, ...] = ("detail", "intermediaire", "texte")):
+    """Évolution de l'accord entre groupes selon l'enjeu du scrutin.
+
+    Forme choisie : un graphique de pentes. La question n'est pas « quelle est
+    la valeur ? » mais « dans quel sens ça bouge quand l'enjeu monte ? », et la
+    pente répond directement. Une seule teinte par sens de variation : bleu si
+    l'accord monte avec l'enjeu, orange s'il baisse.
+    """
+    ax = ax or plt.subplots(figsize=(8.5, 6))[1]
+    x = np.arange(len(ordre))
+    etiquettes = {"detail": "amendements", "intermediaire": "articles\net motions",
+                  "texte": "vote sur\nl'ensemble"}
+
+    fins, debuts = [], []
+    for a, b in paires:
+        d = comparaison.filter((pl.col("groupe_a") == a) & (pl.col("groupe_b") == b))
+        y = [d.filter(pl.col("portee") == p)["accord"][0] for p in ordre]
+        monte = y[-1] >= y[0]
+        couleur = _theme.accent if monte else _theme.accent_2
+        ax.plot(x, y, "-o", lw=2, ms=7, color=couleur,
+                mec=_theme.surface, mew=1.5, zorder=3)
+        # Séparateur « / » et non « – » : les noms de groupes contiennent déjà
+        # des tirets (« LFI-NFP »), et « LFI-NFP-SOC » ne se découpe pas à l'œil.
+        fins.append((f"{a} / {b}", y[-1]))
+        debuts.append((f"{y[0]:.0%}", y[0]))
+
+    # Les paires arrivent souvent à des valeurs très proches : sans écartement,
+    # deux noms se superposent et aucun des deux n'est lisible.
+    etendue = max(v for _, v in fins) - min(v for _, v in fins)
+    for etiquette, _, yy in _decoller([e for e, _ in fins], np.zeros(len(fins)),
+                                      np.array([v for _, v in fins]),
+                                      ecart_min=max(etendue, 0.1) * 0.075):
+        ax.annotate(f"  {etiquette}", (x[-1], yy), fontsize=9.5, va="center",
+                    color=_theme.texte, fontweight="bold", annotation_clip=False)
+    for etiquette, _, yy in _decoller([e for e, _ in debuts], np.zeros(len(debuts)),
+                                      np.array([v for _, v in debuts]),
+                                      ecart_min=max(etendue, 0.1) * 0.06):
+        ax.annotate(f"{etiquette}  ", (x[0], yy), fontsize=9, va="center",
+                    ha="right", color=_theme.texte_secondaire)
+
+    ax.set_xticks(x, [etiquettes.get(p, p) for p in ordre])
+    ax.set_xlim(-0.55, len(ordre) - 0.32)
+    ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(xmax=1.0, decimals=0))
+    ax.set_ylabel("accord de vote")
+    ax.grid(axis="y", lw=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    _habiller(ax, "L'accord entre groupes dépend de l'enjeu du vote",
+              "bleu : l'accord se renforce quand l'enjeu monte · orange : il se défait")
+    return ax
+
+
+def nuage_vote_vs_cosignature(comparaison: pl.DataFrame, ax=None, k_etiquettes: int = 7):
+    """Confronte proximité de vote et travail commun, paire de groupes par paire.
+
+    Chaque point est une paire de groupes. La diagonale implicite est
+    l'attendu : voter ensemble et cosigner ensemble devraient aller de pair.
+    Les points qui s'en écartent sont l'information — d'où l'étiquetage
+    sélectif des seuls extrêmes, plutôt qu'un nom sur chaque point.
+    """
+    ax = ax or plt.subplots(figsize=(8.5, 6))[1]
+    d = comparaison.filter(pl.col("part_cosignatures").is_not_nan())
+    x = d["accord_vote"].to_numpy()
+    y = d["part_cosignatures"].to_numpy()
+
+    ax.scatter(x, y, s=42, c=_theme.accent, alpha=0.75,
+               edgecolors=_theme.surface, linewidths=1.2, zorder=3)
+
+    # On n'annote pas les 132 paires, seulement les deux histoires du graphique :
+    # les paires qui cosignent le plus, et celles qui votent ensemble sans
+    # jamais rien cosigner. Un nom partout serait illisible et sans propos.
+    cosignent = d.sort("part_cosignatures", descending=True).head(k_etiquettes)
+    votent_sans_cosigner = (
+        d.filter(pl.col("part_cosignatures") < 0.01)
+        .sort("accord_vote", descending=True)
+        .head(k_etiquettes)
+    )
+    choisies = pl.concat([cosignent, votent_sans_cosigner]).unique(
+        subset=["groupe_a", "groupe_b"]
+    )
+
+    etendue = float(y.max() - y.min())
+    noms = [f"{r['groupe_a']} / {r['groupe_b']}" for r in choisies.iter_rows(named=True)]
+    for etiquette, xx, yy in _decoller(
+        noms,
+        choisies["accord_vote"].to_numpy(),
+        choisies["part_cosignatures"].to_numpy(),
+        ecart_min=etendue * 0.045,
+    ):
+        ax.annotate(etiquette, (xx, yy), fontsize=8.5, color=_theme.texte,
+                    xytext=(7, 0), textcoords="offset points", va="center",
+                    path_effects=_contour())
+
+    ax.xaxis.set_major_formatter(mpl.ticker.PercentFormatter(xmax=1.0, decimals=0))
+    ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(xmax=1.0, decimals=0))
+    ax.set_xlabel("accord de vote")
+    ax.set_ylabel("part des cosignatures adressées à l'autre groupe")
+    ax.grid(lw=0.6, alpha=0.5)
+    ax.set_axisbelow(True)
+    _habiller(ax, "Voter ensemble n'est pas travailler ensemble",
+              "chaque point est une paire de groupes · seuls les cas extrêmes sont nommés")
+    return ax
+
+
+def heatmap_cosignatures(parts: pl.DataFrame, ax=None):
+    """Part des cosignatures de chaque groupe adressée à chaque autre groupe.
+
+    Matrice volontairement asymétrique : elle se lit **en ligne**. « 22 % des
+    cosignatures de HOR vont vers EPR » n'est pas la même affirmation que
+    l'inverse, parce que les groupes n'ont ni la même taille ni la même
+    activité.
+    """
+    groupes = sorted(parts["groupe_a"].unique().to_list())
+    m = parts.pivot(values="part", index="groupe_a", on="groupe_b").sort("groupe_a")
+    idx = {g: i for i, g in enumerate(m["groupe_a"].to_list())}
+    M = np.array([[m[b][idx[a]] for b in groupes] for a in groupes], dtype=float)
+
+    ax = ax or plt.subplots(figsize=(7.5, 6.5))[1]
+    im = ax.imshow(M, cmap=_theme.cmap, vmin=0, vmax=np.nanmax(M))
+    ax.set_xticks(range(len(groupes)), groupes, rotation=45, ha="right")
+    ax.set_yticks(range(len(groupes)), groupes)
+    ax.set_xticks(np.arange(len(groupes) + 1) - 0.5, minor=True)
+    ax.set_yticks(np.arange(len(groupes) + 1) - 0.5, minor=True)
+    ax.grid(which="minor", color=_theme.surface, lw=2)
+    ax.tick_params(which="minor", length=0)
+
+    seuil = np.nanmax(M) * 0.55
+    for i in range(len(groupes)):
+        for j in range(len(groupes)):
+            v = M[i, j]
+            if np.isnan(v) or v < 0.005:
+                continue
+            ax.text(j, i, f"{v:.0%}", ha="center", va="center", fontsize=7.5,
+                    color=_theme.surface if v > seuil else _theme.texte_secondaire)
+
+    cb = plt.colorbar(im, ax=ax, fraction=0.043, pad=0.03)
+    cb.outline.set_visible(False)
+    cb.set_label("part des cosignatures", color=_theme.texte_secondaire)
+    ax.set_ylabel("groupe qui cosigne")
+    _habiller(ax, "Avec qui chaque groupe cosigne",
+              "à lire en ligne : part des cosignatures d'un groupe adressée à chaque autre")
+    return ax
+
+
 def profil_depute(cube: VoteCube, proches: pl.DataFrame, nom: str, ax=None):
     """Les députés les plus alignés avec un député donné, groupe indiqué en texte."""
     d = proches.sort("accord")
