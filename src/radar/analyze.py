@@ -352,7 +352,7 @@ def sous_cube(cube: VoteCube, colonnes: np.ndarray) -> VoteCube:
     )
 
 
-def test_taille_echantillon(
+def verifier_taille_echantillon(
     paires_groupes: list[tuple[str, str]],
     *,
     n_tirages: int = 40,

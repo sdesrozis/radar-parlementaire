@@ -53,7 +53,7 @@ de l'Assemblée nationale](https://data.assemblee-nationale.fr) : qui vote avec
 qui, quels groupes se fissurent, quels sujets montent, qui dépose quels
 amendements. C'est la visite guidée, pas une enquête.
 
-Les trois notebooks suivants forment une suite. Chacun montre qu'une réponse
+Les quatre notebooks suivants forment une suite. Chacun montre qu'une réponse
 apparemment solide reposait sur un **choix invisible**, et ce que ça change :
 
 | | Le choix invisible | Ce qu'il change |
@@ -61,9 +61,11 @@ apparemment solide reposait sur un **choix invisible**, et ce que ça change :
 | `02` | la **population** de scrutins retenue | l'accord LFI↔SOC passe de 79 % à 63 % |
 | `03` | la **relation** que l'on mesure | LFI et ECOS votent à 88 % et ne cosignent presque jamais |
 | `04` | la **méthode** elle-même | ce qu'on a le droit d'affirmer |
+| `05` | les **données écartées** | l'abstention est intermédiaire 7 fois sur 10, et décide parfois |
 
 Chacun est écrit en hypothèse → méthode → résultat → contre-épreuve, et
-documente les biais rencontrés plutôt que les seules conclusions.
+documente les biais rencontrés plutôt que les seules conclusions. Le `05`
+corrige d'ailleurs une affirmation du `04` : la suite est faillible, et le dit.
 
 **Avant de lancer ce notebook**, construisez les tables :
 
@@ -540,7 +542,7 @@ on ne conclut rien.
 """)
 
 code("""
-robustesse = analyze.test_taille_echantillon(
+robustesse = analyze.verifier_taille_echantillon(
     [("LFI-NFP", "SOC"), ("RN", "DR"), ("EPR", "DR")], n_tirages=40
 )
 robustesse
@@ -875,8 +877,10 @@ réponse apparemment solide reposait sur un choix invisible :
 | `02` | la **population** de scrutins retenue | l'accord LFI↔SOC passe de 79 % à 63 % |
 | `03` | la **relation** que l'on mesure | LFI et ECOS votent à 88 % et ne cosignent presque jamais |
 | `04` | la **méthode** elle-même | ce qu'on a le droit d'affirmer |
+| `05` | les **données écartées** | l'abstention décide, parfois |
 
-Ce notebook s'attaque au troisième. Il ne s'agit pas de remplacer l'analyse en
+Ce notebook s'attaque au troisième — et laisse au `05` le soin de démentir une
+de ses propres affirmations. Il ne s'agit pas de remplacer l'analyse en
 composantes principales du notebook `01` — elle reste le bon outil pour une
 première carte — mais de comprendre **ce qu'elle ne peut pas dire**, et ce qu'un
 modèle permet d'affirmer en plus.
@@ -1121,7 +1125,7 @@ rien d'autre que « il y a assez de paramètres pour mémoriser ».
 """)
 
 code("""
-dims = ideal.test_dimensionnalite(cube, max_dimensions=3, n_repetitions=3)
+dims = ideal.evaluer_dimensionnalite(cube, max_dimensions=3, n_repetitions=3)
 dims.select("dimensions", "n_parametres", "apre_apprentissage", "apre_test",
             "surajustement", "gain_hors_echantillon")
 """)
@@ -1208,9 +1212,14 @@ l'hémicycle ».
 
 ## 12. Limites
 
-- **Les abstentions sont exclues.** Le modèle est binaire. Traiter une
-  abstention comme un demi-vote supposerait une position médiane, alors qu'en
-  pratique parlementaire c'est souvent un refus de choisir.
+- **Les abstentions sont exclues, et c'est la limite la plus coûteuse.** Le
+  modèle logistique est binaire par construction : il n'a pas de troisième
+  issue à prédire. On a d'abord justifié cette exclusion en avançant qu'une
+  abstention n'était pas une position intermédiaire — le notebook `05` teste
+  cette affirmation et **la dément dans 71 % des scrutins**. La bonne
+  formulation est donc : le modèle ne sait pas représenter l'abstention, alors
+  qu'elle porte de l'information. Un modèle ordonné (pour / abstention /
+  contre) serait le bon outil.
 - **Les positions sont supposées fixes** sur toute la période. Un député qui
   évolue apparaît à une position moyenne qui ne correspond à aucun moment
   réel. Une estimation par fenêtre glissante répondrait à cette objection.
@@ -1230,3 +1239,248 @@ uv run radar dimensions
 """)
 
 ecrire("04_points_ideaux.ipynb")
+
+
+# ==========================================================================
+# 05 — L'abstention
+# ==========================================================================
+
+md("""
+# 5 — L'abstention, ou ce qu'on avait écarté
+
+**Où en est-on.** Chaque notebook de cette suite a mis au jour un choix
+invisible : la population de scrutins (`02`), la relation mesurée (`03`), la
+méthode (`04`). Celui-ci s'attaque au dernier, et au plus embarrassant — **les
+données qu'on a écartées**.
+
+Le notebook `04` exclut les abstentions du modèle de points idéaux, et justifie
+ce choix ainsi : « traiter une abstention comme un demi-vote supposerait qu'elle
+se situe entre le pour et le contre, ce qui est faux en pratique parlementaire ».
+
+C'était une affirmation, pas un résultat. Ce notebook la teste.
+
+**Ce qu'on établit :**
+
+1. l'abstention est une **décision collective** — 79 % des abstentions
+   surviennent quand elle est la ligne du groupe ;
+2. elle est **le plus souvent intermédiaire**, contrairement à ce qu'affirmait
+   le notebook `04` : les abstentionnistes se situent entre les deux camps dans
+   71 % des scrutins, et à mi-chemin en médiane ;
+3. elle **décide parfois** : dix votes sur l'ensemble d'un texte se sont joués
+   sur un écart inférieur au nombre d'abstentions.
+""")
+
+code("""
+import numpy as np
+import polars as pl
+import matplotlib.pyplot as plt
+
+from radar import abstention, analyze, ideal, viz
+
+viz.set_theme("clair")
+pl.Config.set_tbl_rows(20)
+pl.Config.set_fmt_str_lengths(75)
+""")
+
+md("""
+## 1. Combien, et par qui
+
+Premier point de méthode : le dénominateur. On rapporte les abstentions aux
+seuls **suffrages exprimés**, pas à l'effectif de l'Assemblée. Un député absent
+n'est pas un abstentionniste : confondre les deux reviendrait à mélanger
+l'absentéisme, qui relève de l'agenda, avec l'abstention, qui est un acte
+politique.
+""")
+
+code("""
+par_groupe = abstention.taux("groupe")
+viz.barres_abstention(par_groupe)
+plt.show()
+par_groupe
+""")
+
+md("""
+L'écart est considérable : EPR s'abstient six fois moins que le RN. Rien de
+mystérieux — le groupe du gouvernement doit soutenir ses textes, il n'a pas le
+loisir de ne pas choisir. L'abstention est un luxe d'opposition et de groupe
+charnière.
+
+Le taux varie peu selon la portée du scrutin, ce qui est en soi une
+information : l'abstention n'est pas réservée aux votes de détail.
+""")
+
+code("""
+abstention.taux("portee")
+""")
+
+md("""
+## 2. Consigne de groupe, ou écart individuel ?
+
+Une abstention peut signifier deux choses opposées. Soit **le groupe s'abstient**
+et le député suit : c'est une position collective, le refus assumé de trancher.
+Soit **le groupe vote** et le député s'abstient : c'est un écart individuel, une
+façon discrète de ne pas suivre.
+
+On tranche en croisant chaque abstention avec la ligne majoritaire de son
+groupe — recalculée depuis le dépouillement nominatif, comme partout dans le
+radar.
+""")
+
+code("""
+abstention.decomposition()
+""")
+
+md("""
+**Quatre abstentions sur cinq sont des consignes de groupe.** L'abstention n'est
+donc pas, à l'Assemblée, l'expression d'une hésitation individuelle : c'est un
+instrument collectif.
+
+Ce qui amène une question : une consigne d'abstention est-elle aussi suivie
+qu'une consigne de vote ?
+""")
+
+code("""
+abstention.cohesion_par_ligne()
+""")
+
+md("""
+Non, et l'écart est net : environ 96 % de suivi pour une consigne « pour » ou
+« contre », 88 % pour une consigne d'abstention. Une position d'abstention est
+un ordre plus mou — souvent le résultat d'un compromis interne, que les membres
+les plus tranchés du groupe ne suivent pas.
+
+## 3. Le test : l'abstention est-elle intermédiaire ?
+
+Voici le cœur du notebook, et la vérification de l'affirmation du `04`.
+
+**La méthode.** On estime l'axe des points idéaux sur les seuls « pour » et
+« contre ». Les abstentionnistes n'ont donc **pas participé** à la construction
+de cet axe. On les y replace ensuite, scrutin par scrutin, et on regarde où
+tombe leur position médiane par rapport aux deux camps.
+
+C'est un test hors modèle au sens strict : rien de ce qu'on mesure n'a servi à
+fabriquer l'instrument de mesure.
+""")
+
+code("""
+cube = analyze.build_cube(portee="texte")
+modele = ideal.estimer(cube, dimensions=1)     # ajusté sans les abstentions
+
+test = abstention.situer_abstentionnistes(cube, modele)
+abstention.resume_intermediaire(test)
+""")
+
+code("""
+viz.distribution_abstention(test)
+plt.show()
+""")
+
+md("""
+**L'affirmation du notebook `04` était trop catégorique.** La distribution est
+clairement centrée sur le milieu : médiane à 0,52, et les abstentionnistes
+tombent entre les deux camps dans 71 % des scrutins. Dans la majorité des cas,
+l'abstention *est* bien une position intermédiaire.
+
+Mais la queue de distribution donne raison à la prudence initiale : dans près
+d'un tiers des scrutins, les abstentionnistes se collent à un camp ou le
+dépassent. Ce sont les cas où l'abstention n'exprime aucun entre-deux, mais une
+opposition qu'on ne veut pas afficher.
+
+Regardons ces deux régimes de plus près.
+""")
+
+code("""
+(test.filter(pl.col("entre_les_camps"))
+     .sort("position_relative")
+     .with_columns(pl.col("position_relative").round(2))
+     .head(5)
+     .select("date", "n_abstentions", "position_relative", "titre"))
+""")
+
+code("""
+# Les cas où l'abstention n'a rien d'un compromis.
+(test.filter(~pl.col("entre_les_camps"))
+     .sort("position_relative", descending=True)
+     .with_columns(pl.col("position_relative").round(2))
+     .head(5)
+     .select("date", "n_abstentions", "position_relative", "titre"))
+""")
+
+md("""
+**Conséquence pour le modèle.** Faut-il pour autant réintégrer les abstentions
+dans `ideal.estimer` ? Non — mais pour une autre raison que celle avancée dans
+le `04`. Le modèle logistique à deux paramètres est **binaire par construction**
+: il n'a pas de troisième issue à prédire. Les intégrer supposerait un modèle
+ordonné, à seuils, qui est un autre travail.
+
+La bonne formulation de la limite est donc : *le modèle ne sait pas représenter
+l'abstention, alors qu'elle porte de l'information dans environ sept cas sur
+dix.* C'est plus embarrassant que ce que disait le `04`, et plus exact.
+
+## 4. Quand l'abstention décide
+
+Dernier angle, le plus concret. Le critère est arithmétique et vérifiable : si
+le nombre d'abstentions dépasse l'écart entre les deux camps, alors les
+abstentionnistes avaient les moyens d'inverser le résultat.
+
+On ne prétend rien de leurs intentions — seulement qu'ils tenaient l'issue.
+""")
+
+code("""
+bascule = abstention.scrutins_bascule(portee="texte")
+print(f"{bascule.height} votes sur l'ensemble d'un texte où l'abstention tenait l'issue")
+bascule.select("date", "n_pour", "n_contre", "n_abstention", "ecart", "sort_code", "titre")
+""")
+
+md("""
+Le plus serré mérite qu'on s'y arrête : un projet de loi de finances adopté par
+**217 voix contre 213** — quatre voix d'écart — avec **84 abstentions**.
+""")
+
+code("""
+cas = bascule.row(0, named=True)
+print(f"{cas['date']} — {cas['titre'][:110]}")
+print(f"{cas['n_pour']} pour / {cas['n_contre']} contre / {cas['n_abstention']} abstentions\\n")
+
+abstention.qui_s_abstenait(cas["scrutin_uid"]).head(8)
+""")
+
+md("""
+La réponse est sans ambiguïté : le groupe socialiste s'abstient à 59 sur 61, les
+écologistes à 20 sur 23. En votant contre, ils faisaient tomber le texte. En
+s'abstenant, ils l'ont laissé passer sans avoir à le voter.
+
+Aucune analyse de proximité de vote ne fait apparaître cet épisode : dans les
+tables du notebook `01`, ces 59 abstentions comptent comme une position parmi
+trois, ni pour ni contre, et se diluent dans une moyenne.
+
+## 5. Ce qu'il faut retenir
+
+| Question | Réponse |
+|---|---|
+| L'abstention est-elle individuelle ? | Non — 79 % suivent une consigne de groupe. |
+| Une consigne d'abstention est-elle suivie ? | Moins bien : 88 % contre 96 % pour un vote. |
+| Est-elle une position intermédiaire ? | Oui dans 71 % des scrutins, médiane à 0,52. |
+| Faut-il la réintégrer au modèle ? | Pas ainsi : il faudrait un modèle ordonné. |
+| Peut-elle décider ? | Oui — 10 votes d'ensemble tenaient sur elle. |
+
+## 6. Limites
+
+- **Le test de position intermédiaire porte sur 52 scrutins**, ceux où chacun
+  des trois camps compte au moins dix députés. C'est peu, et la queue de
+  distribution repose sur une poignée de cas.
+- **Le critère de bascule est arithmétique, pas politique.** Il dit que les
+  abstentionnistes tenaient l'issue, pas qu'ils l'ont voulue ni négociée.
+- **L'abstention est comparée à un axe estimé sur les votes d'ensemble.** Rien
+  ne garantit que la même lecture vaudrait sur les amendements, qui obéissent à
+  une autre logique — la leçon du notebook `02` reste valable ici.
+
+En ligne de commande :
+
+```bash
+uv run radar abstentions
+uv run radar abstentions --bascule
+```
+""")
+
+ecrire("05_abstention.ipynb")

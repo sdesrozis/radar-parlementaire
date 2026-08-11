@@ -682,6 +682,70 @@ def dimensionnalite(table: pl.DataFrame, ax=None):
     return ax
 
 
+def distribution_abstention(test: pl.DataFrame, ax=None, n_classes: int = 24):
+    """Où se situent les abstentionnistes entre les deux camps, scrutin par scrutin.
+
+    Forme choisie : un histogramme, parce que la question porte sur une
+    **distribution** et non sur un classement. Trois repères la rendent lisible
+    sans légende — 0 et 1 marquent les deux camps, 0,5 le milieu exact.
+
+    Si l'abstention était un compromis, la masse se concentrerait autour de 0,5.
+    Si elle n'était qu'une façon de suivre son camp sans le dire, elle
+    s'accumulerait aux bornes.
+    """
+    ax = ax or plt.subplots(figsize=(8, 4.4))[1]
+    v = test["position_relative"].drop_nulls().drop_nans().to_numpy()
+    v = v[np.isfinite(v)]
+
+    ax.hist(np.clip(v, -0.5, 1.5), bins=n_classes, color=_theme.accent,
+            alpha=0.85, edgecolor=_theme.surface, linewidth=1.2, zorder=3)
+    for x, etiquette in ((0.0, "camp le\nplus proche"), (0.5, "milieu exact"),
+                         (1.0, "camp\nopposé")):
+        ax.axvline(x, ls="--", lw=1.2,
+                   color=_theme.accent_2 if x == 0.5 else _theme.muet, zorder=2)
+        ax.annotate(etiquette, (x, ax.get_ylim()[1]), fontsize=8.5, ha="center",
+                    va="top", color=_theme.texte_secondaire,
+                    xytext=(0, -4), textcoords="offset points",
+                    path_effects=_contour())
+
+    mediane = float(np.median(v))
+    # Les valeurs extrêmes sont ramenées aux bornes pour rester lisibles : il
+    # faut le dire, sinon les deux barres d'extrémité se lisent comme des
+    # concentrations réelles.
+    hors = int((v < -0.5).sum() + (v > 1.5).sum())
+    mention = f" · {hors} scrutins hors cadre, ramenés aux barres extrêmes" if hors else ""
+    ax.set_xlabel("position des abstentionnistes entre les deux camps")
+    ax.set_ylabel("nombre de scrutins")
+    ax.grid(axis="y", lw=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    _habiller(ax, "L'abstention est-elle une position intermédiaire ?",
+              f"médiane à {mediane:.2f} · axe estimé sans les abstentions,"
+              f" elles y sont replacées après coup{mention}")
+    return ax
+
+
+def barres_abstention(taux: pl.DataFrame, ax=None, colonne: str = "groupe"):
+    """Taux d'abstention par groupe. Magnitude ordonnée → rampe séquentielle."""
+    d = taux.sort("taux")
+    ax = ax or plt.subplots(figsize=(8, 0.36 * d.height + 1.8))[1]
+    v = d["taux"].to_numpy()
+    norm = (v - v.min()) / max(np.ptp(v), 1e-9)
+    y = np.arange(d.height)
+
+    ax.barh(y, v, color=_theme.cmap(0.25 + 0.6 * norm), height=0.62)
+    ax.set_yticks(y, d[colonne].to_list())
+    ax.xaxis.set_major_formatter(mpl.ticker.PercentFormatter(xmax=1.0, decimals=0))
+    for i, (val, n) in enumerate(zip(v, d["suffrages_exprimes"])):
+        ax.text(val + max(v) * 0.015, i, f"{val:.1%}   ({n:,} suffrages)".replace(",", " "),
+                va="center", fontsize=8.5, color=_theme.texte_secondaire)
+    ax.set_xlim(0, max(v) * 1.35)
+    ax.grid(axis="x", lw=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    _habiller(ax, "Qui s'abstient",
+              "part des suffrages exprimés — les absents ne sont pas comptés")
+    return ax
+
+
 def profil_depute(cube: VoteCube, proches: pl.DataFrame, nom: str, ax=None):
     """Les députés les plus alignés avec un député donné, groupe indiqué en texte."""
     d = proches.sort("accord")

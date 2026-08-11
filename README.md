@@ -38,6 +38,10 @@ uv run radar positions --incertitude
 uv run radar positions --pivots
 uv run radar dimensions
 
+# L'abstention : consigne de groupe, position intermédiaire, arbitrage
+uv run radar abstentions
+uv run radar abstentions --bascule
+
 # Alliances de travail : qui cosigne les amendements de qui
 uv run radar cosignatures --par-groupe
 uv run radar courtiers
@@ -63,12 +67,15 @@ d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 | [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb) | Tous les votes ne se valent pas. L'accord LFI↔SOC passe de 79 % à 63 % selon l'enjeu du scrutin, RN↔DR de 67 % à 86 %. Avec contre-épreuve sur la taille d'échantillon. |
 | [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb) | Voter ensemble n'est pas travailler ensemble. LFI et ECOS votent à 88 % et échangent 0,1 % de leurs cosignatures ; DR et UDDPLR votent à 74 % avec zéro amendement commun. |
 | [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb) | Décrire ou modéliser. Ce qu'un modèle permet d'affirmer que l'ACP ne permet pas : incertitude, lecture des scrutins, test de dimensionnalité. Deux dimensions se justifient, trois non. |
+| [`05_abstention`](notebooks/05_abstention.ipynb) | Ce qu'on avait écarté. L'abstention est une consigne de groupe dans 79 % des cas, une position intermédiaire dans 71 % des scrutins — et elle a tenu l'issue de dix votes sur l'ensemble d'un texte. |
 
-Les notebooks 02 à 04 forment une suite : chacun montre qu'une réponse
+Les notebooks 02 à 05 forment une suite : chacun montre qu'une réponse
 apparemment solide reposait sur un **choix invisible** — la population de
-scrutins (`02`), la relation mesurée (`03`), la méthode elle-même (`04`). Ils
-sont écrits en hypothèse → méthode → résultat → contre-épreuve, et documentent
-les biais rencontrés plutôt que les seules conclusions.
+scrutins (`02`), la relation mesurée (`03`), la méthode elle-même (`04`), les
+données écartées (`05`). Ils sont écrits en hypothèse → méthode → résultat →
+contre-épreuve, et documentent les biais rencontrés plutôt que les seules
+conclusions. Le `05` corrige d'ailleurs une affirmation du `04` : la suite est
+faillible, et le dit.
 
 Ils sont **générés**, pas édités à la main :
 
@@ -108,7 +115,7 @@ censure — revient à mesurer surtout de la tactique parlementaire.
 
 Les deux blocs fonctionnent à l'inverse l'un de l'autre : la gauche se défait
 quand l'enjeu monte, la droite se resserre. Vérifié par rééchantillonnage — ce
-n'est pas un effet de taille d'échantillon (`analyze.test_taille_echantillon`).
+n'est pas un effet de taille d'échantillon (`analyze.verifier_taille_echantillon`).
 
 ```python
 analyze.build_cube(portee="texte")     # les votes qui engagent
@@ -160,6 +167,25 @@ Les deux méthodes classent les députés de façon quasi identique — corréla
 de Pearson 0,95, de Spearman 0,93. Elles ne se contredisent pas ; elles
 n'autorisent simplement pas les mêmes affirmations. Détail dans [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb).
 
+## L'abstention n'est pas un vote flou
+
+5,8 % des suffrages exprimés, mais 1,6 % pour EPR contre 8,9 % pour UDDPLR :
+s'abstenir est un luxe d'opposition et de groupe charnière, pas une hésitation
+répartie au hasard.
+
+- **79 % des abstentions suivent une consigne de groupe** — c'est un instrument
+  collectif, pas un flottement individuel. Et une consigne d'abstention est
+  moins suivie qu'une consigne de vote : 88 % contre 96 %.
+- **Elle est intermédiaire dans 71 % des scrutins.** Replacés sur l'axe des
+  points idéaux estimé *sans eux*, les abstentionnistes tombent entre les deux
+  camps, à mi-chemin en médiane.
+- **Elle a tenu l'issue de dix votes sur l'ensemble d'un texte** — ceux où le
+  nombre d'abstentions dépasse l'écart entre les camps. Le plus serré : un
+  budget adopté par 217 voix contre 213, avec 84 abstentions, dont 59 du groupe
+  socialiste et 20 des écologistes.
+
+Détail dans [`05_abstention`](notebooks/05_abstention.ipynb).
+
 ## Les couleurs des graphiques
 
 Douze groupes politiques, donc douze couleurs conventionnelles ? Non — et ce
@@ -187,6 +213,7 @@ src/radar/
     alerts.py     détecteurs d'anomalies de la semaine
     cosign.py     réseau de cosignatures d'amendements
     ideal.py      modèle de points idéaux (IRT à deux paramètres)
+    abstention.py l'abstention comme objet d'analyse
     viz.py        graphiques matplotlib
     pdf.py        rendu PDF du bulletin (reportlab)
     cli.py        interface en ligne de commande
@@ -196,6 +223,7 @@ notebooks/
     02_portee_des_scrutins.ipynb
     03_reseau_de_cosignatures.ipynb
     04_points_ideaux.ipynb
+    05_abstention.ipynb
 tests/
 ```
 
@@ -241,10 +269,11 @@ législatif (voir ci-dessous) serait plus robuste que l'approche lexicale.
 - **Dynamique temporelle.** Tout est statique sur deux ans ; une fenêtre
   glissante dirait *quand* les alliances se sont nouées ou défaites, et
   lèverait l'hypothèse de positions fixes du modèle de points idéaux.
-- **Abstentions.** Le modèle de points idéaux les exclut, faute de savoir les
-  situer. Un modèle ordonné (pour / abstention / contre) trancherait — encore
-  faut-il vérifier que l'abstention est bien une position intermédiaire, ce qui
-  n'est pas acquis.
+- **Un modèle ordonné** (pour / abstention / contre) pour réintégrer les
+  abstentions dans le modèle de points idéaux. Le notebook `05` a établi
+  qu'elles sont bien intermédiaires dans 71 % des scrutins : les exclure jette
+  de l'information, et le modèle logistique binaire actuel ne sait pas les
+  représenter.
 - **API CIVIX.** Elle expose les mêmes données sous forme d'API REST
   (`https://www.civix.fr/api`). Le radar attaque directement les archives de
   l'Assemblée, ce qui évite toute dépendance à un tiers, mais CIVIX peut être

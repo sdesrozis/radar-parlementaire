@@ -50,10 +50,20 @@ positions fixées, on ajuste les paramètres de chaque scrutin ; à paramètres 
 scrutins fixés, on ajuste les positions. Les deux étapes sont vectorisées sur
 l'ensemble des scrutins et des députés, ce qui rend le bootstrap abordable.
 
-**Les abstentions sont exclues**, comme dans la littérature : le modèle est
-binaire, et traiter une abstention comme un demi-vote supposerait qu'elle se
-situe entre le pour et le contre, ce qui est faux en pratique parlementaire —
-une abstention est souvent un refus de choisir, pas une position médiane.
+**Les abstentions sont exclues** — c'est la limite la plus coûteuse de ce
+module, et la raison n'est pas celle qu'on croit.
+
+Une première version justifiait cette exclusion en avançant qu'une abstention
+n'est pas une position intermédiaire. Le module `abstention` a testé cette
+affirmation en replaçant les abstentionnistes sur l'axe estimé sans eux : ils
+se situent **entre les deux camps dans 71 % des scrutins**, à mi-chemin en
+médiane. L'affirmation était donc fausse dans la majorité des cas.
+
+La vraie raison est structurelle : le modèle logistique à deux paramètres est
+binaire par construction, il n'a pas de troisième issue à prédire. Représenter
+l'abstention demanderait un modèle ordonné à seuils. En attendant, il faut
+savoir qu'on écarte une position qui porte de l'information — voir le notebook
+`05`.
 """
 
 from __future__ import annotations
@@ -228,7 +238,7 @@ def estimer(
 
     Args:
         dimensions: nombre d'axes. Commencer par 1, puis vérifier avec
-            `test_dimensionnalite()` si un second apporte quelque chose.
+            `evaluer_dimensionnalite()` si un second apporte quelque chose.
         ridge_positions: pénalisation des positions, équivalente à une loi a
             priori normale centrée réduite sur `xᵢ`. La valeur 1 correspond à
             l'échelle sur laquelle les positions sont normalisées.
@@ -461,7 +471,7 @@ def intervalles(
     )
 
 
-def test_dimensionnalite(
+def evaluer_dimensionnalite(
     cube: VoteCube,
     *,
     max_dimensions: int = 3,

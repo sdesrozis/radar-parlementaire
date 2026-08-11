@@ -219,7 +219,7 @@ def dimensions(
     from . import ideal
 
     cube = analyze.build_cube(portee=None if portee == "toutes" else portee)
-    d = ideal.test_dimensionnalite(cube, max_dimensions=max_dimensions)
+    d = ideal.evaluer_dimensionnalite(cube, max_dimensions=max_dimensions)
     _table(
         d.select("dimensions", "n_parametres", "apre_apprentissage", "apre_test",
                  "surajustement", "gain_hors_echantillon"),
@@ -227,6 +227,36 @@ def dimensions(
         {c: "{:.3f}" for c in ("apre_apprentissage", "apre_test", "surajustement",
                                "gain_hors_echantillon")},
     )
+
+
+@app.command()
+def abstentions(
+    k: int = typer.Option(15, "-k"),
+    portee: str | None = typer.Option(None, help="texte, intermediaire ou detail."),
+    bascule: bool = typer.Option(False, "--bascule",
+                                help="Scrutins où l'abstention détenait l'issue."),
+) -> None:
+    """L'abstention : qui s'abstient, sur consigne ou non, et quand elle décide."""
+    from . import abstention as ab
+
+    if bascule:
+        d = ab.scrutins_bascule(portee=portee or "texte", k=k)
+        _table(
+            # Colonnes réduites au strict nécessaire : `rich` répartit la
+            # largeur du terminal entre toutes les colonnes, et une de trop
+            # suffit à hacher les titres en tranches illisibles.
+            d.select(
+                "date", "n_pour", "n_contre", "n_abstention", "ecart",
+                pl.col("titre").str.slice(0, 58) + "…",
+            ),
+            "Scrutins où les abstentionnistes détenaient l'issue",
+        )
+        return
+
+    _table(ab.taux("groupe", portee=portee), "Taux d'abstention par groupe",
+           {"taux": "{:.2%}"})
+    _table(ab.decomposition(portee), "Consigne de groupe ou écart individuel ?",
+           {"part": "{:.1%}"})
 
 
 @app.command()
