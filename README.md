@@ -33,6 +33,11 @@ uv run radar amendements --par-groupe
 # Selon l'enjeu politique du scrutin
 uv run radar portees
 
+# Points idéaux : position estimée de chaque député, avec son incertitude
+uv run radar positions --incertitude
+uv run radar positions --pivots
+uv run radar dimensions
+
 # Alliances de travail : qui cosigne les amendements de qui
 uv run radar cosignatures --par-groupe
 uv run radar courtiers
@@ -57,10 +62,13 @@ d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 | [`01_prise_en_main`](notebooks/01_prise_en_main.ipynb) | La visite guidée : proximités, cohésion, carte, sujets, amendements, alertes. |
 | [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb) | Tous les votes ne se valent pas. L'accord LFI↔SOC passe de 79 % à 63 % selon l'enjeu du scrutin, RN↔DR de 67 % à 86 %. Avec contre-épreuve sur la taille d'échantillon. |
 | [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb) | Voter ensemble n'est pas travailler ensemble. LFI et ECOS votent à 88 % et échangent 0,1 % de leurs cosignatures ; DR et UDDPLR votent à 74 % avec zéro amendement commun. |
+| [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb) | Décrire ou modéliser. Ce qu'un modèle permet d'affirmer que l'ACP ne permet pas : incertitude, lecture des scrutins, test de dimensionnalité. Deux dimensions se justifient, trois non. |
 
-Les notebooks 02 et 03 sont écrits en hypothèse → méthode → résultat →
-contre-épreuve, et documentent les biais rencontrés plutôt que de présenter
-seulement les conclusions.
+Les notebooks 02 à 04 forment une suite : chacun montre qu'une réponse
+apparemment solide reposait sur un **choix invisible** — la population de
+scrutins (`02`), la relation mesurée (`03`), la méthode elle-même (`04`). Ils
+sont écrits en hypothèse → méthode → résultat → contre-épreuve, et documentent
+les biais rencontrés plutôt que les seules conclusions.
 
 Ils sont **générés**, pas édités à la main :
 
@@ -130,6 +138,28 @@ retirer les scrutins antérieurs à l'arrivée du député, ainsi que les non-vo
 structurels (membre du Gouvernement, président de séance) qui ne sont pas des
 absences. D'où la matrice d'éligibilité, construite depuis les dates de mandat.
 
+## Décrire ou modéliser : les deux, pour des usages différents
+
+L'ACP (`analyze.carte_politique`) reste l'outil par défaut pour une carte : elle
+est instantanée, sans réglage, et rien ne peut s'y casser. Le modèle de points
+idéaux (`ideal.estimer`) coûte plus cher et demande un réglage, mais donne trois
+choses que l'ACP ne peut pas donner, parce qu'elle ne modélise rien :
+
+1. **une incertitude par député** — l'intervalle médian fait un dixième de
+   l'étendue de l'axe, de quoi rendre indiscernables des dizaines de députés
+   qu'un classement brut aurait séparés ;
+2. **une lecture de chaque scrutin** — ce vote a-t-il activé le clivage
+   principal, ou l'a-t-il traversé ? ;
+3. **un test du nombre de dimensions**, hors échantillon. Réponse pour la 17ᵉ
+   législature : deux dimensions se justifient, trois non. L'axe 1 oppose LFI au
+   reste, l'axe 2 le RN au reste — deux oppositions systématiques distinctes,
+   qui ne portent pas sur les mêmes textes et ne peuvent donc pas tenir sur une
+   seule ligne.
+
+Les deux méthodes classent les députés de façon quasi identique — corrélation
+de Pearson 0,95, de Spearman 0,93. Elles ne se contredisent pas ; elles
+n'autorisent simplement pas les mêmes affirmations. Détail dans [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb).
+
 ## Les couleurs des graphiques
 
 Douze groupes politiques, donc douze couleurs conventionnelles ? Non — et ce
@@ -156,6 +186,7 @@ src/radar/
     topics.py     corpus hebdomadaire et détection des poussées
     alerts.py     détecteurs d'anomalies de la semaine
     cosign.py     réseau de cosignatures d'amendements
+    ideal.py      modèle de points idéaux (IRT à deux paramètres)
     viz.py        graphiques matplotlib
     pdf.py        rendu PDF du bulletin (reportlab)
     cli.py        interface en ligne de commande
@@ -164,6 +195,7 @@ notebooks/
     01_prise_en_main.ipynb
     02_portee_des_scrutins.ipynb
     03_reseau_de_cosignatures.ipynb
+    04_points_ideaux.ipynb
 tests/
 ```
 
@@ -206,12 +238,13 @@ législatif (voir ci-dessous) serait plus robuste que l'approche lexicale.
   séries par texte plutôt que par mot-clé — plus robuste que la détection
   lexicale actuelle, et permettrait de pondérer par l'importance du texte au
   lieu des trois niveaux de portée actuels.
-- **Modèle de points idéaux** (W-NOMINATE, IDEAL bayésien) à la place de l'ACP :
-  intervalles d'incertitude par député, ligne de coupe par scrutin, test de
-  dimensionnalité. À faire sur les votes de portée `texte`, où le premier axe
-  capte 39 % de la variance contre 24 % sur l'ensemble des scrutins.
 - **Dynamique temporelle.** Tout est statique sur deux ans ; une fenêtre
-  glissante dirait *quand* les alliances se sont nouées ou défaites.
+  glissante dirait *quand* les alliances se sont nouées ou défaites, et
+  lèverait l'hypothèse de positions fixes du modèle de points idéaux.
+- **Abstentions.** Le modèle de points idéaux les exclut, faute de savoir les
+  situer. Un modèle ordonné (pour / abstention / contre) trancherait — encore
+  faut-il vérifier que l'abstention est bien une position intermédiaire, ce qui
+  n'est pas acquis.
 - **API CIVIX.** Elle expose les mêmes données sous forme d'API REST
   (`https://www.civix.fr/api`). Le radar attaque directement les archives de
   l'Assemblée, ce qui évite toute dépendance à un tiers, mais CIVIX peut être

@@ -175,6 +175,61 @@ def portees(
 
 
 @app.command()
+def positions(
+    k: int = typer.Option(15, "-k"),
+    dimensions: int = typer.Option(1, help="Nombre d'axes du modèle."),
+    portee: str = typer.Option("texte", help="texte, intermediaire, detail ou toutes."),
+    pivots_seulement: bool = typer.Option(False, "--pivots", help="Les députés médians."),
+    incertitude: bool = typer.Option(False, "--incertitude", help="Intervalles par bootstrap."),
+) -> None:
+    """Estime les points idéaux : la position de chaque député selon ses votes.
+
+    Complète la carte par ACP en fournissant ce qu'elle ne peut pas donner :
+    une incertitude par député et une lecture scrutin par scrutin.
+    """
+    from . import ideal
+
+    cube = analyze.build_cube(portee=None if portee == "toutes" else portee)
+    if incertitude:
+        d = ideal.intervalles(cube, dimensions=dimensions).head(k)
+        _table(
+            d.select("nom_complet", "groupe", "axe1", "borne_basse", "borne_haute", "largeur"),
+            "Positions estimées et intervalle à 90 %",
+            {c: "{:+.2f}" for c in ("axe1", "borne_basse", "borne_haute", "largeur")},
+        )
+        return
+
+    modele = ideal.estimer(cube, dimensions=dimensions)
+    console.print(
+        f"  {modele.n_votes:,} votes · classification {modele.classification:.1%} "
+        f"· APRE {modele.apre:.3f}\n"
+    )
+    d = ideal.pivots(modele, k) if pivots_seulement else modele.table_deputes().head(k)
+    titre = "Députés pivots" if pivots_seulement else "Positions estimées"
+    _table(d.drop("acteur_uid"), titre, {"axe1": "{:+.2f}", "axe2": "{:+.2f}",
+                                         "distance_mediane": "{:.3f}"})
+
+
+@app.command()
+def dimensions(
+    max_dimensions: int = typer.Option(3, help="Nombre maximal d'axes à tester."),
+    portee: str = typer.Option("texte"),
+) -> None:
+    """Combien d'axes faut-il pour décrire l'Assemblée ? Testé hors échantillon."""
+    from . import ideal
+
+    cube = analyze.build_cube(portee=None if portee == "toutes" else portee)
+    d = ideal.test_dimensionnalite(cube, max_dimensions=max_dimensions)
+    _table(
+        d.select("dimensions", "n_parametres", "apre_apprentissage", "apre_test",
+                 "surajustement", "gain_hors_echantillon"),
+        "Un axe de plus apporte-t-il quelque chose ?",
+        {c: "{:.3f}" for c in ("apre_apprentissage", "apre_test", "surajustement",
+                               "gain_hors_echantillon")},
+    )
+
+
+@app.command()
 def cosignatures(
     k: int = typer.Option(15, "-k"),
     par_groupe: bool = typer.Option(False, help="Vue par groupe plutôt que par binôme."),

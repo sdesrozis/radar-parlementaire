@@ -526,6 +526,162 @@ def heatmap_cosignatures(parts: pl.DataFrame, ax=None):
     return ax
 
 
+def courbe_scrutin(modele, index: int, ax=None, montrer_votes: bool = True):
+    """Courbe caractéristique d'un scrutin : le graphique qui explique le modèle.
+
+    En abscisse, la position estimée des députés. En ordonnée, la probabilité
+    que le modèle leur attribue de voter « pour ». La courbe logistique est le
+    modèle ; les points sont les votes réellement exprimés, posés à 0 ou 1 et
+    légèrement dispersés pour qu'on voie leur densité.
+
+    Tout le modèle se lit ici : **où** la courbe bascule, c'est `α/β` ; **à quel
+    point elle est raide**, c'est `β`. Un scrutin bien discriminant montre une
+    marche d'escalier avec les votes nettement séparés de part et d'autre ; un
+    scrutin transversal montre une courbe molle et des points mélangés.
+    """
+    ax = ax or plt.subplots(figsize=(8, 4.2))[1]
+    x = modele.positions[:, 0]
+    beta = float(modele.discrimination[index, 0])
+    alpha = float(modele.difficulte[index])
+
+    grille = np.linspace(x.min() - 0.3, x.max() + 0.3, 400)
+    ax.plot(grille, 1 / (1 + np.exp(-np.clip(beta * grille - alpha, -35, 35))),
+            lw=2.5, color=_theme.accent, zorder=3)
+
+    if montrer_votes and modele.votes_pour is not None:
+        observe = modele.votes_observes[:, index]
+        y = modele.votes_pour[observe, index].astype(float)
+        # Léger bruit vertical : sans lui, tous les votes se superposent sur
+        # deux traits et on ne voit plus où ils se concentrent.
+        bruit = np.random.default_rng(0).normal(0, 0.022, len(y))
+        ax.scatter(x[observe], y + bruit, s=22, alpha=0.5,
+                   c=_theme.muet, linewidths=0, zorder=2)
+
+    if abs(beta) > 1e-6:
+        bascule = alpha / beta
+        if x.min() - 0.5 < bascule < x.max() + 0.5:
+            ax.axvline(bascule, ls="--", lw=1.2, color=_theme.accent_2, zorder=1)
+            ax.annotate(f"bascule\n{bascule:+.2f}", (bascule, 0.5), fontsize=9,
+                        color=_theme.accent_2, ha="left", va="center",
+                        xytext=(6, 0), textcoords="offset points",
+                        path_effects=_contour())
+
+    ax.set_ylim(-0.12, 1.12)
+    ax.set_yticks([0, 0.5, 1], ["contre", "50 %", "pour"])
+    ax.set_xlabel("position estimée du député (axe 1)")
+    ax.grid(lw=0.6, alpha=0.5)
+    ax.set_axisbelow(True)
+    titre = (modele.scrutins["titre"][index] or "")[:95]
+    _habiller(ax, f"β = {beta:.1f}  ·  plus β est grand, plus la coupure est nette",
+              titre)
+    return ax
+
+
+def positions_par_groupe(table: pl.DataFrame, ax=None, colonne: str = "axe1"):
+    """Distribution des positions estimées, un groupe par ligne.
+
+    Forme choisie plutôt qu'un nuage coloré : avec douze groupes, l'identité est
+    portée par l'axe vertical et ses libellés, jamais par la teinte. On voit
+    d'un coup l'ordre des groupes, leur dispersion interne et leurs
+    recouvrements — trois choses qu'un nuage de points masque.
+    """
+    ordre = (
+        table.group_by("groupe").agg(pl.col(colonne).median().alias("m"))
+        .sort("m")["groupe"].to_list()
+    )
+    ax = ax or plt.subplots(figsize=(8.5, 0.42 * len(ordre) + 1.8))[1]
+    rng = np.random.default_rng(0)
+
+    for i, g in enumerate(ordre):
+        v = table.filter(pl.col("groupe") == g)[colonne].to_numpy()
+        ax.scatter(v, np.full(len(v), i) + rng.normal(0, 0.07, len(v)),
+                   s=16, alpha=0.55, c=_theme.accent, linewidths=0)
+        ax.plot([np.median(v)], [i], "|", ms=22, mew=2.5, color=_theme.texte)
+
+    ax.set_yticks(range(len(ordre)), [f"{g}  ({table.filter(pl.col('groupe') == g).height})"
+                                      for g in ordre])
+    ax.set_xlabel(f"position estimée ({colonne})")
+    ax.grid(axis="x", lw=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    _habiller(ax, "Où siège chaque groupe",
+              "un point par député · le trait vertical marque la médiane du groupe")
+    return ax
+
+
+def intervalles_deputes(table: pl.DataFrame, ax=None, k: int = 25,
+                        extrait: str = "etendue"):
+    """Positions avec leur intervalle de confiance, pour un extrait de députés.
+
+    Le graphique qui justifie le modèle : sans les barres, on lirait un
+    classement ; avec elles, on voit que des députés sont indiscernables les
+    uns des autres.
+
+    Args:
+        extrait: `"etendue"` prélève des députés régulièrement espacés sur tout
+            l'axe — c'est le défaut, parce que prendre simplement les `k`
+            premiers ne montre que l'extrémité d'un seul groupe, où la question
+            du chevauchement ne se pose pas. `"tete"` garde les `k` premiers.
+    """
+    table = table.sort("axe1")
+    if extrait == "etendue" and table.height > k:
+        pas = np.linspace(0, table.height - 1, k).round().astype(int)
+        d = table[np.unique(pas)]
+    else:
+        d = table.head(k)
+    ax = ax or plt.subplots(figsize=(8, 0.32 * len(d) + 1.8))[1]
+    y = np.arange(len(d))
+    basse = d["borne_basse"].to_numpy()
+    haute = d["borne_haute"].to_numpy()
+    centre = d["axe1"].to_numpy()
+
+    ax.hlines(y, basse, haute, lw=2.5, color=_theme.muet, zorder=2)
+    ax.plot(centre, y, "o", ms=7, color=_theme.accent,
+            mec=_theme.surface, mew=1.5, zorder=3)
+    ax.set_yticks(y, [f"{n}  ({g})" for n, g in zip(d["nom_complet"], d["groupe"])])
+    ax.invert_yaxis()
+    ax.set_xlabel("position estimée (axe 1) et intervalle à 90 %")
+    ax.grid(axis="x", lw=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    _habiller(ax, "Une position n'est pas un point, c'est une zone",
+              "les intervalles qui se chevauchent désignent des députés indiscernables")
+    return ax
+
+
+def dimensionnalite(table: pl.DataFrame, ax=None):
+    """Ajustement en apprentissage et hors échantillon, dimension par dimension.
+
+    Deux séries, donc deux teintes validées et une légende — plus des étiquettes
+    directes, l'identité n'étant jamais portée par la seule couleur. L'écart
+    entre les deux courbes *est* le surajustement.
+    """
+    ax = ax or plt.subplots(figsize=(7.5, 4.6))[1]
+    x = table["dimensions"].to_numpy()
+    for colonne, couleur, etiquette in (
+        ("apre_apprentissage", _theme.muet, "en apprentissage"),
+        ("apre_test", _theme.accent, "sur des votes non vus"),
+    ):
+        y = table[colonne].to_numpy()
+        ax.plot(x, y, "-o", lw=2.2, ms=8, color=couleur, mec=_theme.surface,
+                mew=1.5, label=etiquette, zorder=3)
+        ax.annotate(f"  {etiquette}", (x[-1], y[-1]), fontsize=9.5, va="center",
+                    color=_theme.texte, fontweight="bold")
+
+    ax.fill_between(x, table["apre_test"].to_numpy(),
+                    table["apre_apprentissage"].to_numpy(),
+                    color=_theme.accent_2, alpha=0.12, lw=0)
+    ax.set_xticks(x, [str(int(v)) for v in x])
+    ax.set_xlim(x.min() - 0.1, x.max() + 0.75)
+    ax.set_xlabel("nombre de dimensions")
+    ax.set_ylabel("APRE")
+    ax.grid(axis="y", lw=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    # Légende à gauche : les étiquettes directes occupent déjà la droite.
+    ax.legend(frameon=False, loc="upper left")
+    _habiller(ax, "Combien de dimensions ?",
+              "la zone orangée est le surajustement · seul le gain hors échantillon compte")
+    return ax
+
+
 def profil_depute(cube: VoteCube, proches: pl.DataFrame, nom: str, ax=None):
     """Les députés les plus alignés avec un député donné, groupe indiqué en texte."""
     d = proches.sort("accord")
