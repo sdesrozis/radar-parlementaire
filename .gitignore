@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Outils
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# Données : téléchargées et reconstruites par `radar update`
+data/
+
