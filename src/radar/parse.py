@@ -524,28 +524,48 @@ def build_positions_groupe(votes: pl.DataFrame) -> pl.DataFrame:
     constatée). Pour mesurer une dissidence, on veut la position réellement
     majoritaire dans le groupe : on la recompte donc à partir des votes.
 
-    En cas d'égalité parfaite entre deux positions, aucune n'est majoritaire et
-    la ligne est marquée `partage` : le groupe n'avait pas de ligne.
+    La table sort **les trois effectifs** (`n_pour`, `n_contre`,
+    `n_abstention`) en plus de la position dominante, et non le seul nombre de
+    « dissidents ». La raison est qu'avec trois positions possibles, « la plus
+    fréquente » ne veut pas dire « majoritaire » : 7 pour / 5 contre /
+    5 abstentions donne une position dominante à 41 %, ce qui décrit un groupe
+    partagé et non une ligne dont on s'écarterait. C'est à la lecture — donc à
+    `analyze.votes_vs_ligne` et à son seuil — de trancher ; ici on se contente
+    de compter, et de fournir de quoi trancher.
+
+    `part_majoritaire` est la fraction des suffrages du groupe qui portent la
+    position dominante. `partage` signale le cas limite d'une égalité parfaite
+    au sommet, où même la position dominante n'existe pas.
     """
-    compte = (
-        votes.filter(pl.col("position").is_in(["pour", "contre", "abstention"]))
-        .group_by("scrutin_uid", "groupe_uid", "position")
-        .agg(pl.len().alias("n"))
-    )
     return (
-        compte.sort("n", descending=True)
+        votes.filter(pl.col("position").is_in(["pour", "contre", "abstention"]))
         .group_by("scrutin_uid", "groupe_uid")
         .agg(
-            pl.col("position").first().alias("majoritaire"),
-            pl.col("n").first().alias("n_majoritaire"),
-            pl.col("n").sum().alias("votants_groupe"),
-            # Égalité au sommet : le groupe est partagé, pas de ligne majoritaire.
-            (pl.col("n").sort(descending=True).slice(0, 2).n_unique() == 1)
-            .and_(pl.col("n").len() > 1)
-            .alias("partage"),
+            (pl.col("position") == "pour").sum().alias("n_pour"),
+            (pl.col("position") == "contre").sum().alias("n_contre"),
+            (pl.col("position") == "abstention").sum().alias("n_abstention"),
         )
         .with_columns(
-            pl.when(pl.col("partage")).then(None).otherwise(pl.col("majoritaire"))
+            pl.sum_horizontal("n_pour", "n_contre", "n_abstention").alias("votants_groupe"),
+            pl.max_horizontal("n_pour", "n_contre", "n_abstention").alias("n_majoritaire"),
+        )
+        .with_columns(
+            # Égalité au sommet : aucune position ne domine, le groupe est partagé.
+            (
+                (pl.col("n_pour") == pl.col("n_majoritaire")).cast(pl.Int32)
+                + (pl.col("n_contre") == pl.col("n_majoritaire")).cast(pl.Int32)
+                + (pl.col("n_abstention") == pl.col("n_majoritaire")).cast(pl.Int32)
+                > 1
+            ).alias("partage"),
+        )
+        .with_columns(
+            pl.when(pl.col("partage"))
+            .then(None)
+            .when(pl.col("n_pour") == pl.col("n_majoritaire"))
+            .then(pl.lit("pour"))
+            .when(pl.col("n_contre") == pl.col("n_majoritaire"))
+            .then(pl.lit("contre"))
+            .otherwise(pl.lit("abstention"))
             .alias("majoritaire"),
             (pl.col("n_majoritaire") / pl.col("votants_groupe")).alias("part_majoritaire"),
         )

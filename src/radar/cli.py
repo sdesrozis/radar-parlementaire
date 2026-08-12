@@ -316,7 +316,7 @@ def sujets(
 ) -> None:
     """Les sujets dont la fréquence explose cette semaine."""
     d = topics.sujets_qui_montent(semaine=semaine, k=k, source=source)
-    _table(d, "Sujets qui montent", {"moyenne_precedente": "{:.1f}", "score": "{:.1f}"})
+    _table(d, "Sujets qui montent", {"attendu": "{:.1f}", "score": "{:.1f}"})
 
 
 @app.command()

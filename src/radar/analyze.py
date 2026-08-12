@@ -428,15 +428,46 @@ def cohesion_groupes(cube: VoteCube, min_communs: int = 30) -> pl.DataFrame:
     return interne.join(tailles, on="groupe", how="left").sort("cohesion", descending=True)
 
 
+#: Fraction des suffrages d'un groupe qu'une position doit réunir pour qu'on
+#: parle de « ligne ». La majorité absolue est le seuil le moins arbitraire :
+#: en deçà, la position dominante n'est qu'une pluralité et le groupe est
+#: partagé. Voir `votes_vs_ligne`.
+SEUIL_LIGNE = 0.5
+
+
 def votes_vs_ligne(
-    scrutins: pl.DataFrame | None = None, *, min_votants_groupe: int = 5
+    scrutins: pl.DataFrame | None = None,
+    *,
+    min_votants_groupe: int = 5,
+    seuil_ligne: float = SEUIL_LIGNE,
 ) -> pl.DataFrame:
     """Votes exprimés, enrichis d'un booléen `dissident`.
 
     La « ligne du groupe » est la position majoritaire **recalculée** depuis le
-    dépouillement nominatif (voir `parse.build_positions_groupe`). Les scrutins
-    où le groupe s'est partagé à égalité sont exclus : sans ligne majoritaire,
-    parler de dissidence n'a pas de sens.
+    dépouillement nominatif (voir `parse.build_positions_groupe`).
+
+    **Encore faut-il qu'il y ait une ligne.** C'est le piège de cette mesure, et
+    il vient du fait qu'il y a trois positions possibles et non deux : la
+    position la plus fréquente d'un groupe peut ne réunir qu'une minorité de
+    ses suffrages. Un groupe qui vote 7 pour, 5 contre et 5 abstentions a une
+    position dominante à 41 % ; compter les dix autres votes comme
+    « dissidents » revient à traiter un groupe qui n'a pas su se mettre
+    d'accord comme un groupe dont dix membres auraient enfreint une consigne.
+    Ce sont deux situations politiquement opposées.
+
+    D'où `seuil_ligne` : seuls les scrutins où une position réunit plus que
+    cette fraction des suffrages du groupe entrent dans le calcul. Par défaut,
+    la majorité absolue. Sous le seuil, le groupe est **partagé** — ce n'est
+    pas un cas de dissidence, c'est un autre phénomène, qui mérite d'être
+    décrit par ses trois effectifs plutôt que par un taux.
+
+    Args:
+        scrutins: restreint à ces scrutins. Tous par défaut.
+        min_votants_groupe: ignore les groupes ayant trop peu voté sur le
+            scrutin — sur quatre votants, une « ligne » ne veut rien dire.
+        seuil_ligne: fraction minimale des suffrages du groupe pour qu'une
+            position compte comme ligne. `0.0` restitue l'ancien comportement,
+            où toute pluralité faisait ligne.
     """
     votes = load("votes")
     lignes = load("positions_groupe")
@@ -448,6 +479,7 @@ def votes_vs_ligne(
         .filter(
             pl.col("majoritaire").is_not_null()
             & (pl.col("votants_groupe") >= min_votants_groupe)
+            & (pl.col("part_majoritaire") > seuil_ligne)
         )
         .with_columns((pl.col("position") != pl.col("majoritaire")).alias("dissident"))
     )

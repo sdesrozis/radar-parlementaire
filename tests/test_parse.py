@@ -62,6 +62,30 @@ class TestPositionsGroupe:
         assert r["majoritaire"][0] == "pour"
         assert r["partage"][0] is False
 
+    def test_une_pluralite_faible_est_reconnaissable(self):
+        """7/5/5 : « pour » domine, mais à 41 % — ce n'est pas une ligne.
+
+        La table ne tranche pas, elle donne de quoi trancher : c'est
+        `analyze.votes_vs_ligne` et son `seuil_ligne` qui écartent ce cas, pour
+        ne pas compter dix « dissidents » dans un groupe qui n'a pas de ligne.
+        """
+        v = self._votes(
+            [("A", "pour")] * 7 + [("B", "contre")] * 5 + [("C", "abstention")] * 5
+        )
+        r = build_positions_groupe(v)
+        assert r["majoritaire"][0] == "pour"
+        assert r["partage"][0] is False       # pas une égalité parfaite…
+        assert r["part_majoritaire"][0] == pytest.approx(7 / 17)   # …mais 41 %
+        assert r["part_majoritaire"][0] < 0.5
+
+    def test_les_trois_effectifs_sont_publies(self):
+        v = self._votes(
+            [("A", "pour")] * 3 + [("B", "contre")] * 2 + [("C", "abstention")] * 1
+        )
+        r = build_positions_groupe(v)
+        assert (r["n_pour"][0], r["n_contre"][0], r["n_abstention"][0]) == (3, 2, 1)
+        assert r["votants_groupe"][0] == 6
+
     def test_les_non_votants_sont_exclus(self):
         v = self._votes([("A", "pour"), ("B", "nonVotant"), ("C", "nonVotant")])
         r = build_positions_groupe(v)

@@ -19,9 +19,12 @@ import polars as pl
 
 from .parse import load
 
-# Mots vides français, complétés du jargon parlementaire qui sature sinon
-# tous les classements.
-STOPWORDS = frozenset(
+# Trois natures de mots à écarter, séparées parce qu'elles s'écartent pour
+# trois raisons différentes — et que confondre les trois rend la liste
+# impossible à maintenir.
+
+#: 1. Les mots vides ordinaires du français. Ils ne portent aucun sens propre.
+MOTS_VIDES = frozenset(
     """
     a au aux avec ce ces dans de des du elle en et eux il ils je la le les leur
     lui ma mais me meme mes moi mon ne nos notre nous on ou par pas pour qu que
@@ -30,25 +33,55 @@ STOPWORDS = frozenset(
     or ni car si sans sous entre vers chez apres avant pendant depuis jusqu
     lorsque quand comme tout tous toute toutes autre autres meme memes tel telle
     cet cette ceux celle celles dont lequel laquelle lesquels auquel
+    apres avant premier premiere second seconde suivant suivante suivants
+    ii iii iv vi vii viii ix xi xii bis ter quater
+    ont sont avaient etaient soit puisse doivent doit peut peuvent
+    mme mmes mlle collegues annee annees leurs nos numero
+    euros millions milliards montant montants
+    etat etats francais france national nationale nationaux
+    """.split()
+)
+
+#: 2. La langue de la rédaction législative. « Substituer à l'alinéa 3 les mots
+#: … » est la syntaxe obligée de tout amendement : ces mots sont présents
+#: partout, quel que soit le sujet, et ne discriminent donc rien.
+JARGON_LEGISTIQUE = frozenset(
+    """
     amendement amendements article articles alinea alineas rediger redige
     substituer inserer supprimer completer remplacer mots mot phrase phrases
-    apres avant premier premiere second seconde suivant suivante suivants
     present presente code loi lois texte textes projet proposition
-    assemblee nationale gouvernement ministre commission seance
-    lecture lectures ensemble visant visan relatif relative relatifs portant
+    visant visan relatif relative relatifs portant
     instituant modifiant creant tendant permettant favorisant renforcant
     sein egard matiere oeuvre lieu titre unique nouvelle nouveau
     disposition dispositions mesure mesures cas chapitre section
     paragraphe conditions condition application applicable prevu prevue
     vise visee mentionne mentionnee defini definie fixe fixee
-    euros millions milliards montant montants numero nos
-    etat etats francais france national nationale nationaux
-    ii iii iv vi vii viii ix xi xii bis ter quater
-    ont sont avaient etaient soit puisse doivent doit peut peuvent
-    mme mmes mlle collegues identique identiques supprime suppression
-    rectifie rectifiee rect annee annees leurs
+    identique identiques supprime suppression rectifie rectifiee rect
     """.split()
 )
+
+#: 3. Les termes de **procédure**. Ceux-là sont trompeurs d'une autre façon :
+#: ils désignent de vraies choses, mais des étapes du parcours d'un texte, pas
+#: des sujets de politique publique. Une commission mixte paritaire qui se
+#: réunit fait bondir « mixte paritaire » sans que rien ne se soit passé dans
+#: le débat public. La question à laquelle ce module doit répondre est « de
+#: quoi débat-on ? », pas « quelle formule administrative revient le plus ? ».
+#:
+#: Volontairement étroite : on n'y met que ce qui est procédural **sans
+#: ambiguïté**. « Public » n'y figure pas, parce que « service public » et
+#: « fonction publique » sont des sujets ; « vote » non plus, parce que « droit
+#: de vote » en est un.
+TERMES_PROCEDURAUX = frozenset(
+    """
+    assemblee nationale gouvernement ministre commission seance
+    lecture lectures ensemble definitive
+    mixte paritaire rapporteur rapporteurs saisine navette
+    """.split()
+) | {"mixte paritaire", "commission mixte", "nouvelle lecture",
+     "lecture definitive", "premiere lecture", "seconde lecture"}
+
+#: Union des trois : ce que `tokeniser` écarte effectivement.
+STOPWORDS = MOTS_VIDES | JARGON_LEGISTIQUE | TERMES_PROCEDURAUX
 
 
 @lru_cache(maxsize=1)
@@ -83,6 +116,10 @@ def tokeniser(texte: str | None, *, bigrammes: bool = True,
               exclus: frozenset[str] = frozenset()) -> list[str]:
     """Découpe un texte en termes utiles : mots seuls et paires de mots.
 
+    Les paires sont filtrées elles aussi, ce qui permet d'écarter une
+    expression sans écarter ses mots — utile quand seule la locution est
+    parasite.
+
     Args:
         exclus: mots à écarter en plus des mots vides — typiquement les noms de
             députés, cf. `noms_de_deputes()`.
@@ -95,7 +132,10 @@ def tokeniser(texte: str | None, *, bigrammes: bool = True,
     ]
     if not bigrammes:
         return mots
-    paires = [f"{a} {b}" for a, b in zip(mots, mots[1:])]
+    paires = [
+        p for a, b in zip(mots, mots[1:])
+        if (p := f"{a} {b}") not in STOPWORDS
+    ]
     return mots + paires
 
 
@@ -195,13 +235,13 @@ class Poussee:
     terme: str
     semaine: str
     n: int
-    moyenne_precedente: float
+    attendu: float
     score: float
 
     def __str__(self) -> str:
         return (
             f"{self.terme:35s} {self.n:5d} occurrences "
-            f"(habituel : {self.moyenne_precedente:.1f}) — score {self.score:.1f}"
+            f"(attendu : {self.attendu:.1f}) — score {self.score:.1f}"
         )
 
 
@@ -218,9 +258,27 @@ def sujets_qui_montent(
 ) -> pl.DataFrame:
     """Les termes dont l'usage explose par rapport aux semaines précédentes.
 
-    Le score est de type Poisson : `(observé − attendu) / √(attendu + 1)`.
-    Il monte quand un terme dépasse sa moyenne récente, sans faire remonter un
-    terme rare qui passerait de 1 à 3 occurrences.
+    **Le score compare des taux, pas des volumes.** C'est la précaution
+    essentielle, et elle n'est pas cosmétique : le corpus hebdomadaire ne fait
+    pas du tout la même taille d'une semaine à l'autre. Un seul texte peut
+    produire des centaines d'amendements, et une semaine sans séance en produit
+    zéro. Comparer les occurrences brutes d'une semaine chargée à celles d'une
+    semaine creuse revient donc à mesurer le calendrier parlementaire plutôt
+    que le débat — n'importe quel terme banal remonte comme « sujet qui monte »
+    simplement parce qu'il y avait plus de documents à lire.
+
+    On procède en deux temps :
+
+    1. **le taux de référence** — combien de fois le terme apparaît par
+       document, sur les semaines précédentes prises ensemble ;
+    2. **l'attendu** — ce taux multiplié par le nombre de documents de la
+       semaine analysée. C'est le nombre d'occurrences qu'on devrait observer
+       si rien n'avait changé, *à volume de la semaine*.
+
+    Le score est ensuite de type Poisson : `(observé − attendu) / √(attendu + 1)`.
+    Le dénominateur est là parce qu'un comptage fluctue naturellement d'autant
+    plus qu'il est grand : passer de 100 à 130 est banal, passer de 2 à 32 ne
+    l'est pas. Le `+ 1` empêche un terme quasi inédit d'obtenir un score infini.
 
     Args:
         freqs: sortie de `frequences_hebdo()`, recalculée si absente.
@@ -249,31 +307,46 @@ def sujets_qui_montent(
     if not reference:
         raise ValueError("pas assez d'historique pour établir une référence")
 
-    courant = freqs.filter(pl.col("semaine") == cible).select("terme", "n", "n_documents")
+    # Volume documentaire : constant sur toutes les lignes d'une même semaine.
+    documents = (
+        freqs.group_by("semaine")
+        .agg(pl.col("n_documents").first())
+        .to_dict(as_series=False)
+    )
+    par_semaine = dict(zip(documents["semaine"], documents["n_documents"]))
+    docs_reference = sum(par_semaine.get(s, 0) for s in reference)
+    docs_courant = par_semaine.get(cible, 0)
+    if not docs_reference or not docs_courant:
+        raise ValueError("volume documentaire nul : impossible de normaliser")
+
+    courant = freqs.filter(pl.col("semaine") == cible).select("terme", "n")
     base = (
         freqs.filter(pl.col("semaine").is_in(reference))
         .group_by("terme")
         .agg(pl.col("n").sum().alias("total_reference"))
+        # Taux par document sur la période de référence, ramené au volume de la
+        # semaine analysée : voilà ce qu'on devrait voir si rien n'avait bougé.
         .with_columns(
-            (pl.col("total_reference") / len(reference)).alias("moyenne_precedente")
+            (pl.col("total_reference") / docs_reference * docs_courant).alias("attendu")
         )
-        .select("terme", "moyenne_precedente")
+        .select("terme", "attendu")
     )
 
     classe = (
         courant.join(base, on="terme", how="left")
-        .with_columns(pl.col("moyenne_precedente").fill_null(0.0))
+        .with_columns(pl.col("attendu").fill_null(0.0))
         .filter(pl.col("n") >= min_occurrences)
         .with_columns(
-            (
-                (pl.col("n") - pl.col("moyenne_precedente"))
-                / (pl.col("moyenne_precedente") + 1.0).sqrt()
-            ).alias("score")
+            ((pl.col("n") - pl.col("attendu")) / (pl.col("attendu") + 1.0).sqrt())
+            .alias("score")
         )
         .filter(pl.col("score") > 0 if seulement_hausses else pl.lit(True))
-        .with_columns(pl.lit(cible).alias("semaine"))
+        .with_columns(
+            pl.lit(cible).alias("semaine"),
+            pl.lit(docs_courant).alias("n_documents"),
+        )
         .sort("score", descending=True)
-        .select("semaine", "terme", "n", "moyenne_precedente", "score")
+        .select("semaine", "terme", "n", "attendu", "score", "n_documents")
     )
     if fusionner_ngrammes:
         classe = classe.filter(
@@ -281,7 +354,7 @@ def sujets_qui_montent(
                 _masque_redondances(
                     classe["terme"].to_list(),
                     classe["n"].to_list(),
-                    classe["moyenne_precedente"].to_list(),
+                    classe["attendu"].to_list(),
                 )
             )
         )

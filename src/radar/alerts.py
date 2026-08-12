@@ -68,32 +68,87 @@ def votes_serres(semaine: date, *, ecart_max: int = 15) -> list[Alerte]:
     ]
 
 
-def fractures_de_groupe(semaine: date, *, seuil: float = 0.08) -> list[Alerte]:
-    """Scrutins où un groupe s'est nettement divisé."""
+def _groupes_du_scrutin(semaine: date) -> pl.DataFrame:
+    """Effectifs par position, pour chaque groupe et chaque scrutin de la semaine."""
     fin = semaine + timedelta(days=7)
     scrutins = load("scrutins").filter(
         (pl.col("date_d") >= semaine) & (pl.col("date_d") < fin)
     )
-    groupes = load("organes").select(
+    noms = load("organes").select(
         pl.col("organe_uid").alias("groupe_uid"), pl.col("libelle_abrev").alias("groupe")
     )
-    d = (
-        analyze.votes_vs_ligne(scrutins)
+    return (
+        load("positions_groupe")
         .join(scrutins.select("scrutin_uid", "date", "titre"), on="scrutin_uid", how="inner")
-        .join(groupes, on="groupe_uid", how="left")
-        .group_by("scrutin_uid", "date", "titre", "groupe")
-        .agg(pl.len().alias("votants"), pl.col("dissident").sum().alias("dissidents"))
-        .filter(pl.col("votants") >= 15)
-        .with_columns((pl.col("dissidents") / pl.col("votants")).alias("taux"))
+        .join(noms, on="groupe_uid", how="left")
+        .filter(pl.col("votants_groupe") >= 15)
+    )
+
+
+def fractures_de_groupe(semaine: date, *, seuil: float = 0.08) -> list[Alerte]:
+    """Scrutins où des députés se sont écartés d'une **ligne nette** de leur groupe.
+
+    Le détecteur ne se déclenche que si une position réunit la majorité absolue
+    des suffrages du groupe (`analyze.SEUIL_LIGNE`). Sans ce garde-fou, il
+    remontait surtout des groupes sans ligne du tout : le seuil de 8 % de
+    « hors ligne » sélectionne mécaniquement les scrutins les plus éclatés,
+    c'est-à-dire précisément ceux où la position dominante ne domine rien. Ces
+    cas-là sont désormais traités par `groupes_partages`, qui les nomme pour ce
+    qu'ils sont.
+    """
+    d = (
+        _groupes_du_scrutin(semaine)
+        .filter(pl.col("part_majoritaire") > analyze.SEUIL_LIGNE)
+        .with_columns(
+            (pl.col("votants_groupe") - pl.col("n_majoritaire")).alias("dissidents")
+        )
+        .with_columns((pl.col("dissidents") / pl.col("votants_groupe")).alias("taux"))
         .filter(pl.col("taux") >= seuil)
         .sort("taux", descending=True)
     )
     return [
         Alerte(
             categorie="fracture",
-            titre=f"{r['groupe']} divisé : {r['dissidents']}/{r['votants']} votes hors ligne",
-            detail=f"{r['date']} — {(r['titre'] or '')[:180]}",
+            titre=(
+                f"{r['groupe']} : {r['dissidents']}/{r['votants_groupe']} votes "
+                f"s'écartent de la ligne « {r['majoritaire']} »"
+            ),
+            detail=(
+                f"{r['date']} — {r['n_pour']} pour / {r['n_contre']} contre / "
+                f"{r['n_abstention']} abstentions — {(r['titre'] or '')[:160]}"
+            ),
             intensite=min(1.0, r["taux"] / 0.5),
+            donnees={"scrutin_uid": r["scrutin_uid"], "groupe": r["groupe"]},
+        )
+        for r in d.iter_rows(named=True)
+    ]
+
+
+def groupes_partages(semaine: date, *, seuil: float = analyze.SEUIL_LIGNE) -> list[Alerte]:
+    """Scrutins où un groupe n'a **pas** dégagé de position majoritaire.
+
+    À ne pas confondre avec une fracture : personne ne s'écarte d'une consigne
+    ici, il n'y a simplement pas de consigne dégagée. On rapporte donc les trois
+    effectifs et la part de la position dominante, sans parler de dissidence.
+    """
+    d = (
+        _groupes_du_scrutin(semaine)
+        .filter(pl.col("part_majoritaire") <= seuil)
+        .sort("part_majoritaire")
+    )
+    return [
+        Alerte(
+            categorie="groupe partagé",
+            titre=(
+                f"{r['groupe']} sans ligne majoritaire "
+                f"(position dominante à {r['part_majoritaire']:.0%})"
+            ),
+            detail=(
+                f"{r['date']} — {r['n_pour']} pour / {r['n_contre']} contre / "
+                f"{r['n_abstention']} abstentions sur {r['votants_groupe']} votants "
+                f"— {(r['titre'] or '')[:160]}"
+            ),
+            intensite=min(1.0, (seuil - r["part_majoritaire"]) / seuil + 0.5),
             donnees={"scrutin_uid": r["scrutin_uid"], "groupe": r["groupe"]},
         )
         for r in d.iter_rows(named=True)
@@ -115,8 +170,9 @@ def poussees_thematiques(
             categorie="sujet",
             titre=f"« {r['terme']} » en forte hausse",
             detail=(
-                f"{r['n']} occurrences cette semaine, contre "
-                f"{r['moyenne_precedente']:.1f} en moyenne les semaines précédentes"
+                f"{r['n']} occurrences cette semaine, contre {r['attendu']:.1f} "
+                f"attendues au vu des semaines précédentes et des "
+                f"{r['n_documents']} documents de la semaine"
             ),
             intensite=min(1.0, r["score"] / 20.0),
             donnees={"terme": r["terme"], "score": r["score"]},
@@ -222,6 +278,7 @@ def toutes_les_alertes(
     alertes += activite_hebdo(semaine)
     alertes += votes_serres(semaine)
     alertes += fractures_de_groupe(semaine)
+    alertes += groupes_partages(semaine)
     alertes += deputes_en_rupture(cube, semaine)
     if avec_sujets:
         alertes += poussees_thematiques(semaine)

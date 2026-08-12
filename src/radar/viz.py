@@ -212,15 +212,15 @@ def barres_sujets(montants: pl.DataFrame, ax=None, k: int = 15):
 
     ax.barh(y, v, color=_theme.cmap(0.3 + 0.6 * norm), height=0.62)
     ax.set_yticks(y, d["terme"].to_list())
-    ax.set_xlabel("score de poussée   (observé − habituel) / √habituel")
-    for i, (s, n, moy) in enumerate(zip(v, d["n"], d["moyenne_precedente"])):
-        ax.text(s + max(v) * 0.015, i, f"{n} vs {moy:.0f}", va="center", fontsize=8.5,
+    ax.set_xlabel("score de poussée   (observé − attendu) / √attendu")
+    for i, (s, n, att) in enumerate(zip(v, d["n"], d["attendu"])):
+        ax.text(s + max(v) * 0.015, i, f"{n} vs {att:.0f}", va="center", fontsize=8.5,
                 color=_theme.texte_secondaire)
     ax.grid(axis="x", lw=0.6, alpha=0.6)
     ax.set_axisbelow(True)
     semaine = montants["semaine"][0] if montants.height else ""
     _habiller(ax, "Sujets qui montent",
-              f"semaine du {semaine} · occurrences cette semaine vs moyenne des semaines précédentes")
+              f"semaine du {semaine} · observé vs attendu, à volume de documents égal")
     return ax
 
 
