@@ -59,53 +59,38 @@ uv run radar rapport --semaine 2026-06-15 --pdf
 Le PDF est produit par reportlab, sans dépendance système : pas besoin
 d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 
-## Les notebooks
+---
 
-| Notebook | Ce qu'il établit |
-|---|---|
-| [`01_prise_en_main`](notebooks/01_prise_en_main.ipynb) | La visite guidée : proximités, cohésion, carte, sujets, amendements, alertes. |
-| [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb) | Tous les votes ne se valent pas. L'accord LFI↔SOC passe de 79 % à 63 % selon l'enjeu du scrutin, RN↔DR de 67 % à 86 %. Avec contre-épreuve sur la taille d'échantillon. |
-| [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb) | Voter ensemble n'est pas travailler ensemble. LFI et ECOS votent à 88 % et échangent 0,1 % de leurs cosignatures ; DR et UDDPLR votent à 74 % avec zéro amendement commun. |
-| [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb) | Décrire ou modéliser. Ce qu'un modèle permet d'affirmer que l'ACP ne permet pas : incertitude, lecture des scrutins, test de dimensionnalité. Deux dimensions se justifient, trois non. |
-| [`05_abstention`](notebooks/05_abstention.ipynb) | Ce qu'on avait écarté. L'abstention est une consigne de groupe dans 79 % des cas, une position intermédiaire dans 71 % des scrutins — et elle a tenu l'issue de dix votes sur l'ensemble d'un texte. |
+# Comment lire les chiffres
 
-Les notebooks 02 à 05 forment une suite : chacun montre qu'une réponse
-apparemment solide reposait sur un **choix invisible** — la population de
-scrutins (`02`), la relation mesurée (`03`), la méthode elle-même (`04`), les
-données écartées (`05`). Ils sont écrits en hypothèse → méthode → résultat →
-contre-épreuve, et documentent les biais rencontrés plutôt que les seules
-conclusions. Le `05` corrige d'ailleurs une affirmation du `04` : la suite est
-faillible, et le dit.
+Cette partie est le cœur du projet. Chaque mesure repose sur une définition, et
+chaque définition écarte quelque chose. Le but n'est pas de supprimer ces
+choix — c'est impossible — mais de les rendre visibles, chiffrés et
+discutables. On procède partout de la même façon : **la question, le piège, ce
+qu'on fait, ce que ça change.**
 
-Ils sont **générés**, pas édités à la main :
+## 1. La portée du scrutin
 
-```bash
-uv run python notebooks/_generer.py
-uv run jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
-```
+**La question.** « Ces deux groupes votent-ils souvent ensemble ? »
 
-## Les données
+**Le piège.** 86 % des scrutins publics portent sur un **amendement**. Seuls
+245 scrutins engagent vraiment — vote sur l'ensemble d'un texte, motion de
+censure. Un vote sur un sous-amendement est souvent tactique : on approuve un
+aménagement technique sans approuver le texte. Les agréger tous revient donc à
+mesurer surtout de la tactique parlementaire, et une seule loi très amendée
+peut peser plus lourd que deux ans de votes solennels.
 
-| Table | Contenu | Volume |
+**Ce qu'on fait.** Les scrutins sont classés en trois portées par la syntaxe
+très régulière de leurs titres — 99,7 % sont reconnus — et l'accord est
+recalculé séparément sur chacune.
+
+| Portée | Ce que c'est | Nombre |
 |---|---|---|
-| `deputes` | état civil, groupe, circonscription, dates de mandat | 648 |
-| `scrutins` | un scrutin public par ligne, avec son sort | 8 434 |
-| `votes` | (scrutin × député) → position de vote | 1 270 476 |
-| `positions_groupe` | ligne majoritaire de chaque groupe, **recalculée** | 91 996 |
-| `amendements` | amendements déposés, auteur, **cosignataires**, sort | 123 224 |
-| `organes`, `mandats` | groupes, commissions, historique des mandats | — |
+| `detail` | amendements, sous-amendements | 7 216 |
+| `intermediaire` | articles, motions de procédure | 973 |
+| `texte` | ensemble d'un texte, motion de censure | 245 |
 
-Volumes constatés sur la 17ᵉ législature au 11 août 2026. Tout est stocké en
-Parquet dans `data/tables/`, reconstruit par `radar build`.
-
-Le téléchargement est conditionnel (`If-Modified-Since`) : l'Assemblée republie
-ses archives plusieurs fois par jour, on ne retélécharge que ce qui a changé.
-
-## La portée du scrutin, la décision la plus lourde
-
-86 % des scrutins publics portent sur un **amendement**. Les agréger avec les
-245 votes qui engagent politiquement — vote sur l'ensemble d'un texte, motion de
-censure — revient à mesurer surtout de la tactique parlementaire.
+**Ce que ça change.** Beaucoup, et de façon ordonnée avec l'enjeu :
 
 | Paire | Amendements | Vote sur l'ensemble |
 |---|---|---|
@@ -114,26 +99,194 @@ censure — revient à mesurer surtout de la tactique parlementaire.
 | EPR ↔ DR | 71 % | **83 %** |
 
 Les deux blocs fonctionnent à l'inverse l'un de l'autre : la gauche se défait
-quand l'enjeu monte, la droite se resserre. Vérifié par rééchantillonnage — ce
-n'est pas un effet de taille d'échantillon (`analyze.verifier_taille_echantillon`).
+quand l'enjeu monte, la droite se resserre. La part de variance captée par le
+premier axe passe de 24 % à 38 % — autrement dit le clivage politique devient
+bien plus lisible dès qu'on retire les amendements.
+
+**La contre-épreuve.** On pourrait objecter que 245 scrutins contre 7 216, ce
+n'est qu'un effet de taille d'échantillon. On tire donc quarante fois 245
+votes d'amendement au hasard et on recalcule : LFI↔SOC donne 72–87 % sur ces
+tirages, contre 63 % sur les textes. L'écart tombe nettement hors de
+l'étendue ; ce n'est pas du bruit (`analyze.verifier_taille_echantillon`).
 
 ```python
 analyze.build_cube(portee="texte")     # les votes qui engagent
 analyze.build_cube(portee="detail")    # la vie des amendements
 ```
 
-Détail complet dans [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb).
+Détail dans [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb).
 
-## Trois autres décisions qui changent les chiffres
+## 2. La ligne du groupe : trois situations à ne pas confondre
 
-**La ligne du groupe est recalculée, pas lue.** L'Assemblée publie un champ
-`positionMajoritaire` par groupe et par scrutin. Il diverge du dépouillement
-nominatif dans **7,6 %** des cas — c'est une position de consigne, pas la
-position constatée. S'y fier fabrique des dissidents qui n'existent pas : sur
-une semaine test, un groupe apparaissait « divisé à 48 contre 54 » alors que le
-vote réel était quasi unanime. Le radar recompte donc la majorité depuis les
-votes, et marque `partage` les scrutins où le groupe se divise à égalité — sans
-ligne majoritaire, parler de dissidence n'a pas de sens.
+**La question.** « Ce député s'est-il écarté de son groupe ? »
+
+**Le premier piège : lire la ligne au lieu de la compter.** L'Assemblée publie
+un champ `positionMajoritaire` par groupe et par scrutin. Mais c'est une
+position de *consigne*, pas la position *constatée* : elle diverge du
+dépouillement nominatif dans **4,9 %** des couples (groupe × scrutin). S'y
+fier fabrique des dissidents qui n'existent pas — cela doublerait le nombre de
+votes classés « hors ligne » (6,7 % au lieu de 3,1 %) et changerait le verdict
+sur **5,6 %** des votes individuels. Le radar recompte donc la majorité depuis
+les bulletins.
+
+**Le second piège, plus subtil : il n'y a pas toujours de ligne.** Il y a trois
+positions possibles et non deux, donc « la position la plus fréquente » ne veut
+pas dire « la position majoritaire ». Un groupe qui vote **5 pour, 7 contre et
+5 abstentions** a une position dominante à 41 % : les dix autres votes ne sont
+pas des écarts à une consigne, ils sont la preuve qu'aucune consigne ne s'est
+dégagée. Compter dix « dissidents » ici, c'est confondre deux situations
+politiquement opposées :
+
+| Situation | Ce que ça veut dire |
+|---|---|
+| **Ligne nette** — une position > 50 % des suffrages du groupe | le groupe a tranché ; on peut parler d'écart |
+| **Groupe partagé** — position dominante ≤ 50 % | le groupe n'a pas tranché ; personne ne « dissident » |
+| **Dissidence individuelle** — un député s'écarte d'une ligne nette | le seul cas où le mot a un sens |
+
+**Ce qu'on fait.** La table `positions_groupe` publie les **trois effectifs**
+(`n_pour`, `n_contre`, `n_abstention`) et la part de la position dominante, pas
+un simple compte de dissidents. C'est ensuite à la lecture de trancher :
+`analyze.votes_vs_ligne` n'accepte que les scrutins dépassant `SEUIL_LIGNE`, la
+majorité absolue — le seuil le moins arbitraire disponible. Les alertes
+hebdomadaires distinguent en conséquence deux catégories, `fracture` et
+`groupe partagé`, qui ne disent pas du tout la même chose :
+
+```
+[fracture]       SOC : 28/58 votes s'écartent de la ligne « pour »
+                 30 pour / 0 contre / 28 abstentions — protection des mineurs…
+
+[groupe partagé] GDR sans ligne majoritaire (position dominante à 41 %)
+                 5 pour / 7 contre / 5 abstentions sur 17 votants — …
+```
+
+**Ce que ça change.** 1,31 % des couples (groupe × scrutin) sont des groupes
+partagés : peu en volume, mais ils étaient surreprésentés là où ça compte. Un
+détecteur qui cherche les scrutins les plus éclatés sélectionne mécaniquement
+ceux où la position dominante ne domine rien — sur la semaine du 20 juillet
+2026, quatre des alertes de « fracture » les plus fortes étaient en réalité des
+groupes sans ligne. Elles sont désormais nommées pour ce qu'elles sont.
+
+```python
+analyze.votes_vs_ligne()                    # ligne nette seulement (défaut)
+analyze.votes_vs_ligne(seuil_ligne=0.0)     # ancien comportement, pour comparer
+```
+
+## 3. Le lien de cosignature : compter la même chose des deux côtés
+
+**La question.** « Avec qui ce groupe travaille-t-il ? »
+
+**Pourquoi un second réseau, alors qu'on a déjà les votes.** Parce que les deux
+mesurent des choses différentes. Le vote mesure la *discipline* : l'accord
+intra-groupe dépasse 90 % partout, parce que c'est la consigne. La cosignature
+mesure l'*initiative* : personne n'est tenu de cosigner l'amendement d'un
+collègue, et on ne cosigne pas celui d'un adversaire par inadvertance.
+
+**L'unité comptée est le lien** : une paire de députés ayant cosigné un même
+amendement. Un amendement signé par A, B et C crée trois liens — A–B, A–C, B–C.
+
+**Le piège.** La matrice des cosignatures est symétrique : à l'intérieur d'un
+groupe, chaque paire y figure **deux fois**, en (i, j) et en (j, i). Et sa
+diagonale ne contient pas des liens, mais le nombre d'amendements signés par
+chaque député — un nombre énorme, sans rapport. Une version précédente en
+tenait correctement compte au numérateur et pas au dénominateur. Résultat : les
+parts d'un groupe totalisaient **0,40 à 0,80 au lieu de 1**, et le déficit
+variait d'un groupe à l'autre. Les groupes n'étaient donc même pas comparables
+entre eux — ce qui est le seul usage d'une part.
+
+**Ce qu'on fait.** La même convention partout : chaque paire une fois, la
+diagonale jamais. Les parts d'une ligne totalisent 1, et un test le vérifie.
+Chaque part est publiée avec son nombre de liens absolu, parce qu'une part de
+0,3 % sur 59 liens et sur 59 000 ne se lisent pas pareil.
+
+**Ce que ça change.** Les ordres de grandeur restent, les niveaux bougent :
+LFI↔ECOS passe de 0,1 % à **0,3 %** des cosignatures. La conclusion tient
+toujours — deux groupes qui votent à 88 % ensemble n'échangent presque aucun
+travail législatif, et DR↔UDDPLR votent à 74 % avec **zéro** amendement
+commun — mais elle est maintenant chiffrée sur une base cohérente.
+
+**Deux garde-fous supplémentaires**, sans lesquels le réseau ne mesure pas ce
+qu'on croit :
+
+- **les dépôts de groupe entier.** La moitié des amendements portent au moins
+  dix signatures, et le 90ᵉ centile en compte 71 — l'effectif exact du groupe
+  LFI. Ces dépôts collectifs relient mécaniquement tous les membres d'un groupe
+  deux à deux : le réseau finirait par mesurer l'appartenance au groupe. D'où le
+  plafond de signataires, réglé bas par défaut ;
+- **les amendements de rapporteur.** Deux co-rapporteurs d'un même texte
+  cosignent des dizaines d'amendements rédactionnels, quels que soient leurs
+  groupes. Sans filtre, la paire la plus « affine » de l'Assemblée est une
+  députée EPR et une députée LFI qui ont corédigé un texte — 94 amendements
+  communs, pour l'essentiel intitulés « Rédactionnel ». C'est un rôle
+  institutionnel, pas une alliance.
+
+Enfin, l'affinité entre deux députés est mesurée par l'**indice de Jaccard** —
+`communs / (total_A + total_B − communs)` — et non par le compte brut, qui ne
+remonterait que les plus prolifiques.
+
+Détail dans [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb).
+
+## 4. Un sujet qui monte : à volume de documents égal
+
+**La question.** « De quoi débat-on cette semaine ? »
+
+**Le piège.** Le corpus hebdomadaire ne fait pas du tout la même taille d'une
+semaine à l'autre : un seul texte peut produire des centaines d'amendements, et
+une semaine de vacances parlementaires en produit zéro. Comparer les
+occurrences **brutes** d'une semaine chargée à celles d'une semaine creuse
+revient à mesurer le calendrier plutôt que le débat — n'importe quel terme
+banal remonte comme « sujet qui monte » simplement parce qu'il y avait plus de
+texte à lire.
+
+**Ce qu'on fait.** Le score compare des **taux**, en deux temps :
+
+1. **le taux de référence** — combien de fois le terme apparaît *par document*,
+   sur les semaines précédentes prises ensemble ;
+2. **l'attendu** — ce taux multiplié par le nombre de documents de la semaine
+   analysée. C'est ce qu'on devrait observer si rien n'avait changé, *à volume
+   de la semaine*.
+
+Le score est ensuite de type Poisson : `(observé − attendu) / √(attendu + 1)`.
+Le dénominateur est là parce qu'un comptage fluctue d'autant plus qu'il est
+grand — passer de 100 à 130 est banal, passer de 2 à 32 ne l'est pas. Le `+ 1`
+empêche un terme quasi inédit d'obtenir un score infini. La sortie affiche
+`n`, `attendu` et `n_documents` côte à côte, pour qu'on puisse toujours voir
+sur quel volume la comparaison est faite.
+
+**Trois familles de mots sont écartées, pour trois raisons différentes** — et
+les confondre rendait la liste impossible à maintenir :
+
+| Famille | Pourquoi | Exemples |
+|---|---|---|
+| `MOTS_VIDES` | aucun sens propre | de, les, avec, plus |
+| `JARGON_LEGISTIQUE` | syntaxe obligée de tout amendement | alinéa, substituer, rédiger, visant |
+| `TERMES_PROCEDURAUX` | désignent des étapes, pas des sujets | commission, séance, mixte paritaire |
+
+La troisième est la plus intéressante. Ces termes désignent de vraies choses,
+mais des étapes du parcours d'un texte : une commission mixte paritaire qui se
+réunit fait bondir « mixte paritaire » sans que rien ne se soit passé dans le
+débat public. Elle est volontairement **étroite** : « public » n'y figure pas,
+parce que « service public » est un sujet ; « vote » non plus, à cause du
+« droit de vote ».
+
+**Deux nettoyages complètent le dispositif :**
+
+- **les noms de députés sont filtrés** (depuis la table `deputes`) : les titres
+  de scrutins nomment l'auteur, et sans ce filtre un député qui dépose trente
+  amendements dans la semaine devient un « sujet » ;
+- **les n-grammes redondants sont fusionnés** : un texte discuté sur vingt-quatre
+  scrutins fait remonter tous les fragments de son titre avec exactement le même
+  effectif — « corse », « corse autonome », « constitutionnelle corse »… C'est
+  un sujet, pas huit.
+
+**Ce que ça change.** Sur la semaine du 20 juillet 2026, le classement était
+mené par « mixte paritaire » — une procédure. Il l'est maintenant par
+« protection », qui renvoie aux deux textes réellement débattus cette
+semaine-là (protection des mineurs en ligne, protection de l'enfance).
+
+`topics.TERMES_PROCEDURAUX` et ses deux voisines restent le levier de réglage
+principal : si un terme parasite revient, c'est là qu'il se retire.
+
+## 5. Trois dénominateurs qui ne vont pas de soi
 
 **Un absent n'est ni d'accord ni en désaccord.** L'accord entre deux députés est
 calculé sur les seuls scrutins où *les deux* se sont prononcés, et les paires
@@ -145,7 +298,15 @@ retirer les scrutins antérieurs à l'arrivée du député, ainsi que les non-vo
 structurels (membre du Gouvernement, président de séance) qui ne sont pas des
 absences. D'où la matrice d'éligibilité, construite depuis les dates de mandat.
 
-## Décrire ou modéliser : les deux, pour des usages différents
+**Un « courtier » n'est pas celui qui cosigne le plus hors de son groupe.** La
+part brute ne se compare pas d'un député à l'autre : un membre d'un groupe de
+17 a 96 % de l'Assemblée « hors de son groupe », contre 79 % pour un membre
+d'un groupe de 122. Classer sur la part brute revient à classer les groupes par
+petite taille — c'est ce que faisait une première version, dont le palmarès
+était intégralement occupé par le plus petit groupe. On rapporte donc la part
+observée à la part **attendue** sous mélange aléatoire.
+
+## 6. Décrire ou modéliser : les deux, pour des usages différents
 
 L'ACP (`analyze.carte_politique`) reste l'outil par défaut pour une carte : elle
 est instantanée, sans réglage, et rien ne peut s'y casser. Le modèle de points
@@ -165,15 +326,16 @@ choses que l'ACP ne peut pas donner, parce qu'elle ne modélise rien :
 
 Les deux méthodes classent les députés de façon quasi identique — corrélation
 de Pearson 0,95, de Spearman 0,93. Elles ne se contredisent pas ; elles
-n'autorisent simplement pas les mêmes affirmations. Détail dans [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb).
+n'autorisent simplement pas les mêmes affirmations. Détail dans
+[`04_points_ideaux`](notebooks/04_points_ideaux.ipynb).
 
-## L'abstention n'est pas un vote flou
+## 7. L'abstention n'est pas un vote flou
 
-5,8 % des suffrages exprimés, mais 1,6 % pour EPR contre 8,9 % pour UDDPLR :
+5,7 % des suffrages exprimés, mais 1,6 % pour EPR contre 8,9 % pour UDDPLR :
 s'abstenir est un luxe d'opposition et de groupe charnière, pas une hésitation
 répartie au hasard.
 
-- **79 % des abstentions suivent une consigne de groupe** — c'est un instrument
+- **80 % des abstentions suivent une consigne de groupe** — c'est un instrument
   collectif, pas un flottement individuel. Et une consigne d'abstention est
   moins suivie qu'une consigne de vote : 88 % contre 96 %.
 - **Elle est intermédiaire dans 71 % des scrutins.** Replacés sur l'axe des
@@ -186,7 +348,92 @@ répartie au hasard.
 
 Détail dans [`05_abstention`](notebooks/05_abstention.ipynb).
 
-## Les couleurs des graphiques
+---
+
+# Ce que le radar ne mesure pas
+
+Les limites connues, écrites ici pour qu'on n'ait pas à les redécouvrir.
+
+**Le périmètre exact est « scrutins publics et dépôts d'amendements ».** La
+participation aux scrutins ne mesure ni le temps de présence, ni le travail en
+commission, ni le travail en circonscription. Les interventions en séance,
+questions au Gouvernement et rapports ne sont pas couverts.
+
+**15,4 % des suffrages exprimés le sont par délégation.** Le champ
+`par_delegation` est conservé dans la table `votes`, mais aucune analyse ne le
+distingue encore : un vote émis par un collègue mandaté compte comme un vote
+personnel, y compris dans les classements de dissidence individuelle.
+
+**Le groupe affiché est le groupe actuel, pas celui du jour du vote.** La table
+`votes` porte bien `groupe_uid` au moment du scrutin — les lignes de groupe et
+la dissidence sont donc correctes historiquement. Mais les agrégats qui passent
+par `deputes.groupe` (accord entre groupes, cohésion, cosignatures) rattachent
+un vote passé au groupe actuel de son auteur, ce qui concerne 1,5 % des votes.
+Par ailleurs `en_exercice_seulement=True` est le défaut : **71 députés et 4,7 %
+des votes** sont écartés des analyses, y compris de mesures de cohésion qui
+portent justement sur des groupes ayant perdu des membres.
+
+**Les scrutins ne sont pas rattachés à un dossier législatif.** Le champ
+`objet.dossierLegislatif` est nul dans les 8 434 fichiers source : ce n'est pas
+un défaut de parsing, la donnée n'y est pas. Y remédier demande d'ingérer le
+jeu *Dossiers législatifs* de l'Assemblée, ou de rattacher par titre. Les
+amendements, eux, portent déjà `texte_legislatif_uid` à 100 % : une unité
+« texte » est disponible de ce côté-là.
+
+**Compter les amendements ne mesure pas l'influence législative.** Le volume
+favorise la quantité, les dépôts collectifs et parfois l'obstruction. Distinguer
+dépôt, retrait, rejet, adoption et reprise par le Gouvernement reste à faire.
+
+**Les alertes ne tiennent pas compte du calendrier de séance.** Une semaine sans
+séance apparaît « calme » alors qu'il ne s'est simplement rien tenu. Les seuils
+sont fixes et ne corrigent ni la multiplicité des tests, ni la corrélation entre
+les votes d'un même texte.
+
+---
+
+# Les données
+
+| Table | Contenu | Volume |
+|---|---|---|
+| `deputes` | état civil, groupe, circonscription, dates de mandat | 648 |
+| `scrutins` | un scrutin public par ligne, avec son sort et sa portée | 8 434 |
+| `votes` | (scrutin × député) → position, groupe du jour, délégation | 1 270 476 |
+| `positions_groupe` | ligne de chaque groupe, **recalculée**, et ses trois effectifs | 91 996 |
+| `amendements` | amendements déposés, auteur, **cosignataires**, sort | 123 224 |
+| `organes`, `mandats` | groupes, commissions, historique des mandats | — |
+
+Volumes constatés sur la 17ᵉ législature au 11 août 2026. Tout est stocké en
+Parquet dans `data/tables/`, reconstruit par `radar build`.
+
+Le téléchargement est conditionnel (`If-Modified-Since`) : l'Assemblée republie
+ses archives plusieurs fois par jour, on ne retélécharge que ce qui a changé.
+
+# Les notebooks
+
+| Notebook | Ce qu'il établit |
+|---|---|
+| [`01_prise_en_main`](notebooks/01_prise_en_main.ipynb) | La visite guidée : proximités, cohésion, carte, sujets, amendements, alertes. |
+| [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb) | Tous les votes ne se valent pas. L'accord LFI↔SOC passe de 79 % à 63 % selon l'enjeu du scrutin, RN↔DR de 67 % à 86 %. Avec contre-épreuve sur la taille d'échantillon. |
+| [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb) | Voter ensemble n'est pas travailler ensemble. LFI et ECOS votent à 88 % et échangent 0,3 % de leurs cosignatures ; DR et UDDPLR votent à 74 % avec zéro amendement commun. |
+| [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb) | Décrire ou modéliser. Ce qu'un modèle permet d'affirmer que l'ACP ne permet pas : incertitude, lecture des scrutins, test de dimensionnalité. Deux dimensions se justifient, trois non. |
+| [`05_abstention`](notebooks/05_abstention.ipynb) | Ce qu'on avait écarté. L'abstention est une consigne de groupe dans 80 % des cas, une position intermédiaire dans 71 % des scrutins — et elle a tenu l'issue de dix votes sur l'ensemble d'un texte. |
+
+Les notebooks 02 à 05 forment une suite : chacun montre qu'une réponse
+apparemment solide reposait sur un **choix invisible** — la population de
+scrutins (`02`), la relation mesurée (`03`), la méthode elle-même (`04`), les
+données écartées (`05`). Ils sont écrits en hypothèse → méthode → résultat →
+contre-épreuve, et documentent les biais rencontrés plutôt que les seules
+conclusions. Le `05` corrige d'ailleurs une affirmation du `04` : la suite est
+faillible, et le dit.
+
+Ils sont **générés**, pas édités à la main :
+
+```bash
+uv run python notebooks/_generer.py
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
+```
+
+# Les couleurs des graphiques
 
 Douze groupes politiques, donc douze couleurs conventionnelles ? Non — et ce
 n'est pas une question de goût, c'est mesurable. Le rouge de LFI (`#cc2443`) et
@@ -201,14 +448,14 @@ par proximité de vote, petits multiples titrés, étiquettes directes. La palet
 d'accents est validée pour la vision normale et les trois principaux
 daltonismes, en mode clair comme en mode sombre (`viz.set_theme("sombre")`).
 
-## Structure
+# Structure
 
 ```
 src/radar/
     config.py     sources open data, chemins, vocabulaire des positions
     fetch.py      téléchargement conditionnel + décompression
     parse.py      JSON de l'AN → tables Parquet
-    analyze.py    accord, cohésion, dissidence, participation, carte
+    analyze.py    accord, cohésion, ligne de groupe, participation, carte
     topics.py     corpus hebdomadaire et détection des poussées
     alerts.py     détecteurs d'anomalies de la semaine
     cosign.py     réseau de cosignatures d'amendements
@@ -218,7 +465,7 @@ src/radar/
     pdf.py        rendu PDF du bulletin (reportlab)
     cli.py        interface en ligne de commande
 notebooks/
-    _generer.py                  source des trois notebooks
+    _generer.py                  source des cinq notebooks
     01_prise_en_main.ipynb
     02_portee_des_scrutins.ipynb
     03_reseau_de_cosignatures.ipynb
@@ -231,41 +478,27 @@ tests/
 uv run pytest
 ```
 
-## Automatiser
+Les tests ne vérifient pas seulement que le code tourne : chacun **verrouille un
+biais déjà rencontré**, et son docstring dit lequel. Les parts de cosignature
+d'un groupe totalisent 1 ; une pluralité à 41 % ne fait pas ligne ; un député de
+petit groupe ne devient pas « courtier » par la seule taille de son groupe.
+
+# Automatiser
 
 `radar update && radar rapport` en tâche hebdomadaire suffit à alimenter un
 site, une newsletter ou un fil social. Le rapport sort en Markdown avec ses
 figures dans `data/out/`.
 
-## La détection de sujets est lexicale, donc perfectible
-
-Les sujets sont détectés sur les mots des titres de scrutins et des exposés
-sommaires — approche simple, sans modèle, mais qui demande trois garde-fous,
-tous implémentés dans `topics.py` :
-
-- **les noms de députés sont filtrés** (depuis la table `deputes`) : sans cela,
-  un député qui dépose trente amendements dans la semaine remonte comme un
-  « sujet », ce qui dit quelque chose de son activité mais rien du débat ;
-- **les n-grammes redondants sont fusionnés** : un texte discuté sur vingt-quatre
-  scrutins fait remonter tous les fragments de son titre avec le même effectif —
-  « corse », « corse autonome », « constitutionnelle corse »… C'est un sujet, pas
-  huit ;
-- **le jargon parlementaire est en mots vides** : « article », « amendement »,
-  « première lecture », « identiques », « rect. » saturent sinon tout classement.
-
-La liste `topics.STOPWORDS` reste le levier de réglage principal : si un terme
-parasite revient, c'est là qu'il se retire. Rattacher les scrutins à leur dossier
-législatif (voir ci-dessous) serait plus robuste que l'approche lexicale.
-
-## Pistes non couvertes
+# Pistes non couvertes
 
 - **Interventions en séance.** Le compte rendu (dataset *Syceron*) permettrait
   d'ajouter le temps de parole aux classements. L'URL testée pour la 17ᵉ
   législature renvoie 404 ; le chemin exact reste à trouver.
 - **Dossiers législatifs.** Rattacher chaque scrutin à son dossier donnerait des
   séries par texte plutôt que par mot-clé — plus robuste que la détection
-  lexicale actuelle, et permettrait de pondérer par l'importance du texte au
-  lieu des trois niveaux de portée actuels.
+  lexicale, et permettrait de pondérer par l'importance du texte au lieu des
+  trois niveaux de portée actuels. Demande un jeu de données supplémentaire
+  (voir « Ce que le radar ne mesure pas »).
 - **Dynamique temporelle.** Tout est statique sur deux ans ; une fenêtre
   glissante dirait *quand* les alliances se sont nouées ou défaites, et
   lèverait l'hypothèse de positions fixes du modèle de points idéaux.
@@ -279,7 +512,7 @@ législatif (voir ci-dessous) serait plus robuste que l'approche lexicale.
   l'Assemblée, ce qui évite toute dépendance à un tiers, mais CIVIX peut être
   utile pour des requêtes ponctuelles.
 
-## Sources et licence
+# Sources et licence
 
 Données : [open data de l'Assemblée nationale](https://data.assemblee-nationale.fr),
 Licence Ouverte 2.0. Le radar ne modifie pas les données sources ; tous les
