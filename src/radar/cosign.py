@@ -219,32 +219,53 @@ def paires_cosignataires(
 
 
 def cosignatures_entre_groupes(reseau: ReseauCosignatures) -> pl.DataFrame:
-    """Part des cosignatures de chaque groupe qui vont vers chaque autre groupe.
+    """Part des liens de cosignature de chaque groupe qui vont vers chaque autre.
 
-    On raisonne en parts de lignes et non en affinité moyenne : un groupe de 122
-    députés et un groupe de 10 n'ont pas le même potentiel de cosignature, et la
-    part sortante répond directement à « avec qui ce groupe travaille-t-il ? ».
+    **L'unité comptée est le lien**, c'est-à-dire une paire de députés ayant
+    cosigné un même amendement. Un amendement signé par A, B et C crée trois
+    liens : A–B, A–C, B–C.
+
+    Tout l'enjeu est que numérateur et dénominateur comptent la même chose.
+    C'est moins évident qu'il n'y paraît, parce que la matrice `communs` est
+    symétrique : à l'intérieur d'un groupe, chaque paire y figure **deux fois**,
+    en (i, j) et en (j, i), et sa diagonale ne contient pas des liens mais le
+    nombre d'amendements signés par chaque député. Une première version divisait
+    correctement les liens internes par deux au numérateur, mais laissait les
+    doublons et la diagonale dans le dénominateur : les parts d'un groupe
+    totalisaient alors 0,40 à 0,80 au lieu de 1, et le déficit variait d'un
+    groupe à l'autre — donc les groupes n'étaient même pas comparables entre
+    eux.
+
+    Ici la même convention s'applique partout — chaque paire une fois, la
+    diagonale jamais — et les parts d'une ligne totalisent 1. Elles répondent
+    alors vraiment à « sur tout ce que ce groupe cosigne, quelle fraction va
+    vers tel groupe ? ».
+
+    On raisonne en parts et non en affinité moyenne : un groupe de 122 députés
+    et un groupe de 10 n'ont pas le même potentiel de cosignature.
     """
     groupes = reseau.groupes()
     uniques = sorted({g for g in groupes if g})
     idx = {g: np.array([i for i, x in enumerate(groupes) if x == g]) for g in uniques}
 
-    lignes = []
+    liens: dict[tuple[str, str], float] = {}
     for a in uniques:
-        bloc_total = reseau.communs[idx[a], :].sum()
         for b in uniques:
             bloc = reseau.communs[np.ix_(idx[a], idx[b])]
-            if a == b:
-                # Ne pas compter deux fois les liens internes, ni la diagonale.
-                total = (bloc.sum() - np.trace(bloc)) / 2
-            else:
-                total = bloc.sum()
+            liens[(a, b)] = (
+                (bloc.sum() - np.trace(bloc)) / 2 if a == b else float(bloc.sum())
+            )
+
+    lignes = []
+    for a in uniques:
+        total = sum(liens[(a, b)] for b in uniques)
+        for b in uniques:
             lignes.append(
                 {
                     "groupe_a": a,
                     "groupe_b": b,
-                    "liens": float(total),
-                    "part": float(total / bloc_total) if bloc_total else float("nan"),
+                    "liens": float(liens[(a, b)]),
+                    "part": float(liens[(a, b)] / total) if total else float("nan"),
                 }
             )
     return pl.DataFrame(lignes)

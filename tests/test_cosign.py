@@ -8,7 +8,12 @@ import numpy as np
 import polars as pl
 import pytest
 
-from radar.cosign import ReseauCosignatures, courtiers, paires_cosignataires
+from radar.cosign import (
+    ReseauCosignatures,
+    cosignatures_entre_groupes,
+    courtiers,
+    paires_cosignataires,
+)
 from radar.parse import _strip_html
 
 
@@ -97,6 +102,47 @@ class TestCourtiers:
         )
         d = courtiers(r, k=10, min_signatures=1)
         assert "NI" not in d["groupe"].to_list()
+
+
+class TestPartsEntreGroupes:
+    """Une part qui n'est pas une part déforme toutes les comparaisons.
+
+    La matrice `communs` est symétrique et sa diagonale porte le nombre
+    d'amendements signés par chaque député, pas des liens. Une première version
+    en tenait compte au numérateur et pas au dénominateur : les parts d'un
+    groupe totalisaient 0,40 à 0,80, avec un déficit variable d'un groupe à
+    l'autre.
+    """
+
+    def test_les_parts_d_un_groupe_totalisent_un(self):
+        parts = cosignatures_entre_groupes(reseau_jouet())
+        sommes = parts.group_by("groupe_a").agg(pl.col("part").sum())
+        assert all(s == pytest.approx(1.0) for s in sommes["part"])
+
+    def test_le_lien_interne_compte_une_fois(self):
+        # G1 = {A, B, C} : liens internes A–B (80), A–C (10), B–C (10) = 100.
+        parts = cosignatures_entre_groupes(reseau_jouet())
+        interne = parts.filter(
+            (pl.col("groupe_a") == "G1") & (pl.col("groupe_b") == "G1")
+        )
+        assert interne["liens"][0] == pytest.approx(100.0)
+
+    def test_le_lien_externe_compte_une_fois(self):
+        # G1 → G2 : A–D (5), B–D (5), C–D (2) = 12.
+        parts = cosignatures_entre_groupes(reseau_jouet())
+        externe = parts.filter(
+            (pl.col("groupe_a") == "G1") & (pl.col("groupe_b") == "G2")
+        )
+        assert externe["liens"][0] == pytest.approx(12.0)
+        assert externe["part"][0] == pytest.approx(12 / 112)
+
+    def test_la_diagonale_n_est_jamais_comptee(self):
+        # Gonfler la diagonale (amendements signés seul) ne doit rien changer.
+        r = reseau_jouet()
+        avant = cosignatures_entre_groupes(r)["part"].to_list()
+        r.communs = r.communs.copy()
+        np.fill_diagonal(r.communs, 10_000)
+        assert cosignatures_entre_groupes(r)["part"].to_list() == pytest.approx(avant)
 
 
 class TestPaires:
