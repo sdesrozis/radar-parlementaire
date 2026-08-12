@@ -444,6 +444,47 @@ def rapport(
 
 
 @app.command()
+def site(
+    port: int = typer.Option(8000, help="Port d'écoute."),
+    host: str = typer.Option("127.0.0.1", help="Adresse d'écoute. Locale par défaut."),
+    ouvrir: bool = typer.Option(True, help="Ouvrir le navigateur au démarrage."),
+    bootstrap: int = typer.Option(
+        40, help="Rééchantillonnages pour l'intervalle des positions. 0 = pas d'intervalle."
+    ),
+    journal: bool = typer.Option(False, help="Journaliser chaque requête HTTP."),
+) -> None:
+    """Sert un site local : fiche par député, scrutins, statistiques.
+
+    Tout est calculé au démarrage, puis servi depuis la mémoire. L'écoute est
+    locale : le site n'est pas exposé au réseau sauf `--host` explicite.
+    """
+    import webbrowser
+
+    from .site import Donnees, servir
+
+    with console.status("[dim]calcul des données…[/dim]") as etat:
+        donnees = Donnees.construire(
+            bootstrap=bootstrap,
+            journal=lambda quoi: etat.update(f"[dim]{quoi}…[/dim]"),
+        )
+
+    serveur = servir(donnees, host=host, port=port, silencieux=not journal)
+    url = f"http://{host}:{port}/"
+    console.print(
+        f"  {donnees.deputes.height} députés, {donnees.scrutins.height} scrutins\n"
+        f"  → [link={url}]{url}[/link]   (Ctrl+C pour arrêter)"
+    )
+    if ouvrir:
+        webbrowser.open(url)
+    try:
+        serveur.serve_forever()
+    except KeyboardInterrupt:
+        console.print("  arrêt.")
+    finally:
+        serveur.server_close()
+
+
+@app.command()
 def info() -> None:
     """État des tables construites."""
     t = Table(title="Tables du radar", title_justify="left", header_style="bold")

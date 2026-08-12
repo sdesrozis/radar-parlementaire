@@ -54,10 +54,44 @@ uv run radar dissidence
 uv run radar rapport                         # Markdown + figures PNG
 uv run radar rapport --pdf                   # et la version PDF
 uv run radar rapport --semaine 2026-06-15 --pdf
+
+# Le site local : une fiche par député, ses votes, les scrutins
+uv run radar site                            # http://127.0.0.1:8000
 ```
 
 Le PDF est produit par reportlab, sans dépendance système : pas besoin
 d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
+
+## Le site local
+
+`radar site` calcule tout au démarrage — une douzaine de secondes — puis sert
+depuis la mémoire, avec le serveur de la bibliothèque standard : pas de
+dépendance web, pas de base de données, rien qui écoute au-delà de la machine
+sauf `--host` explicite.
+
+```bash
+uv run radar site --port 8000 --bootstrap 40   # 0 : démarrage plus rapide, positions sans intervalle
+```
+
+Quatre vues : **les députés** (liste triable, participation, dissidence,
+position estimée), **la fiche** d'un député, **les scrutins** avec le
+dépouillement nominatif groupe par groupe, **les groupes** avec leur cohésion et
+l'étendue interne des positions. Une cinquième page, *Méthode*, dit ce que
+chaque chiffre écarte.
+
+La fiche affiche systématiquement ce que la ligne de commande fait afficher à la
+demande : le taux avec son dénominateur, la position avec son intervalle, et
+surtout **la proximité de vote en double** — sur les 8 434 scrutins d'un côté,
+sur les 245 votes qui engagent de l'autre. C'est là que le radar sert à quelque
+chose : un binôme peut être à 96 % d'accord dans la première colonne et
+nettement moins dans la seconde, et cet écart est plus informatif que chacun des
+deux nombres.
+
+Une page web donne à un chiffre une autorité que sa définition ne lui donne pas.
+Le site est construit contre ce biais : rien n'y est affiché sans son
+dénominateur, et les votes d'un groupe partagé — aucune position au-dessus de la
+moitié des suffrages — sont marqués comme tels au lieu d'être comptés comme de
+la dissidence.
 
 ---
 
@@ -463,6 +497,8 @@ src/radar/
     abstention.py l'abstention comme objet d'analyse
     viz.py        graphiques matplotlib
     pdf.py        rendu PDF du bulletin (reportlab)
+    site.py       site local : API JSON + serveur de la bibliothèque standard
+    web/          la page unique servie par `radar site` (HTML, CSS, JS)
     cli.py        interface en ligne de commande
 notebooks/
     _generer.py                  source des cinq notebooks
