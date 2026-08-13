@@ -28,9 +28,10 @@
       <p>Un tableau de {{N_DEPUTES}} sur {{N_DEPUTES}}, cela fait {{PAIRES}} cases.
         Aucune ne peut porter d'étiquette&nbsp;: elles sont trop petites. C'est
         justement l'intérêt — <b>on ne regarde plus des députés, on regarde une
-        forme</b>. Survolez une case pour retrouver les deux noms, leur taux
-        d'accord et, comme partout sur ce site, le nombre de scrutins sur lequel
-        il a été calculé.</p>
+        forme</b>. Pour retrouver une paire précise, <b>nommez les deux
+        députés</b> plutôt que de viser une case&nbsp;: le taux d'accord
+        s'affiche avec, comme partout sur ce site, le nombre de scrutins sur
+        lequel il a été calculé.</p>
 
       <p class="jalon">Ce qui compte le plus</p>
       <h2>L'ordre des lignes n'a pas été choisi par nous</h2>
@@ -58,23 +59,68 @@
       <p class="provenance carte-etat" id="carte-etat">{{LEGENDE_ORDRE}}</p>
     </div>
 
+    <!-- ══ COMPARER DEUX DÉPUTÉS ═══════════════════════════════════
+         Le tableau ne s'explorait qu'au survol : ni le clavier, ni un écran
+         tactile n'y donnaient accès, et sur un téléphone il aurait fallu viser
+         une case de 574ᵉ de largeur. Ces deux champs sont le même outil que la
+         matrice, par un autre chemin — on y nomme la paire au lieu de la
+         pointer, et la case correspondante s'allume dans le tableau.
+         ══════════════════════════════════════════════════════════════ -->
+    <div class="carte-duo">
+      <div class="carte-choix" data-cote="a">
+        <label class="jalon" for="paire-a">Premier député</label>
+        <div class="champ champ-mince">
+          <input type="search" id="paire-a" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-expanded="false" aria-autocomplete="list"
+                 aria-controls="liste-a" placeholder="Chercher un nom…">
+          <button class="effacer" type="button" hidden>effacer</button>
+        </div>
+        <ul class="carte-suggestions" id="liste-a" role="listbox" hidden></ul>
+      </div>
+      <div class="carte-choix" data-cote="b">
+        <label class="jalon" for="paire-b">Second député</label>
+        <div class="champ champ-mince">
+          <input type="search" id="paire-b" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-expanded="false" aria-autocomplete="list"
+                 aria-controls="liste-b" placeholder="Chercher un nom…">
+          <button class="effacer" type="button" hidden>effacer</button>
+        </div>
+        <ul class="carte-suggestions" id="liste-b" role="listbox" hidden></ul>
+      </div>
+    </div>
+
     <div class="carte-scene">
       <div class="carte-toile">
+        <!-- `tabindex` et non `role="img"` seul : la matrice est un contrôle,
+             on s'y déplace aux flèches et on épingle une paire par Entrée. -->
         <canvas id="carte" width="{{N_DEPUTES}}" height="{{N_DEPUTES}}"
-                role="img" aria-label="{{ALT_MATRICE}}"></canvas>
+                tabindex="0" role="application"
+                aria-describedby="carte-mode-emploi"
+                aria-label="{{ALT_MATRICE}}"></canvas>
         <div class="carte-viseur" hidden></div>
       </div>
 
-      <aside class="carte-lecture" id="carte-lecture">
-        <p class="carte-invite">Survolez le tableau.</p>
+      <aside class="carte-lecture" id="carte-lecture" aria-live="polite">
+        <p class="carte-invite">Survolez le tableau, ou touchez une case&nbsp;;
+          au clavier, les flèches déplacent le viseur et Entrée épingle la paire.
+          Les deux champs ci-dessus font la même chose par le nom.</p>
         <div class="carte-paire" hidden>
           <p class="carte-nom carte-nom-a"></p>
           <p class="carte-nom carte-nom-b"></p>
           <p class="carte-taux"></p>
           <p class="provenance carte-denominateur"></p>
+          <p class="carte-epingle" hidden>
+            <span class="etiquette-epingle">paire épinglée</span>
+            <button type="button" class="lien-nu" id="carte-detacher">détacher</button>
+          </p>
         </div>
       </aside>
     </div>
+
+    <p class="visuellement-cache" id="carte-mode-emploi">
+      Tableau des accords entre députés. Flèches pour déplacer le viseur,
+      Majuscule et flèches pour avancer de dix, Entrée pour épingler la paire.
+    </p>
 
     <!-- L'échelle commence à la plus faible valeur observée, pas à zéro, et le
          dit : une échelle tronquée muette est un mensonge par cadrage. -->
@@ -134,10 +180,21 @@
       </div>
     </div>
 
+    <!-- Il n'existe pas « un » accord entre deux groupes : il en existe deux,
+         selon ce qu'on donne le même poids. Le tableau les publie tous les
+         deux plutôt que d'en choisir un en silence. -->
+    <div class="bascules bascules-convention" role="group" aria-label="Convention de calcul">
+      <button type="button" data-convention="paires" aria-pressed="true">Moyenne des paires</button>
+      <button type="button" data-convention="agregee" aria-pressed="false">Sur tous les votes communs</button>
+    </div>
+
     <div class="tableau-defile">
-      <table class="matrice-groupes">
-        <caption class="provenance">Part des scrutins où deux députés de ces
-          groupes votent pareil, en moyenne sur toutes les paires possibles.</caption>
+      <table class="matrice-groupes" id="matrice-groupes">
+        <caption class="provenance" id="legende-convention">Part des scrutins où
+          deux députés de ces groupes votent pareil, <b>en moyenne sur toutes les
+          paires</b>&nbsp;: chaque binôme compte pour un, quel que soit le nombre
+          de scrutins où il a été mesuré. Survolez une case pour son nombre de
+          paires et de scrutins communs.</caption>
         <thead>
           <tr><th scope="col"><span class="visuellement-cache">Groupe</span></th>{{ENTETES_GROUPES}}</tr>
         </thead>
@@ -146,6 +203,23 @@
         </tbody>
       </table>
     </div>
+
+    <details class="piege">
+      <summary>Les deux façons de calculer cette case, et leurs {{ECART_CONVENTIONS}} points d'écart</summary>
+      <p><b>La moyenne des paires</b> donne le même poids à chaque binôme. Elle
+        répond à «&nbsp;deux députés pris au hasard dans ces deux groupes votent-ils
+        pareil&nbsp;?&nbsp;» Un député entré en cours de mandat, mesuré sur
+        quarante scrutins, y pèse autant qu'un député présent depuis 2024.</p>
+      <p><b>Le taux agrégé</b> rapporte tous les votes concordants à tous les
+        votes communs. Il répond à «&nbsp;sur l'ensemble des votes que ces deux
+        groupes ont en commun, quelle part est concordante&nbsp;?&nbsp;» Les
+        binômes les plus longuement observés y pèsent davantage.</p>
+      <p>Les deux sont justes. Elles diffèrent ici de <b>{{ECART_CONVENTIONS}}
+        points</b> au maximum, et ce n'est pas une erreur de calcul&nbsp;: c'est
+        la trace de l'hétérogénéité des dénominateurs. <b>Publier l'une sans
+        nommer la convention ferait passer un choix de méthode pour un
+        fait</b> — le bouton ci-dessus bascule de l'une à l'autre.</p>
+    </details>
 
     <details class="piege">
       <summary>Pourquoi aucune de ces cases n'est colorée par groupe</summary>

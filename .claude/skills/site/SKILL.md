@@ -110,15 +110,36 @@ moitié, le site produit 577 fiches qui se ressemblent.
 
 ## État actuel
 
-Fait : fiche de député (577), accueil pédagogique, annuaire avec recherche par nom,
-département, numéro, région et groupe, **carte « Qui vote avec qui ? »** (matrice des
-164 451 paires en canvas), **page Méthode**.
+Fait : fiche de député (577), accueil pédagogique **ouvert par la recherche**, annuaire
+avec recherche par nom, département, numéro, région et groupe, **carte « Qui vote avec
+qui ? »** (matrice des 164 451 paires en canvas, paire épinglable au clic, au tactile,
+au clavier ou par le nom), **page Méthode**, **barre de navigation mobile**, marque
+tirée de `site/assets/logo.png`.
 
 À faire, dans cet ordre : la recherche par **commune** (l'open data ne publie pas la
 composition des circonscriptions — il faut une table externe), la page « cette semaine »
 branchée sur `radar/alerts.py`, les pages scrutin et groupe, le glossaire, puis la
-publication (mentions légales, décision d'indexation, nom de domaine, images
-OpenGraph).
+publication (mentions légales, décision d'indexation, nom de domaine, image OpenGraph
+dédiée — le logo y sert de solution d'attente).
+
+## La marque
+
+`site/assets/` porte les images de marque ; `generer.py` les copie dans `sortie/statique/`.
+`logo.png` est le verrou complet, `marque.png` l'emblème seul recadré au carré — c'est lui
+qui sert de favicon et d'en-tête, le verrou complet étant illisible à 32 pixels.
+
+**Le bleu et le rouge du logo n'entrent dans aucun graphique.** Ils sont déclarés dans
+`style.css` (`--marque`, `--drapeau-bleu`, `--drapeau-rouge`) uniquement pour être nommés
+et cantonnés : un lecteur qui verrait ces deux couleurs sur une mesure aurait raison de
+croire qu'elles désignent des camps. Le pied de page le dit explicitement.
+
+## Une seule recherche
+
+`recherche()` dans `radar.js` sert l'accueil **et** l'annuaire : deux implémentations
+donneraient deux réponses au même mot. Les pages ne diffèrent que par `data-limite` et
+`data-vide="masquer"`. Les trois signaux (présence, écart au groupe, position) sont mis
+en forme **côté Python** dans `Site.index_annuaire()` — le JavaScript ne fabrique ni
+pourcentage ni virgule décimale, et n'a pas à savoir qu'un taux manquant n'est pas zéro.
 
 ## La carte des accords
 

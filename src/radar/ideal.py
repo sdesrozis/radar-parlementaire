@@ -414,6 +414,38 @@ def _ajustement(Y: np.ndarray, M: np.ndarray, p: np.ndarray) -> tuple[float, flo
 # --------------------------------------------------------------------------
 
 
+#: Colonnes de la table des scrutins pouvant servir de bloc de rééchantillonnage,
+#: de la plus fine à la plus grossière. La première réellement remplie gagne.
+#: `dossier_uid` serait le bon niveau — les scrutins d'un même texte sont
+#: fortement corrélés — mais l'open data de l'Assemblée ne le renseigne jamais ;
+#: `seance_uid` est le regroupement le plus fin qui existe dans la source.
+BLOCS_CANDIDATS = ("dossier_uid", "seance_uid", "date")
+
+
+def blocs_de_scrutins(cube: VoteCube, cle: str | None = None) -> list[np.ndarray]:
+    """Découpe les colonnes du cube en blocs de scrutins non indépendants.
+
+    Renvoie une liste de tableaux d'indices de colonnes. Sans `cle`, on prend la
+    première colonne de `BLOCS_CANDIDATS` réellement remplie ; `cle="aucun"`
+    rend un bloc par scrutin, c'est-à-dire le bootstrap indépendant.
+    """
+    if cle == "aucun":
+        return [np.array([j]) for j in range(cube.n_scrutins)]
+
+    colonnes = [cle] if cle else list(BLOCS_CANDIDATS)
+    for nom in colonnes:
+        if nom not in cube.scrutins.columns:
+            continue
+        valeurs = cube.scrutins[nom].to_list()
+        if any(v is None for v in valeurs):
+            continue
+        groupes: dict = {}
+        for j, v in enumerate(valeurs):
+            groupes.setdefault(v, []).append(j)
+        return [np.array(v) for v in groupes.values()]
+    return [np.array([j]) for j in range(cube.n_scrutins)]
+
+
 def intervalles(
     cube: VoteCube,
     *,
@@ -421,6 +453,7 @@ def intervalles(
     dimensions: int = 1,
     graine: int = 0,
     niveau: float = 0.90,
+    bloc: str | None = None,
     **kwargs,
 ) -> pl.DataFrame:
     """Intervalle de confiance sur la position de chaque député, par bootstrap.
@@ -429,21 +462,39 @@ def intervalles(
     c'est une zone. Sans intervalle, on classerait deux députés séparés par un
     centième d'écart-type comme s'il s'agissait d'une différence réelle.
 
-    **La méthode.** On rééchantillonne les *scrutins* avec remise — et non les
-    députés, car ce sont les scrutins qui constituent l'échantillon
-    d'observations — puis on réestime le modèle sur chaque tirage. L'intervalle
-    est le quantile empirique des positions obtenues.
+    **La méthode : un bootstrap par blocs.** On rééchantillonne les *scrutins*
+    avec remise — et non les députés, car ce sont les scrutins qui constituent
+    l'échantillon d'observations. Mais **les scrutins ne sont pas indépendants
+    entre eux** : ceux d'une même séance portent sur le même texte, dans le même
+    rapport de force, et se ressemblent bien plus que deux scrutins tirés au
+    hasard dans la législature. Les tirer un par un revient à faire comme si
+    l'échantillon comptait 245 observations indépendantes alors qu'il en compte
+    173 paquets — et à publier des intervalles trop serrés, donc des
+    classements trop assurés.
 
-    Le signe de l'axe étant fixé par ancrage à chaque réestimation, les tirages
-    sont directement comparables.
+    On tire donc des **blocs entiers** avec remise, autant de blocs qu'il en
+    existe. Le niveau de bloc est choisi par `blocs_de_scrutins` : le dossier
+    législatif si la source le renseignait, la séance sinon.
+
+    L'intervalle est le quantile empirique des positions obtenues. Le signe de
+    l'axe étant fixé par ancrage à chaque réestimation, les tirages sont
+    directement comparables.
+
+    Args:
+        bloc: colonne de regroupement. `None` choisit automatiquement,
+            `"aucun"` restitue le bootstrap indépendant d'avant — utile pour
+            mesurer de combien les intervalles s'élargissent.
     """
     rng = np.random.default_rng(graine)
     base = estimer(cube, dimensions=dimensions, **kwargs)
     ordre = {u: i for i, u in enumerate(base.deputes["acteur_uid"].to_list())}
     tirages = np.full((n_bootstrap, len(ordre)), np.nan)
 
+    blocs = blocs_de_scrutins(cube, bloc)
+
     for b in range(n_bootstrap):
-        colonnes = rng.integers(0, cube.n_scrutins, cube.n_scrutins)
+        choisis = rng.integers(0, len(blocs), len(blocs))
+        colonnes = np.concatenate([blocs[i] for i in choisis])
         try:
             m = estimer(sous_cube(cube, colonnes), dimensions=dimensions, **kwargs)
         except (ValueError, np.linalg.LinAlgError):

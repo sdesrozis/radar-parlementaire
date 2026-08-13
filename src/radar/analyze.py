@@ -176,6 +176,24 @@ def build_cube(
 # --------------------------------------------------------------------------
 
 
+def _comptes_accords(cube: VoteCube) -> tuple[np.ndarray, np.ndarray]:
+    """Les deux comptages bruts dont sort tout taux d'accord.
+
+    Séparé de `agreement` parce que l'agrégation par groupe a besoin des
+    numérateurs et des dénominateurs eux-mêmes, et non de leurs quotients : la
+    moyenne des quotients et le quotient des sommes ne sont pas le même nombre.
+
+    Returns:
+        (accords, communs) — votes identiques, et scrutins où les deux ont
+        exprimé un suffrage.
+    """
+    P = cube.pour.astype(np.float32)
+    C = cube.contre.astype(np.float32)
+    A = cube.abstention.astype(np.float32)
+    V = cube.exprime.astype(np.float32)
+    return P @ P.T + C @ C.T + A @ A.T, V @ V.T
+
+
 def agreement(cube: VoteCube, min_communs: int = 30) -> tuple[np.ndarray, np.ndarray]:
     """Taux d'accord entre chaque paire de députés.
 
@@ -187,13 +205,7 @@ def agreement(cube: VoteCube, min_communs: int = 30) -> tuple[np.ndarray, np.nda
     Returns:
         (taux, communs) — deux matrices carrées (n_députés × n_députés).
     """
-    P = cube.pour.astype(np.float32)
-    C = cube.contre.astype(np.float32)
-    A = cube.abstention.astype(np.float32)
-    V = cube.exprime.astype(np.float32)
-
-    accords = P @ P.T + C @ C.T + A @ A.T
-    communs = V @ V.T
+    accords, communs = _comptes_accords(cube)
     with np.errstate(invalid="ignore", divide="ignore"):
         taux = accords / communs
     taux[communs < min_communs] = np.nan
@@ -263,8 +275,36 @@ def paires_remarquables(
 
 
 def accord_entre_groupes(cube: VoteCube, min_communs: int = 30) -> pl.DataFrame:
-    """Taux d'accord moyen entre chaque paire de groupes politiques."""
+    """Accord entre chaque paire de groupes, sous ses **deux** conventions.
+
+    **Il n'existe pas un « accord entre deux groupes ».** Il en existe deux, ils
+    ne donnent pas le même nombre, et publier l'un sans nommer la convention
+    revient à faire passer un choix de méthode pour un fait :
+
+    - `accord` — **moyenne non pondérée des taux de paires de députés.** Chaque
+      binôme compte pour un, quel que soit le nombre de scrutins sur lequel il a
+      été mesuré. C'est la convention par défaut, et elle répond à la question
+      « deux députés pris au hasard dans ces deux groupes votent-ils pareil ? ».
+    - `accord_agrege` — **quotient des sommes**, sur tous les votes communs de
+      toutes les paires. Un binôme qui a 400 scrutins en commun y pèse quatre
+      fois un binôme qui en a 100. Il répond à « sur l'ensemble des votes
+      communs de ces deux groupes, quelle part est concordante ? ».
+
+    Sur la 17ᵉ législature, l'écart entre les deux atteint 4,4 points. Il vient
+    de l'hétérogénéité des dénominateurs : un député entré en cours de mandat ou
+    peu présent a peu de scrutins communs, sa paire pèse pourtant autant que les
+    autres dans la moyenne non pondérée.
+
+    `n_paires` et `scrutins_communs` accompagnent les deux taux — sans eux, une
+    case calculée sur trois binômes se lit comme une case calculée sur mille.
+
+    Les paires sous `min_communs` scrutins communs sont écartées des **deux**
+    mesures, pour qu'elles portent exactement sur la même population.
+    """
     taux, _ = agreement(cube, min_communs)
+    accords, communs = _comptes_accords(cube)
+    retenu = ~np.isnan(taux)          # exclut la diagonale et les paires trop courtes
+
     groupes = cube.groupes()
     uniques = sorted({g for g in groupes if g})
     idx = {g: np.array([k for k, x in enumerate(groupes) if x == g]) for g in uniques}
@@ -272,11 +312,21 @@ def accord_entre_groupes(cube: VoteCube, min_communs: int = 30) -> pl.DataFrame:
     lignes = []
     for a in uniques:
         for b in uniques:
-            bloc = taux[np.ix_(idx[a], idx[b])]
-            if a == b:
-                bloc = bloc[~np.eye(len(idx[a]), dtype=bool)]
-            valeur = float(np.nanmean(bloc)) if bloc.size else float("nan")
-            lignes.append({"groupe_a": a, "groupe_b": b, "accord": valeur})
+            grille = np.ix_(idx[a], idx[b])
+            garde = retenu[grille]
+            bloc = taux[grille]
+            num = float(accords[grille][garde].sum())
+            den = float(communs[grille][garde].sum())
+            lignes.append(
+                {
+                    "groupe_a": a,
+                    "groupe_b": b,
+                    "accord": float(np.nanmean(bloc)) if garde.any() else float("nan"),
+                    "accord_agrege": num / den if den else float("nan"),
+                    "n_paires": int(garde.sum() // (2 if a == b else 1)),
+                    "scrutins_communs": int(den // (2 if a == b else 1)),
+                }
+            )
     return pl.DataFrame(lignes)
 
 
@@ -349,6 +399,31 @@ def sous_cube(cube: VoteCube, colonnes: np.ndarray) -> VoteCube:
         abstention=cube.abstention[:, colonnes],
         non_votant=cube.non_votant[:, colonnes],
         eligible=cube.eligible[:, colonnes],
+    )
+
+
+def sous_cube_deputes(cube: VoteCube, lignes: np.ndarray) -> VoteCube:
+    """Restreint un cube à un sous-ensemble de députés, par index de lignes.
+
+    Pendant de `sous_cube`, qui restreint les colonnes. Il sert à faire coïncider
+    le périmètre d'un calcul avec celui de son affichage : une cohésion de groupe
+    présentée à côté d'un effectif de députés en exercice doit être calculée sur
+    ces députés-là, et non sur tous ceux ayant siégé depuis 2024.
+    """
+    # `i` n'existe que sur un cube sorti de `build_cube` : on le réindexe s'il
+    # est là, sans l'exiger, pour que la fonction reste testable sur un cube
+    # construit à la main.
+    deputes = cube.deputes[lignes]
+    if "i" in deputes.columns:
+        deputes = deputes.drop("i").with_row_index("i")
+    return VoteCube(
+        deputes=deputes,
+        scrutins=cube.scrutins,
+        pour=cube.pour[lignes],
+        contre=cube.contre[lignes],
+        abstention=cube.abstention[lignes],
+        non_votant=cube.non_votant[lignes],
+        eligible=cube.eligible[lignes],
     )
 
 
@@ -506,10 +581,28 @@ def dissidence(cube: VoteCube, min_votes: int = 50) -> pl.DataFrame:
 
 
 def participation(cube: VoteCube) -> pl.DataFrame:
-    """Taux de participation, rapporté aux seuls scrutins où le député siégeait.
+    """Taux de participation, rapporté aux seuls scrutins où le député pouvait voter.
 
-    Les non-votants « structurels » (membre du Gouvernement, président de
-    séance) sont retirés du dénominateur : ce ne sont pas des absences.
+    **Il n'existe qu'un seul dénominateur de présence sur ce projet, et c'est
+    celui-ci.** Il se construit en deux retraits, qui répondent à deux objections
+    différentes :
+
+    1. les scrutins tenus **hors de son mandat** — neuf députés en exercice sont
+       entrés en cours de législature, et leur taux serait faussé s'il portait
+       sur des votes qu'ils n'ont pas pu émettre ;
+    2. les non-votants **structurels** (membre du Gouvernement, président de
+       séance) — la source dit explicitement pourquoi ils n'ont pas voté, et ce
+       n'est pas une absence.
+
+    La colonne `denominateur` est renvoyée avec le taux, et pas seulement
+    utilisée puis jetée : toute autre partie du projet qui affiche une présence
+    doit reprendre ce nombre-là. Le site l'a un temps recalculé de son côté sans
+    le second retrait, ce qui donnait deux chiffres différents pour la même
+    mesure — jusqu'à 12,5 points d'écart sur les votes qui engagent.
+
+    La fonction s'applique à n'importe quel cube : passer `build_cube(portee=
+    "texte")` donne la présence aux seuls votes qui engagent, avec exactement la
+    même définition.
     """
     votes = load("votes")
     structurels = (
@@ -535,13 +628,21 @@ def participation(cube: VoteCube) -> pl.DataFrame:
     return (
         df.with_columns(pl.col("non_votants_structurels").fill_null(0))
         .with_columns(
+            # Un non-votant structurel ne peut l'être que sur un scrutin où il
+            # siégeait : le retrait ne peut pas rendre le dénominateur négatif.
+            # Le plancher à 0 protège malgré tout d'une source incohérente, et
+            # le taux devient alors `null` plutôt qu'une division par zéro.
             (pl.col("scrutins_eligibles") - pl.col("non_votants_structurels"))
-            .clip(lower_bound=1)
+            .clip(lower_bound=0)
             .alias("denominateur")
         )
-        .with_columns((pl.col("votes_exprimes") / pl.col("denominateur")).alias("participation"))
-        .drop("denominateur")
-        .sort("participation", descending=True)
+        .with_columns(
+            pl.when(pl.col("denominateur") > 0)
+            .then(pl.col("votes_exprimes") / pl.col("denominateur"))
+            .otherwise(None)
+            .alias("participation")
+        )
+        .sort("participation", descending=True, nulls_last=True)
     )
 
 

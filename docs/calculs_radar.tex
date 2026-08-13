@@ -1,0 +1,758 @@
+% !TeX program = pdflatex
+% Document autonome : les résultats numériques changent avec les données,
+% mais les définitions et les formules décrites ici restent reproductibles.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2.45cm]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\hypersetup{colorlinks=true,linkcolor=blue!55!black,urlcolor=blue!55!black,
+  pdftitle={Comprendre les calculs du Radar parlementaire}}
+\setlength{\parskip}{0.55em}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.22}
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\Pp}{\mathbb{P}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\important}[1]{\begin{quote}\small\color{blue!55!black}\textbf{À retenir.} #1\end{quote}}
+\newcommand{\prudence}[1]{\begin{quote}\small\color{red!55!black}\textbf{Prudence d'interprétation.} #1\end{quote}}
+
+\title{Comprendre les calculs du \emph{Radar parlementaire}\\
+\large Guide didactique pour l'étudiant·e en statistique et science politique}
+\author{Documentation méthodologique du projet \code{radar}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Le projet \emph{Radar parlementaire} transforme les données ouvertes de
+l'Assemblée nationale en indicateurs sur les votes, les abstentions, les
+amendements et les cosignatures. Ce document explique \emph{ce qui est
+effectivement calculé}, avec les formules, les dénominateurs et les choix de
+méthode. L'objectif n'est pas de donner une étiquette politique à un député ni
+de mesurer sa « valeur » : il est de décrire, de manière reproductible, une
+partie observable de l'activité parlementaire.
+
+Les résultats numériques varient lorsque de nouveaux scrutins arrivent. Le
+texte présente donc les calculs et des exemples jouets plutôt qu'un instantané
+des résultats.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Avant toute formule : quelle est la question ?}
+
+Un calcul politique n'est jamais seulement une formule. Il suppose aussi une
+question, une unité d'observation et un périmètre. Ici, les unités élémentaires
+sont :
+
+\begin{itemize}
+  \item un \textbf{scrutin public} $j$ ;
+  \item un \textbf{député} $i$ ;
+  \item un \textbf{vote nominatif} de $i$ au scrutin $j$ ;
+  \item lorsque les amendements sont disponibles, un \textbf{amendement} et
+  l'ensemble de ses signataires.
+\end{itemize}
+
+Le projet répond à des questions descriptives : « qui vote de la même façon ?
+», « un groupe a-t-il une ligne nette ? », « quels termes deviennent plus
+présents ? », « qui cosigne avec qui ? ». Il ne permet pas, à lui seul, de
+répondre à « pourquoi ce député a-t-il voté ainsi ? », « ce député travaille-t-il
+bien ? » ou « deux groupes sont-ils alliés ? ». Ces dernières questions
+nécessitent du contexte politique, qualitatif et institutionnel.
+
+\important{Un pourcentage n'est interprétable qu'avec son dénominateur et sa
+population de référence. C'est pourquoi les fonctions du projet renvoient les
+comptes bruts avec les taux.}
+
+\section{Des fichiers bruts au cube de votes}
+
+\subsection{Nettoyer sans inventer de données}
+
+Les fichiers de l'Assemblée sont des JSON issus d'un format XML. Ils peuvent
+encoder une liste d'un seul élément comme un dictionnaire, ou une valeur absente
+comme un objet particulier. Le module \code{src/radar/parse.py} homogénéise ces
+formes puis produit des tables Parquet : \code{deputes}, \code{scrutins},
+\code{votes}, \code{positions\_groupe} et, si demandé, \code{amendements}.
+
+La table \code{votes} a une ligne par couple observé $(i,j)$ et quatre états
+possibles : \emph{pour}, \emph{contre}, \emph{abstention} et \emph{non-votant}.
+Une absence de ligne dans une table n'est jamais convertie silencieusement en
+un vote contre ou en une absence : ce serait fabriquer une observation.
+
+\subsection{Une matrice par position}
+
+Pour $n$ députés et $m$ scrutins sélectionnés, le projet construit quatre
+matrices booléennes de taille $n\times m$ :
+\[
+ P_{ij}=\ind(\text{$i$ vote pour au scrutin $j$}),\qquad
+ C_{ij}=\ind(\text{$i$ vote contre au scrutin $j$}),
+\]
+\[
+ A_{ij}=\ind(\text{$i$ s'abstient au scrutin $j$}),\qquad
+ N_{ij}=\ind(\text{$i$ est non-votant au scrutin $j$}).
+\]
+Le vote est dit \emph{exprimé} lorsqu'il vaut pour, contre ou abstention :
+\[
+ V_{ij}=P_{ij}+C_{ij}+A_{ij}.
+\]
+Puisque ces matrices sont booléennes et exclusives, $V_{ij}$ vaut $1$ si le
+député a exprimé une position, et $0$ sinon.
+
+Pour les analyses factorielles exploratoires, le projet utilise aussi une
+matrice signée :
+\[
+ S_{ij}=P_{ij}-C_{ij}\in\{-1,0,+1\}.
+\]
+Une abstention et un non-vote y sont tous deux codés $0$ ; cette convention est
+utile pour une carte descriptive, mais elle ne signifie pas que ces deux
+situations sont politiquement identiques.
+
+\subsection{L'éligibilité : ne pas pénaliser un mandat qui n'avait pas commencé}
+
+Le cube contient enfin $E_{ij}$, l'indicatrice que le mandat de $i$ couvre la
+date du scrutin $j$. Si $d_j$ est la date du scrutin, $d_i^{\mathrm{début}}$ et
+$d_i^{\mathrm{fin}}$ les bornes du mandat, alors :
+\[
+ E_{ij}=\ind\left(d_i^{\mathrm{début}}\leq d_j\leq
+ d_i^{\mathrm{fin}}\right).
+\]
+Pour un mandat en cours, la borne de fin est considérée comme future. Cette
+matrice est essentielle pour les mesures de présence : un élu arrivé en cours
+de législature ne pouvait pas participer aux scrutins antérieurs.
+
+\subsection{Portée politique d'un scrutin}
+
+Tous les scrutins publics ne disent pas la même chose. Le titre est classé par
+motifs réguliers en une catégorie, puis en une portée :
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.25\linewidth}p{.30\linewidth}p{.32\linewidth}}
+\toprule
+Catégorie & Portée & Lecture \\
+\midrule
+Amendement, sous-amendement & \code{detail} & Travail technique et tactique sur le texte. \\
+Article, motion de procédure, déclaration & \code{intermediaire} & Enjeu intermédiaire. \\
+Ensemble d'un texte, motion de censure & \code{texte} & Vote qui engage le plus nettement une position sur le texte. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Le classement est déterministe : il dépend de la syntaxe du titre, pas d'un
+codage politique fait à la main. Les analyses peuvent être recalculées séparément
+pour les trois portées. Cette séparation évite qu'une longue séquence
+d'amendements écrase, par son seul nombre, les votes sur l'ensemble d'un texte.
+
+Le projet calcule aussi la \emph{contestation} du scrutin :
+\[
+ q_j=\frac{\min(n_{\mathrm{pour},j},n_{\mathrm{contre},j})}
+ {\max(n_{\mathrm{pour},j}+n_{\mathrm{contre},j},1)}.
+\]
+Elle est proche de $0$ pour un scrutin quasi unanime et de $0{,}5$ pour un
+scrutin très partagé. On peut l'utiliser pour retirer les votes joués d'avance,
+qui gonflent mécaniquement l'accord général.
+
+\section{Proximité de vote : compter les accords, puis seulement les diviser}
+
+\subsection{La définition entre deux députés}
+
+Pour une paire de députés $(i,k)$, le nombre de scrutins où les deux ont
+exprimé un suffrage est
+\[
+ M_{ik}=\sum_{j=1}^{m}V_{ij}V_{kj}.
+\]
+Le nombre d'accords est
+\[
+ K_{ik}=\sum_{j=1}^{m}
+ \left(P_{ij}P_{kj}+C_{ij}C_{kj}+A_{ij}A_{kj}\right).
+\]
+Le taux d'accord est donc
+\[
+ T_{ik}=\frac{K_{ik}}{M_{ik}}.
+\]
+Une absence ou un non-vote ne compte ni comme accord ni comme désaccord : il
+sort du dénominateur. L'abstention, en revanche, est une position et deux
+abstentions concordent.
+
+Dans le code, les matrices de tous les $K_{ik}$ et $M_{ik}$ sont obtenues d'un
+coup par produits matriciels :
+\[
+ K=PP^{\mathsf T}+CC^{\mathsf T}+AA^{\mathsf T},\qquad M=VV^{\mathsf T}.
+\]
+C'est exactement la formule précédente, calculée pour toutes les paires à la
+fois.
+
+\subsection{Exemple jouet}
+
+Considérons six scrutins. A et B votent toujours pareil ; C est opposé à A,
+sauf qu'ils s'abstiennent tous les deux au cinquième scrutin ; D ne vote qu'une
+fois, comme A.
+
+\begin{center}
+\begin{tabular}{c*{6}{c}}
+\toprule
+ & $s_1$ & $s_2$ & $s_3$ & $s_4$ & $s_5$ & $s_6$ \\
+\midrule
+A & pour & pour & contre & contre & abst. & pour \\
+B & pour & pour & contre & contre & abst. & pour \\
+C & contre & contre & pour & pour & abst. & contre \\
+D & pour & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Alors $T_{AB}=6/6=100\%$, $T_{AC}=1/6\approx16{,}7\%$ et
+$T_{AD}=1/1=100\%$. Le dernier résultat est exact mais peu informatif. Le
+projet masque un taux quand $M_{ik}$ est inférieur à un seuil, fixé par défaut
+à 30 scrutins communs (et à 20 pour les seuls votes de portée \code{texte}).
+La diagonale est également masquée : un député est toujours d'accord avec lui-même.
+
+\important{Un « 100\% d'accord » sans le nombre de scrutins communs est souvent
+un faux signal. Le seuil ne rend pas une paire peu observée moins proche : il
+reconnaît que sa proximité n'est pas mesurée de façon suffisamment stable.}
+
+\subsection{De deux députés à deux groupes : deux questions légitimes}
+
+Soient $G$ et $H$ deux groupes. Après exclusion des paires sous le seuil, le
+projet publie deux conventions :
+\begin{align*}
+ \overline T_{GH}&=\frac{1}{|\mathcal P_{GH}|}
+ \sum_{(i,k)\in\mathcal P_{GH}}T_{ik},\\
+ T^{\mathrm{agrégé}}_{GH}&=
+ \frac{\sum_{(i,k)\in\mathcal P_{GH}}K_{ik}}
+ {\sum_{(i,k)\in\mathcal P_{GH}}M_{ik}}.
+\end{align*}
+Ici $\mathcal P_{GH}$ est l'ensemble des paires retenues, avec une paire interne
+à $G$ comptée une seule fois.
+
+La première formule est une \textbf{moyenne non pondérée des paires}. Elle
+répond à : « si je tire un député de $G$ et un de $H$, quelle est leur proximité
+moyenne ? ». La seconde est un \textbf{quotient de sommes} : une paire observée
+sur 400 scrutins y pèse quatre fois une paire observée sur 100. Elle répond à :
+« sur tous les votes communs de toutes les paires, quelle part est concordante ? ».
+
+Ce ne sont pas deux estimations concurrentes d'une vérité unique ; elles ont des
+pondérations et donc des questions différentes. Le nombre de paires et le
+nombre de scrutins communs accompagnent les deux mesures.
+
+\subsection{Cohésion interne}
+
+La cohésion d'un groupe est la convention $\overline T_{GG}$ : l'accord moyen
+entre les paires distinctes de ses membres. Elle mesure une homogénéité de votes,
+pas l'existence d'une consigne ni l'intensité des débats internes. Un effectif
+doit toujours être affiché à côté : une moyenne calculée sur trois binômes est
+beaucoup plus instable qu'une moyenne calculée sur plusieurs milliers.
+
+\subsection{Comparer les portées et vérifier la taille d'échantillon}
+
+Pour une paire de groupes, le projet recalcule les taux sur les trois ensembles
+disjoints de scrutins : détail, intermédiaire et texte. Un écart entre la portée
+\code{detail} et la portée \code{texte} peut cependant venir de deux causes :
+un vrai changement de comportement ou le fait que le second ensemble est plus
+petit.
+
+La contre-épreuve est un test de rééchantillonnage. Si la portée \code{texte}
+contient $m_T$ scrutins, on tire sans remise $m_T$ scrutins parmi les scrutins de
+détail, $B$ fois (par défaut $B=40$), et l'on recalcule l'accord. Si le taux
+observé sur les textes est extérieur au minimum--maximum des $B$ tirages, il est
+peu plausible que la seule taille d'échantillon explique l'écart. Cette procédure
+est un contrôle intuitif ; elle ne remplace pas un modèle causal.
+
+\section{Présence, ligne de groupe et dissidence}
+
+\subsection{Participation : un numérateur, deux retraits au dénominateur}
+
+Pour le député $i$, le nombre de votes exprimés est
+\[
+ X_i=\sum_j V_{ij}E_{ij}.
+\]
+Le nombre de scrutins éligibles est $L_i=\sum_jE_{ij}$. Certains non-votes sont
+structurels : par exemple l'exercice d'une fonction incompatible avec le vote.
+Si $R_i$ est leur nombre, le dénominateur est
+\[
+ D_i=\max(L_i-R_i,0),
+ \qquad \mathrm{participation}_i=\frac{X_i}{D_i},
+\]
+avec une valeur manquante si $D_i=0$.
+
+Le premier retrait ($E_{ij}$) évite de compter des scrutins antérieurs au
+mandat. Le second ($R_i$) évite de traiter une impossibilité institutionnelle
+comme une absence. Le taux mesure la participation aux scrutins publics, pas
+le travail parlementaire dans son ensemble.
+
+\subsection{Reconstruire la ligne à partir du dépouillement}
+
+Pour un groupe $g$ et un scrutin $j$, on recompte les trois effectifs :
+\[
+ n^+_{gj},\quad n^-_{gj},\quad n^0_{gj},\qquad
+ n_{gj}=n^+_{gj}+n^-_{gj}+n^0_{gj}.
+\]
+La part de la position dominante est
+\[
+ h_{gj}=\frac{\max(n^+_{gj},n^-_{gj},n^0_{gj})}{n_{gj}}.
+\]
+La source publie une position majoritaire de groupe, mais le projet ne l'utilise
+pas pour classer les députés : il recalcule les comptes à partir des votes
+nominatifs. La ligne observée est la position dominante uniquement si :
+
+\begin{enumerate}
+  \item il y a au moins cinq votants dans le groupe ;
+  \item il n'y a pas d'égalité au sommet ;
+  \item $h_{gj}>0{,}5$.
+\end{enumerate}
+
+Pourquoi une majorité stricte ? Avec 7 pour, 5 contre et 5 abstentions, la
+position la plus fréquente ne rassemble que $7/17\simeq41\%$. Les dix autres
+votes ne sont pas dix infractions à une ligne : ils révèlent qu'aucune position
+ne domine. Le scrutin est classé \emph{groupe partagé}, pas \emph{fracture}.
+
+\subsection{Taux de dissidence}
+
+Sur les seuls votes $\mathcal L_i$ où une ligne nette existe pour le groupe de
+$i$, la dissidence est
+\[
+ \mathrm{dissidence}_i=
+ \frac{\sum_{j\in\mathcal L_i}\ind(\text{vote de $i$}\neq
+ \text{ligne de son groupe au scrutin $j$})}{|\mathcal L_i|}.
+\]
+Une personne avec trop peu de votes comparables est écartée du classement
+(minimum de 50 par défaut). Cette mesure décrit un écart à la majorité
+\emph{observée} du groupe : elle ne prouve ni une opposition idéologique ni une
+désobéissance à une consigne privée.
+
+\subsection{Scrutins serrés et scrutins clivants}
+
+Un scrutin est dit serré lorsque
+\[
+ e_j=|n_{\mathrm{pour},j}-n_{\mathrm{contre},j}|
+\]
+est faible (au plus 10 voix par défaut). À l'inverse, la part de votes dissidents
+parmi les votes auxquels une ligne de groupe s'applique permet de construire un
+taux de fracture du scrutin. Les deux notions sont différentes : un vote peut
+être très serré mais parfaitement discipliné, ou largement adopté tout en
+divisant fortement certains groupes.
+
+\section{Deux cartes descriptives : ACP et positionnement multidimensionnel}
+
+\subsection{Analyse en composantes principales (ACP)}
+
+L'ACP est une réduction de dimension. On centre chaque colonne de la matrice
+signée $S$, puis on écrit sa décomposition en valeurs singulières :
+\[
+ S_c=U\Sigma V^{\mathsf T}.
+\]
+Les coordonnées sur les deux premiers axes sont les deux premières colonnes de
+$U\Sigma$. La part d'inertie expliquée par l'axe $r$ est
+\[
+ \frac{\sigma_r^2}{\sum_q\sigma_q^2}.
+\]
+L'ACP est descriptive : elle résume les régularités dominantes dans les votes
+codés. Les axes peuvent être retournés sans que le résultat ne change ; leurs
+signes ne sont donc pas des étiquettes politiques.
+
+\subsection{Positionnement multidimensionnel (MDS)}
+
+Une autre carte part de la distance $d_{ik}=1-T_{ik}$ : proches au vote signifie
+petite distance. Les taux indisponibles sont provisoirement remplacés par la
+moyenne des taux disponibles, puis la matrice des distances est doublement
+centrée :
+\[
+ B=-\frac12 JD^{\circ2}J,\qquad
+ J=I-\frac1n\mathbf{1}\mathbf{1}^{\mathsf T}.
+\]
+Les deux vecteurs propres associés aux plus grandes valeurs propres de $B$
+donnent les coordonnées. Le MDS cherche une carte qui préserve autant que
+possible les distances d'accord ; il est plus directement lié aux proximités
+de paires, mais il est plus coûteux.
+
+\prudence{Une carte rapproche des comportements observés. Elle ne démontre pas
+une idéologie, une stratégie commune ou une cause du vote.}
+
+\section{Le modèle de points idéaux : expliquer et prédire les votes binaires}
+
+\subsection{Le modèle statistique}
+
+L'ACP décrit une configuration ; le modèle de points idéaux pose un mécanisme
+probabiliste. Il ne conserve que les votes pour et contre. Pour un député $i$
+et un scrutin $j$ :
+\[
+ Y_{ij}=\ind(\text{$i$ vote pour}),\qquad
+ \Pp(Y_{ij}=1)=\operatorname{logit}^{-1}(\beta_j^{\mathsf T}x_i-\alpha_j),
+\]
+où
+\[
+ \operatorname{logit}^{-1}(z)=\frac{1}{1+e^{-z}}.
+\]
+
+Dans cette équation, $x_i\in\R^d$ est la position latente du député,
+$\beta_j\in\R^d$ est le vecteur de discrimination du scrutin et $\alpha_j$
+son paramètre de difficulté. En dimension 1, le point de bascule est
+$\alpha_j/\beta_j$ si $\beta_j\neq0$ : à cette position, la probabilité de
+voter pour vaut $1/2$. Plus $|\beta_j|$ est grand, plus le scrutin sépare
+nettement les positions.
+
+Les abstentions ne sont pas transformées en demi-votes. Elles sont exclues de
+ce modèle parce qu'il est binaire, non parce qu'elles seraient dépourvues de
+sens politique. Les analyses dédiées de la section~\ref{sec:abstention} les
+traitent explicitement.
+
+\subsection{Les filtres avant estimation}
+
+Le modèle retire les scrutins avec trop peu de pour/contre, les députés avec
+trop peu de votes binaires et, par défaut, les scrutins très peu contestés :
+\[
+ \frac{\min(n_{\mathrm{pour},j},n_{\mathrm{contre},j})}
+ {n_{\mathrm{pour},j}+n_{\mathrm{contre},j}}\geq0{,}025.
+\]
+Un vote quasi unanime peut être politiquement important mais apporte très peu
+d'information pour ordonner les députés sur un axe. Ce filtre sert à stabiliser
+l'estimation, pas à déclarer ces scrutins sans intérêt.
+
+\subsection{Estimation alternée et pénalisation}
+
+Le projet maximise une vraisemblance logistique pénalisée. Schématiquement, il
+cherche à maximiser :
+\[
+ \ell=\sum_{i,j\ \mathrm{observés}}
+ \left[Y_{ij}\log(p_{ij})+(1-Y_{ij})\log(1-p_{ij})\right]
+ -\frac{\lambda_x}{2}\sum_i\|x_i\|^2
+ -\frac{\lambda_\beta}{2}\sum_j\|\beta_j\|^2.
+\]
+Les difficultés $\alpha_j$ ne sont pas pénalisées : un scrutin peut
+légitimement être très largement acquis. Les paramètres sont ajustés par
+régressions logistiques pénalisées alternées :
+
+\begin{enumerate}
+  \item positions $x_i$ fixées, estimer les paramètres de chaque scrutin ;
+  \item paramètres des scrutins fixés, estimer les positions des députés ;
+  \item recommencer jusqu'à stabilisation de la log-vraisemblance.
+\end{enumerate}
+
+Chaque régression logistique est mise à jour par IRLS (\emph{iteratively
+reweighted least squares}), c'est-à-dire un pas de Newton utilisant les poids
+$p_{ij}(1-p_{ij})$. Le code traite les nombreux scrutins en parallèle dans des
+produits matriciels, ce qui rend possible le bootstrap.
+
+La pénalisation de $\beta_j$ est importante : avec une séparation parfaite,
+le maximum de vraisemblance non pénalisé tend vers $|\beta_j|=\infty$. On
+obtiendrait des frontières verticales et des positions artificiellement tassées.
+La valeur de $\lambda_\beta$ n'est pas choisie à l'œil : elle est comparée par
+validation croisée.
+
+\subsection{Le problème d'identification}
+
+Le produit $\beta_j^{\mathsf T}x_i$ reste le même si l'on change simultanément
+l'échelle et l'orientation de l'espace. Après estimation, le projet :
+
+\begin{enumerate}
+  \item centre les positions ;
+  \item les réduit à un écart-type unitaire ;
+  \item les tourne sur leurs axes principaux ;
+  \item oriente le premier axe pour qu'un groupe d'ancrage soit du côté négatif.
+\end{enumerate}
+
+L'ancrage rend deux exécutions lisibles dans le même sens. Il ne donne pas une
+signification intrinsèque (« gauche », « droite ») à l'axe : il fixe seulement
+le miroir.
+
+\subsection{Évaluer l'ajustement : classification et APRE}
+
+La classification compare $\ind(p_{ij}\geq0{,}5)$ au vote observé. Mais elle
+favorise les scrutins très déséquilibrés : prédire toujours la majorité est déjà
+souvent correct. L'APRE (\emph{aggregate proportional reduction in error})
+compare donc les erreurs du modèle aux erreurs de ce prédicteur naïf :
+\[
+ \mathrm{APRE}=\frac{E_0-E_{\mathrm{modèle}}}{E_0},
+\]
+où $E_0$ est la somme des effectifs minoritaires de chaque scrutin, et
+$E_{\mathrm{modèle}}$ le nombre d'erreurs de classification. APRE $=0$ signifie
+« pas mieux que toujours choisir la majorité » ; APRE $=1$ signifie aucune erreur.
+
+Pour choisir le nombre de dimensions et la pénalisation, une part des cellules
+de vote est mise de côté au hasard. Le modèle est estimé sur le reste puis
+évalué sur ces votes non vus. Une dimension supplémentaire qui n'améliore que
+l'ajustement d'apprentissage est du surajustement ; elle ne doit pas être lue
+comme un nouveau clivage politique.
+
+\subsection{Incertitude par bootstrap de blocs}
+
+\label{sec:bootstrap}
+Une position estimée est une estimation, non une position mesurée sans erreur.
+Le projet tire avec remise des \emph{blocs} de scrutins, réestime le modèle à
+chaque tirage, puis prend les quantiles empiriques. Pour un niveau $1-\gamma$,
+l'intervalle est :
+\[
+ [\widehat x_i^{(\gamma/2)},\widehat x_i^{(1-\gamma/2)}].
+\]
+
+Les scrutins d'une même séance sont corrélés : ils peuvent porter sur le même
+texte et le même rapport de force. Les tirer indépendamment reviendrait à
+surestimer la quantité d'information. Le bootstrap regroupe donc, si possible,
+par dossier législatif, sinon par séance, sinon par date. Les intervalles sont
+plus larges que sous un bootstrap scrutin par scrutin, mais plus honnêtes.
+
+\important{Deux intervalles qui se recouvrent ne démontrent pas l'égalité des
+positions, mais ils doivent empêcher de lire un petit écart de rang comme une
+différence certaine.}
+
+\section{L'abstention est une position à analyser}\label{sec:abstention}
+
+\subsection{Taux d'abstention}
+
+Pour un groupe, un député, une catégorie ou une portée, le taux est
+\[
+ \frac{\#\{\text{abstentions}\}}
+ {\#\{\text{pour, contre ou abstention}\}}.
+\]
+Les absences et non-votes ne sont pas dans le dénominateur : sinon on mesurerait
+un mélange d'abstention volontaire et d'absentéisme.
+
+\subsection{Consigne, retrait ou indétermination}
+
+Chaque abstention est jointe à la ligne recalculée de son groupe. Elle est
+classée :
+
+\begin{itemize}
+  \item \textbf{consigne}, si le groupe a une ligne nette d'abstention ;
+  \item \textbf{retrait}, si le groupe a une ligne nette pour ou contre ;
+  \item \textbf{indéterminée}, si aucune ligne nette n'existe ou si le groupe a
+  trop peu voté.
+\end{itemize}
+
+Les parts sont divisées par le \emph{total de toutes les abstentions}, y compris
+les indéterminées. Cette troisième catégorie mesure une limite de classement ;
+la retirer du dénominateur ferait artificiellement gonfler les deux premières.
+
+\subsection{Tester l'idée d'une position intermédiaire}
+
+Le modèle de points idéaux est estimé sans abstentions. Pour chaque scrutin où
+les trois populations sont assez nombreuses, on compare les médianes des
+positions : $m_+$ pour les pour, $m_-$ pour les contre et $m_0$ pour les
+abstentionnistes. Après avoir posé $b=\min(m_+,m_-)$ et $h=\max(m_+,m_-)$, la
+position relative est
+\[
+ r=\frac{m_0-b}{h-b}.
+\]
+Une valeur entre 0 et 1 place la médiane des abstentionnistes entre les deux
+camps ; $r=0{,}5$ la place à mi-chemin. C'est un test \emph{hors modèle} :
+l'information d'abstention n'a pas servi à construire l'axe. Il ne prouve pas
+que chaque abstention est un compromis ; il évalue cette proposition scrutin
+par scrutin.
+
+\subsection{Quand l'abstention aurait pu faire basculer l'issue}
+
+Si un texte est adopté, $e=n_{\mathrm{pour}}-n_{\mathrm{contre}}>0$. Il suffit
+de déplacer $e$ abstentionnistes vers le contre pour atteindre l'égalité, qui
+fait échouer l'adoption : le seuil est donc $a\geq e$.
+
+Si le texte est rejeté, $e=n_{\mathrm{contre}}-n_{\mathrm{pour}}\geq0$. Le pour
+doit dépasser le contre, pas seulement l'égaler : le seuil est $a>e$, soit au
+moins $e+1$ abstentionnistes. La fonction ne prétend pas connaître leurs
+intentions ; elle établit seulement qu'ils étaient assez nombreux pour modifier
+l'issue sous ce scénario arithmétique.
+
+\section{Amendements et réseau de cosignatures}
+
+\subsection{Volumes et adoption}
+
+Pour un député ou un groupe, le projet compte les amendements dont l'auteur est
+identifié, puis calcule :
+\[
+ \mathrm{taux\ d'adoption}=\frac{\#\{\text{amendements adoptés}\}}
+ {\#\{\text{amendements déposés}\}}.
+\]
+Ce taux est descriptif : l'adoption dépend notamment de la recevabilité, de la
+procédure, de la majorité, du sujet et du statut de l'auteur. Comparer seulement
+des taux sans le volume de dépôts serait trompeur.
+
+\subsection{Construire les liens}
+
+Un amendement signé par A, B et C crée les trois liens non orientés A--B,
+A--C et B--C. Si $D$ est la matrice d'incidence députés $\times$ amendements,
+avec $D_{ia}=1$ si le député $i$ a signé l'amendement $a$, alors
+\[
+ W=DD^{\mathsf T}.
+\]
+Pour $i\neq k$, $W_{ik}$ est le nombre d'amendements cosignés ensemble. Sur la
+diagonale, $W_{ii}$ est le nombre total d'amendements signés par $i$ : ce n'est
+pas un lien avec soi-même.
+
+Le réseau exclut par défaut les amendements de rapporteur et les amendements
+ayant plus de dix signataires. Le premier filtre évite de confondre une tâche
+institutionnelle avec une alliance. Le second évite qu'un dépôt collectif de
+groupe crée mécaniquement tous les liens internes possibles.
+
+\subsection{Affinité de Jaccard}
+
+Le compte $W_{ik}$ favorise les députés les plus actifs. L'affinité utilisée
+pour classer les paires est donc l'indice de Jaccard :
+\[
+ J_{ik}=\frac{W_{ik}}{s_i+s_k-W_{ik}},
+\]
+où $s_i=W_{ii}$ est le nombre d'amendements signés par $i$. Il s'agit de la
+taille de l'intersection des deux répertoires de signatures divisée par leur
+union. Les députés avec moins de 20 signatures sont masqués : une petite base
+peut produire un Jaccard de 1 sans signal robuste.
+
+\subsection{Part des liens entre groupes}
+
+Pour deux groupes distincts $G$ et $H$, le volume de liens est
+\[
+ L_{GH}=\sum_{i\in G}\sum_{k\in H}W_{ik}.
+\]
+Pour un lien interne, la matrice symétrique le compte deux fois et la diagonale
+doit être retirée :
+\[
+ L_{GG}=\frac{1}{2}\left(\sum_{i\in G}\sum_{k\in G}W_{ik}
+ -\sum_{i\in G}W_{ii}\right).
+\]
+La part de la production de liens de $G$ orientée vers $H$ est
+\[
+ \pi_{G\to H}=\frac{L_{GH}}{\sum_Q L_{GQ}}.
+\]
+La même convention -- chaque paire une fois, jamais la diagonale -- est
+employée au numérateur et au dénominateur. Ainsi, les parts d'une ligne totalisent
+1 et les groupes deviennent comparables.
+
+\subsection{Les « courtiers » : sortir de son groupe plus que ne l'impose sa taille}
+
+La part brute de liens hors groupe est mécaniquement plus grande dans un petit
+groupe. Pour le député $i$ du groupe $G$, le projet la compare à l'attendu sous
+mélange aléatoire :
+\[
+ \mathrm{part\ observée}_i=\frac{\text{liens de $i$ hors de $G$}}
+ {\text{tous les liens de $i$}},\qquad
+ \mathrm{part\ attendue}_i=\frac{N-|G|}{N-1}.
+\]
+Le ratio observé/attendu vaut 1 sous cette référence. Un ratio supérieur à 1
+signale une ouverture hors groupe plus forte que ce que la seule taille du groupe
+produirait. Les non-inscrits sont exclus de cette mesure : « hors de son groupe »
+n'a alors pas de référence bien définie.
+
+\section{Détecter les sujets qui montent}
+
+\subsection{Corpus et unités de comptage}
+
+Le corpus hebdomadaire contient les titres de scrutins et, lorsque disponible,
+les titres et les premiers caractères des exposés sommaires d'amendements. Les
+textes sont passés en minuscules sans accents, tokenisés en mots et bigrammes,
+puis filtrés : mots vides, jargon légistique, termes de procédure et noms de
+députés ne doivent pas devenir des « sujets ».
+
+L'unité pertinente est le \textbf{document qui mentionne au moins une fois un
+terme}, non le nombre d'occurrences. Si un mot est répété dix fois dans un long
+document, ce document contribue une fois à $n_{t,w}^{\mathrm{docs}}$. Avec
+$N_t$ documents durant la semaine $t$, la fréquence comparable est
+\[
+ f_{t,w}=\frac{n_{t,w}^{\mathrm{docs}}}{N_t}.
+\]
+Cela empêche qu'une semaine comportant des textes longs ou beaucoup de dépôts
+soit confondue avec un changement de thème.
+
+\subsection{Attendu binomial et score de poussée}
+
+Sur les semaines de référence $R$, la fréquence de référence du terme $w$ est
+\[
+ p_w=\frac{\sum_{t\in R}n_{t,w}^{\mathrm{docs}}}{\sum_{t\in R}N_t}.
+\]
+Dans la semaine courante de taille $N$, l'effectif attendu est
+$\mu_w=Np_w$. Sous l'hypothèse de stabilité, le nombre de documents mentionnant
+le terme suit approximativement
+\[
+ X_w\sim\mathrm{Binomiale}(N,p_w).
+\]
+Le projet calcule la probabilité de queue $\Pp(X_w\geq x_w)$ et un score de
+classement
+\[
+ z_w=\frac{x_w-\mu_w}{\sqrt{\mu_w+1}}.
+\]
+Le score classe l'ampleur de la hausse ; la $p$-valeur vérifie si elle est
+compatible avec le hasard sous le modèle binomial. Pour un terme absent de la
+référence, une petite fréquence plancher évite une $p$-valeur artificiellement
+nulle sur une seule mention.
+
+\subsection{Tests multiples : Benjamini--Hochberg}
+
+Des milliers de mots et d'expressions peuvent être testés chaque semaine. Au
+seuil de 5\% sans correction, on attendrait beaucoup de faux signaux. Les
+$p$-valeurs ordonnées $p_{(1)}\leq\cdots\leq p_{(m)}$ sont converties en
+$q$-valeurs de Benjamini--Hochberg :
+\[
+ q_{(r)}=\min_{s\geq r}\left(\frac{m}{s}p_{(s)}\right),
+\]
+bornée par 1. Filtrer à $q\leq0{,}05$ contrôle le taux de fausses découvertes
+attendu à 5\% parmi les signaux retenus, sous les hypothèses usuelles de la
+procédure. Enfin, des n-grammes parfaitement redondants sont fusionnés pour ne
+pas faire passer plusieurs fragments d'un même titre pour plusieurs sujets.
+
+\section{Lire les sorties sans leur faire dire plus qu'elles ne disent}
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.25\linewidth}p{.31\linewidth}p{.31\linewidth}}
+\toprule
+Indicateur & Ce qu'il décrit & Ce qu'il ne démontre pas \\
+\midrule
+Accord de vote & Concordance de positions exprimées & Motif commun, alliance durable, identité idéologique. \\
+Participation & Vote aux scrutins où l'élu pouvait voter & Volume total de travail parlementaire. \\
+Dissidence & Écart à une majorité observée de groupe & Violation d'une consigne privée ou désaccord idéologique. \\
+Point idéal & Axe latent qui prédit des votes binaires & Étiquette intrinsèque ou position politique totale. \\
+Cosignature & Travail d'initiative rendu visible par les signatures & Alliance générale ou causalité entre députés. \\
+Sujet montant & Hausse relative de mentions dans le corpus & Importance normative ou attention de toute la société. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Une bonne lecture procède dans cet ordre :
+
+\begin{enumerate}
+  \item vérifier le périmètre (dates, portée, élus inclus) ;
+  \item lire le numérateur et le dénominateur ;
+  \item comparer, si nécessaire, les scrutins de détail et les votes qui engagent ;
+  \item regarder les seuils d'exclusion et l'incertitude ;
+  \item revenir au titre, au texte et au contexte politique du scrutin.
+\end{enumerate}
+
+\section{Reproduire et auditer}
+
+Les calculs décrits ici sont implémentés dans :
+
+\begin{itemize}
+  \item \code{src/radar/parse.py} : normalisation, catégories, portées et
+  positions de groupe ;
+  \item \code{src/radar/analyze.py} : cube, accord, cohésion, participation,
+  dissidence et cartes ;
+  \item \code{src/radar/ideal.py} : modèle de points idéaux, validation et
+  bootstrap ;
+  \item \code{src/radar/abstention.py} : analyses spécifiques aux abstentions ;
+  \item \code{src/radar/cosign.py} : réseau de cosignatures ;
+  \item \code{src/radar/topics.py} : corpus et détection de poussées.
+\end{itemize}
+
+Pour reconstruire les tables depuis les données ouvertes de l'Assemblée :
+
+\begin{verbatim}
+uv run radar update
+\end{verbatim}
+
+Les tests unitaires du projet contiennent également des cubes synthétiques :
+ils vérifient notamment les faux 100\% d'accord, la différence entre moyenne de
+taux et quotient de sommes, l'orientation du modèle et l'APRE.
+
+\important{La reproductibilité ne consiste pas seulement à pouvoir relancer le
+code. Elle suppose de publier les définitions, les seuils, les exclusions et
+les incertitudes qui rendent un chiffre discutable.}
+
+\end{document}
+

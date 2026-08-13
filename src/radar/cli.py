@@ -135,7 +135,9 @@ def participation(
     d = analyze.participation(cube)
     d = d.tail(k).reverse() if pire else d.head(k)
     _table(
-        d.select("nom_complet", "groupe", "votes_exprimes", "scrutins_eligibles", "participation"),
+        # `denominateur` et non `scrutins_eligibles` : c'est le nombre réellement
+        # divisé, une fois retirés les non-votants structurels.
+        d.select("nom_complet", "groupe", "votes_exprimes", "denominateur", "participation"),
         "Participation aux scrutins" + (" — dernières places" if pire else ""),
         {"participation": "{:.1%}"},
     )
@@ -246,8 +248,9 @@ def abstentions(
             # largeur du terminal entre toutes les colonnes, et une de trop
             # suffit à hacher les titres en tranches illisibles.
             d.select(
-                "date", "n_pour", "n_contre", "n_abstention", "ecart",
-                pl.col("titre").str.slice(0, 58) + "…",
+                "date", "n_pour", "n_contre", "n_abstention",
+                "abstentions_requises", "bascule_vers",
+                pl.col("titre").str.slice(0, 50) + "…",
             ),
             "Scrutins où les abstentionnistes détenaient l'issue",
         )
@@ -316,7 +319,12 @@ def sujets(
 ) -> None:
     """Les sujets dont la fréquence explose cette semaine."""
     d = topics.sujets_qui_montent(semaine=semaine, k=k, source=source)
-    _table(d, "Sujets qui montent", {"attendu": "{:.1f}", "score": "{:.1f}"})
+    _table(
+        d.select("semaine", "terme", "n_docs", "n_documents", "attendu",
+                 "part", "score", "q_valeur"),
+        "Sujets qui montent",
+        {"attendu": "{:.1f}", "part": "{:.1%}", "score": "{:.1f}", "q_valeur": "{:.3f}"},
+    )
 
 
 @app.command()

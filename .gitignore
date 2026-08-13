@@ -17,6 +17,15 @@ wheels/
 # Données : téléchargées et reconstruites par `radar update`
 data/
 
+# Compilation LaTeX du guide méthodologique : seule la source est versionnée
+docs/*.aux
+docs/*.fdb_latexmk
+docs/*.fls
+docs/*.log
+docs/*.out
+docs/*.pdf
+docs/*.toc
+
 site/sortie/
 
 # Autorisations locales de Claude Code, propres à la machine

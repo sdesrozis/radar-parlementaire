@@ -3,6 +3,17 @@
    Encre & papier. Un accent indigo, un signal ocre, rien d'autre.
    Aucune couleur ne désigne un groupe politique : la couleur porte une
    grandeur ou une emphase, l'identité passe par le texte.
+
+   LA MARQUE. Le logo apporte trois couleurs — un bleu d'encre, le bleu et le
+   rouge du drapeau. Elles sont déclarées ici pour être nommées, et elles ne
+   servent qu'à la marque : le favicon, le logo du pied de page. Aucune mesure,
+   aucune bande, aucune case de matrice ne les emploie. Un lecteur qui verrait
+   du bleu et du rouge sur un graphique de ce site aurait raison de croire
+   qu'ils désignent des camps — c'est précisément pourquoi ils n'y entrent pas.
+   L'emblème de l'en-tête est d'ailleurs monochrome : il suit `--encre`.
+
+   La typographie de l'en-tête reprend celle du logo : « RADAR » en chasse fixe
+   très espacée, « parlementaire » en romain italique.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -19,6 +30,11 @@
   --accent-voile: #33327A1F;
   --signal:       #8A6B12;
   --signal-voile: #8A6B121F;
+
+  /* Réservées à la marque. Voir l'avertissement en tête de fichier. */
+  --marque:        #0A1F44;
+  --drapeau-bleu:  #0044BB;
+  --drapeau-rouge: #E4002B;
 
   --serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, "Segoe UI", Roboto, sans-serif;
@@ -139,17 +155,62 @@ a:hover { text-decoration-color: var(--accent); }
   display: flex; align-items: center; justify-content: space-between;
   gap: 24px; height: 62px;
 }
-.marque { display: flex; align-items: baseline; gap: 9px; text-decoration: none; }
+.marque { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+/* L'emblème du logo, découpé du fichier d'origine. `align-self: baseline` le
+   poserait sur la ligne d'écriture, où il flotterait au-dessus du texte : il
+   est centré, et un demi-pixel de descente l'aligne optiquement sur les
+   capitales de « RADAR ». */
+.marque .embleme {
+  flex: none; width: 28px; height: 28px;
+  transform: translateY(0.5px);
+}
 .marque .m1 {
   font-family: var(--mono); font-size: 13px; font-weight: 600;
   letter-spacing: 0.22em; text-transform: uppercase;
 }
 .marque .m2 { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--encre-2); }
+@media (max-width: 420px) { .marque .m2 { display: none; } }
 .menu { display: flex; gap: 26px; font-size: 14.5px; }
 .menu a { text-decoration: none; color: var(--encre-2); padding: 4px 0; border-bottom: 1.5px solid transparent; }
 .menu a:hover { color: var(--encre); }
 .menu a[aria-current] { color: var(--encre); border-bottom-color: var(--accent); }
 @media (max-width: 720px) { .menu { display: none; } }
+
+/* ── navigation mobile ─────────────────────────────────────────────────
+   Le menu de l'en-tête disparaît sous 720 px : cette barre le remplace, au
+   lieu de laisser le lecteur sans chemin. Quatre destinations, quatre verbes —
+   ce que la page permet de faire, pas comment elle s'appelle.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.menu-mobile { display: none; }
+
+@media (max-width: 720px) {
+  .menu-mobile {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: fixed; inset: auto 0 0 0; z-index: 60;
+    background: color-mix(in srgb, var(--papier) 92%, transparent);
+    backdrop-filter: saturate(140%) blur(12px);
+    border-top: 1px solid var(--trait);
+    /* La barre système d'iOS mange les derniers pixels : sans cette réserve,
+       le dernier onglet est à moitié sous le trait de l'accueil. */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .menu-mobile a {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px 8px; text-decoration: none; color: var(--encre-2);
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.07em;
+    text-transform: uppercase;
+    border-top: 2px solid transparent;
+  }
+  .menu-mobile a svg { width: 21px; height: 21px; }
+  .menu-mobile a[aria-current] { color: var(--accent); border-top-color: var(--accent); }
+
+  /* Le pied de page doit pouvoir être atteint : sans cette réserve, ses
+     dernières lignes restent définitivement sous la barre. */
+  .pied { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  body { padding-bottom: 62px; }
+}
 
 /* ── titre de fiche ────────────────────────────────────────────────── */
 
@@ -373,6 +434,21 @@ h1 {
 
 .pied { padding-block: 48px 72px; }
 .pied .grille { display: grid; gap: 30px; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
+/* Le logo complet, à sa seule place : le pied de page. Il est en couleurs et
+   loin de tout graphique, donc sans risque d'être lu comme une mesure. */
+.pied-logo { display: block; width: 108px; height: auto; }
+
+/* Le bleu d'encre du logo (#0A1F44) est presque noir : sur le papier sombre il
+   disparaît, et le fronton devient une masse. On l'éclaircit — le drapeau reste
+   reconnaissable, l'emblème redevient lisible. C'est le seul filtre du site, et
+   il ne s'applique qu'à la marque : aucune donnée n'est retouchée à l'affichage. */
+@media (prefers-color-scheme: dark) {
+  .marque .embleme, .pied-logo { filter: brightness(1.75) saturate(0.95); }
+}
+:root[data-theme="dark"] .marque .embleme,
+:root[data-theme="dark"] .pied-logo { filter: brightness(1.75) saturate(0.95); }
+:root[data-theme="light"] .marque .embleme,
+:root[data-theme="light"] .pied-logo { filter: none; }
 .pied h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--encre-3); margin: 0 0 10px; font-weight: 600; }
 .pied p, .pied li { font-size: 14.5px; color: var(--encre-2); margin: 0 0 7px; line-height: 1.6; }
 .pied ul { list-style: none; padding: 0; margin: 0; }
@@ -406,6 +482,19 @@ h1 {
   text-wrap: pretty;
 }
 .manifeste .appui em { font-style: normal; color: var(--encre); box-shadow: inset 0 -0.42em 0 var(--accent-voile); }
+
+/* La recherche en tête d'accueil. Elle est le premier geste possible sur le
+   site, avant toute explication : on vient y chercher quelqu'un. */
+.chercher-tete { margin-top: 34px; max-width: 780px; }
+.chercher-tete .compteur { padding-top: 20px; }
+.chercher-tete .compteur[hidden] { display: none; }
+.chercher-tete .annuaire:empty { display: none; }
+.deborde {
+  margin: 16px 0 0; font-family: var(--mono); font-size: 12px;
+  letter-spacing: 0.06em; color: var(--encre-2);
+}
+.deborde[hidden] { display: none; }
+.deborde b { color: var(--encre); }
 
 /* Le périmètre, en mono : c'est une provenance, pas un argument de vente. */
 .perimetre {
@@ -526,10 +615,34 @@ h1 {
 .an-nom { font-family: var(--serif); font-size: 1.22rem; letter-spacing: -0.012em; }
 .an-lieu { font-size: 14px; color: var(--encre-2); }
 .an-grp { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--encre-2); }
-.an-chiffre { font-family: var(--mono); font-size: 12.5px; color: var(--encre-3); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Les trois signaux. Chacun porte son libellé : un nombre nu dans une liste se
+   lit comme une note, alors qu'il ne dit rien sans savoir ce qu'il compte.
+   Le dénominateur, lui, reste sur la fiche — il n'entre pas dans une ligne. */
+.an-chiffres { display: flex; gap: 18px; justify-content: flex-end; }
+.an-mesure { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.an-mesure b {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--encre);
+}
+.an-mesure i {
+  font-family: var(--mono); font-style: normal; font-size: 9.5px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--encre-3);
+  white-space: nowrap;
+}
+@media (min-width: 780px) {
+  .annuaire a { grid-template-columns: minmax(0, 1fr) 170px 90px 250px; }
+}
 @media (max-width: 779px) {
   .an-lieu, .an-grp { grid-column: 1; font-size: 13px; }
-  .an-chiffre { grid-row: 1; grid-column: 2; }
+  .an-chiffres { grid-row: 1 / span 2; grid-column: 2; gap: 12px; }
+  .an-mesure i { font-size: 9px; }
+}
+@media (max-width: 520px) {
+  /* Trois mesures ne tiennent pas à côté d'un nom sur un téléphone : la
+     dernière passe sous les deux autres plutôt que de compresser le nom. */
+  .an-chiffres { grid-row: auto; grid-column: 1; justify-content: flex-start; gap: 20px; }
+  .an-mesure { align-items: flex-start; }
 }
 .annuaire mark { background: var(--accent-voile); color: inherit; border-radius: 2px; padding: 0 1px; }
 
@@ -586,8 +699,52 @@ h1 {
 .bascules button[aria-pressed="true"] { background: var(--accent); color: var(--papier-haut); }
 .carte-etat { flex: 1 1 22ch; margin: 0; max-width: 56ch; }
 
+/* ── comparer deux députés ─────────────────────────────────────────────
+   Le tableau n'était explorable qu'au survol : ces deux champs sont l'autre
+   chemin vers la même mesure — celui du clavier, du tactile, et de qui sait
+   déjà quelle paire il cherche.
+   ────────────────────────────────────────────────────────────────────── */
+
+.carte-duo {
+  display: grid; gap: 16px 24px; margin-bottom: 26px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  max-width: 720px;
+}
+.carte-choix { position: relative; }
+.carte-choix .jalon { margin-bottom: 8px; }
+.champ-mince input { font-size: 1.05rem; padding: 10px 0; }
+
+.carte-suggestions {
+  position: absolute; z-index: 30; left: 0; right: 0; top: 100%;
+  margin: 4px 0 0; padding: 4px 0; list-style: none;
+  background: var(--papier-haut);
+  border: 1px solid var(--trait-fort); border-radius: 3px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.09);
+  max-height: 17rem; overflow-y: auto;
+}
+.carte-suggestions[hidden] { display: none; }
+.carte-suggestions li {
+  padding: 8px 14px; cursor: pointer; font-size: 15px;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.carte-suggestions li:hover,
+.carte-suggestions li:focus { background: var(--accent-voile); outline: none; }
+.carte-suggestions .grp {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em;
+  color: var(--encre-3); flex: none;
+}
+
 .carte-scene { display: grid; gap: 30px; align-items: start; }
 @media (min-width: 900px) { .carte-scene { grid-template-columns: minmax(0, 1fr) 22rem; } }
+
+/* Sur un téléphone, viser une case de 574ᵉ de largeur n'a pas de sens : la
+   lecture passe *au-dessus* du tableau, et ce sont les deux champs qui
+   deviennent l'outil principal. Le tableau reste — c'est le sujet de la
+   page — mais il redevient ce qu'il est à cette taille : une forme. */
+@media (max-width: 899px) {
+  .carte-scene { display: flex; flex-direction: column; }
+  .carte-lecture { order: -1; min-height: 0; }
+}
 
 .carte-toile { position: relative; line-height: 0; }
 .carte-toile canvas {
@@ -624,6 +781,30 @@ h1 {
 }
 .carte-denominateur { margin: 0; }
 
+/* La paire épinglée le dit, et dit comment la lâcher : un état qui persiste
+   sans s'annoncer se lit comme une panne. */
+.carte-epingle {
+  display: flex; align-items: center; gap: 12px; margin: 16px 0 0;
+}
+.carte-epingle[hidden] { display: none; }
+.etiquette-epingle {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 3px 10px;
+}
+.lien-nu {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--encre-3);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.lien-nu:hover { color: var(--encre); }
+
+/* La toile est un contrôle : le focus clavier doit s'y voir. */
+.carte-toile canvas:focus-visible {
+  outline: 2px solid var(--accent-vif); outline-offset: 2px;
+}
+
 .carte-echelle {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
   margin-top: 26px; font-size: 12px; color: var(--encre-2);
@@ -657,6 +838,13 @@ h1 {
   font-weight: 400; color: var(--encre-3); margin-left: 8px;
 }
 .matrice-groupes td.soi { outline: 1px solid var(--trait-fort); outline-offset: -1px; }
+
+/* Les deux conventions sont écrites dans la page ; la bascule choisit celle
+   qu'on lit. Rien n'est recalculé, rien n'est demandé au réseau. */
+.matrice-groupes .agregee { display: none; }
+.matrice-groupes.vue-agregee .par-paires { display: none; }
+.matrice-groupes.vue-agregee .agregee { display: inline; }
+.bascules-convention { margin: 6px 0 14px; }
 
 .visuellement-cache {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -705,12 +893,3 @@ h1 {
   font-family: var(--mono); font-size: 12px; color: var(--encre-3);
 }
 .liste-limites li b { color: var(--encre); font-weight: 600; }
-
-.commandes {
-  margin: 20px 0; padding: 16px 18px; overflow-x: auto;
-  background: var(--papier-creux); border: 1px solid var(--trait); border-radius: 3px;
-}
-.commandes code {
-  font-family: var(--mono); font-size: 13px; line-height: 1.75;
-  color: var(--encre); white-space: pre;
-}

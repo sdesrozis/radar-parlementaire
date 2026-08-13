@@ -170,9 +170,9 @@ def poussees_thematiques(
             categorie="sujet",
             titre=f"« {r['terme']} » en forte hausse",
             detail=(
-                f"{r['n']} occurrences cette semaine, contre {r['attendu']:.1f} "
-                f"attendues au vu des semaines précédentes et des "
-                f"{r['n_documents']} documents de la semaine"
+                f"cité dans {r['n_docs']} des {r['n_documents']} documents de la "
+                f"semaine, contre {r['attendu']:.1f} attendus au vu des semaines "
+                f"précédentes (q = {r['q_valeur']:.3f})"
             ),
             intensite=min(1.0, r["score"] / 20.0),
             donnees={"terme": r["terme"], "score": r["score"]},

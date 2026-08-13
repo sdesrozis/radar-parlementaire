@@ -276,6 +276,11 @@ SCRUTIN_SCHEMA = {
     "titre": pl.Utf8,
     "demandeur": pl.Utf8,
     "dossier_uid": pl.Utf8,
+    #: Séance où le scrutin a été tenu. La source ne remplit jamais
+    #: `dossierLegislatif` — ce champ est le seul regroupement disponible pour
+    #: dire que deux scrutins ne sont pas des observations indépendantes.
+    #: Cf. `ideal.intervalles`, qui rééchantillonne par bloc.
+    "seance_uid": pl.Utf8,
     "mode_publication": pl.Utf8,
     "nb_votants": pl.Int64,
     "suffrages_exprimes": pl.Int64,
@@ -371,6 +376,7 @@ def _scrutin_row(s: dict) -> dict:
         "titre": text(s.get("titre")) or text(dig(s, "objet", "libelle")),
         "demandeur": text(dig(s, "demandeur", "texte")),
         "dossier_uid": text(dig(s, "objet", "dossierLegislatif")),
+        "seance_uid": text(s.get("seanceRef")),
         "mode_publication": text(s.get("modePublicationDesVotes")),
         "nb_votants": _int(dig(s, "syntheseVote", "nombreVotants")),
         "suffrages_exprimes": _int(dig(s, "syntheseVote", "suffragesExprimes")),

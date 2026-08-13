@@ -62,6 +62,30 @@ uv run python site/generer.py --servir       # http://127.0.0.1:8000
 Le PDF est produit par reportlab, sans dépendance système : pas besoin
 d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 
+## Guide méthodologique LaTeX
+
+Le guide didactique des calculs est disponible dans
+[`docs/calculs_radar.tex`](docs/calculs_radar.tex). Sa compilation nécessite
+une distribution LaTeX incluant les paquets usuels (`babel`, `amsmath`,
+`booktabs`, `hyperref`). Depuis la racine du projet :
+
+```bash
+cd docs
+latexmk -pdf calculs_radar.tex
+```
+
+Sans `latexmk`, lancer deux fois `pdflatex` permet de générer aussi la table des
+matières et les renvois internes :
+
+```bash
+cd docs
+pdflatex calculs_radar.tex
+pdflatex calculs_radar.tex
+```
+
+Le fichier produit est `docs/calculs_radar.pdf`. Cette compilation est
+indépendante du PDF hebdomadaire, qui reste généré par ReportLab.
+
 ## Le site
 
 Le site est **statique** : `site/generer.py` construit les données une fois puis

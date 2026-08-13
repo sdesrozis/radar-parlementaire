@@ -9,9 +9,12 @@ une position intermédiaire entre le pour et le contre.
 Ce module la prend pour objet, et établit trois choses sur la 17ᵉ législature :
 
 1. **L'abstention est une décision collective, pas un flottement individuel.**
-   Quatre abstentions sur cinq surviennent quand l'abstention est la position
-   majoritaire du groupe. Ce n'est pas un député qui hésite, c'est un groupe qui
-   choisit de ne pas choisir.
+   Sur l'ensemble des abstentions — y compris celles que la méthode ne sait pas
+   classer — près de trois sur quatre surviennent quand l'abstention est la
+   position majoritaire du groupe. Ce n'est pas un député qui hésite, c'est un
+   groupe qui choisit de ne pas choisir. Une abstention sur dix reste
+   indéterminée, parce que le groupe n'avait ce jour-là aucune ligne : elle est
+   comptée comme telle, et non répartie entre les deux autres cas.
 
 2. **Elle est, le plus souvent, bel et bien intermédiaire.** Replacés sur l'axe
    estimé sans elles, les abstentionnistes se situent entre les deux camps dans
@@ -29,7 +32,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from .analyze import VoteCube, votes_vs_ligne
+from .analyze import SEUIL_LIGNE, VoteCube
 from .parse import load
 
 
@@ -78,29 +81,64 @@ def taux(par: str = "groupe", *, portee: str | None = None) -> pl.DataFrame:
     )
 
 
-def decomposition(portee: str | None = None) -> pl.DataFrame:
+def decomposition(
+    portee: str | None = None,
+    *,
+    min_votants_groupe: int = 5,
+    seuil_ligne: float = SEUIL_LIGNE,
+) -> pl.DataFrame:
     """L'abstention suit-elle la ligne du groupe, ou s'en écarte-t-elle ?
 
     On croise chaque abstention avec la position majoritaire de son groupe sur
-    ce scrutin, recalculée depuis le dépouillement nominatif. Trois cas :
+    ce scrutin, recalculée depuis le dépouillement nominatif. **Trois** cas, et
+    le troisième n'est pas un résidu technique :
 
     - `consigne` — le groupe s'abstient, le député aussi. C'est une décision
       collective : le groupe refuse de trancher ;
     - `retrait` — le groupe vote pour ou contre, le député s'abstient. Là, c'est
-      un écart individuel, une façon discrète de ne pas suivre.
+      un écart individuel, une façon discrète de ne pas suivre ;
+    - `indeterminee` — **le groupe n'avait pas de ligne** : aucune position n'y
+      réunissait la majorité absolue des suffrages, ou trop peu de ses membres
+      avaient voté. Sans ligne, il n'y a ni consigne à suivre ni consigne à
+      quitter, et forcer l'abstention dans l'une des deux cases inventerait une
+      information.
 
-    La distinction change tout : dans le premier cas l'abstention est un acte
-    politique de groupe, dans le second un signal de dissidence.
+    **Le dénominateur est le total des abstentions, pas le sous-ensemble
+    classifiable.** Cette fonction s'appuyait auparavant sur `votes_vs_ligne`,
+    qui écarte silencieusement les scrutins sans ligne : les parts publiées
+    portaient sur 89,9 % des abstentions sans que rien ne le dise, et
+    « quatre abstentions sur cinq sont une consigne » était en réalité « quatre
+    sur cinq **parmi celles qu'on sait classer** ». Les trois parts somment
+    désormais à 1, et la troisième mesure ce que la méthode ne sait pas trancher.
     """
     scrutins = load("scrutins").select("scrutin_uid", "portee")
-    d = votes_vs_ligne().join(scrutins, on="scrutin_uid", how="inner")
-    if portee:
-        d = d.filter(pl.col("portee") == portee)
+    lignes = load("positions_groupe")
 
-    a = d.filter(pl.col("position") == "abstention")
+    a = (
+        load("votes")
+        .filter(pl.col("position") == "abstention")
+        .join(scrutins, on="scrutin_uid", how="inner")
+        # `left` et non `inner` : une abstention dont le groupe n'a pas de ligne
+        # doit rester dans le total. C'est tout l'objet de la troisième catégorie.
+        .join(lignes, on=["scrutin_uid", "groupe_uid"], how="left")
+    )
+    if portee:
+        a = a.filter(pl.col("portee") == portee)
+    if not a.height:
+        return pl.DataFrame(
+            schema={"nature": pl.Utf8, "abstentions": pl.UInt32, "part": pl.Float64}
+        )
+
+    sans_ligne = (
+        pl.col("majoritaire").is_null()
+        | (pl.col("votants_groupe") < min_votants_groupe)
+        | (pl.col("part_majoritaire") <= seuil_ligne)
+    )
     return (
         a.with_columns(
-            pl.when(pl.col("majoritaire") == "abstention")
+            pl.when(sans_ligne)
+            .then(pl.lit("indeterminee"))
+            .when(pl.col("majoritaire") == "abstention")
             .then(pl.lit("consigne"))
             .otherwise(pl.lit("retrait"))
             .alias("nature")
@@ -205,16 +243,37 @@ def resume_intermediaire(test: pl.DataFrame) -> dict:
 
 
 def scrutins_bascule(*, portee: str | None = None, k: int | None = None) -> pl.DataFrame:
-    """Scrutins où les abstentionnistes détenaient l'issue du vote.
+    """Scrutins où les abstentionnistes détenaient réellement l'issue du vote.
 
-    Le critère est simple et vérifiable : le nombre d'abstentions dépasse
-    l'écart entre les deux camps. Dans ce cas, si les abstentionnistes avaient
-    rejoint le camp minoritaire, le résultat s'inversait — s'abstenir revenait
-    donc à trancher, sans avoir à l'assumer publiquement.
+    **Le seuil n'est pas le même selon le résultat, et c'est tout l'objet de
+    cette fonction.** Un texte est adopté quand les « pour » l'emportent
+    strictement sur les « contre » ; les abstentions ne comptent pas dans les
+    suffrages exprimés, et l'égalité vaut rejet. Le critère naïf
+    « abstentions ≥ écart » traite donc les deux cas de la même façon alors
+    qu'ils ne le sont pas :
+
+    - **scrutin adopté**, écart `e = pour − contre` : si les `a` abstentionnistes
+      avaient voté contre, le camp du contre atteindrait `contre + a`. Le texte
+      tombe dès que `contre + a ≥ pour`, donc dès que **`a ≥ e`**, puisque
+      l'égalité suffit à faire échouer ;
+    - **scrutin rejeté**, écart `e = contre − pour` : le camp du pour doit
+      *dépasser* le contre, pas l'égaler. Il faut donc **`a > e`**. Avec `a = e`
+      le vote reste rejeté, et le compter comme « bascule » serait faux.
+
+    Appliquer `a ≥ e` partout faisait entrer 69 scrutins où l'égalité était
+    atteinte sans que rien ne bascule. Le critère ci-dessous est celui du
+    règlement, appliqué au résultat effectivement obtenu.
+
+    Le cas des motions de censure ne se pose pas : elles exigent 289 voix sur
+    l'effectif de l'Assemblée, et la source n'y publie ni « contre » ni
+    abstention — aucune n'a d'abstention, donc aucune n'entre ici.
 
     Ce n'est pas une affirmation sur les intentions : c'est une arithmétique. On
     ne prétend pas que ces députés *voulaient* le résultat obtenu, seulement
     qu'ils avaient les moyens de l'empêcher.
+
+    La colonne `bascule_vers` dit dans quel sens le résultat aurait tourné, et
+    `abstentions_requises` combien d'abstentionnistes il aurait fallu déplacer.
     """
     s = load("scrutins").filter(
         (pl.col("n_abstention") > 0) & (pl.col("nb_votants") > 20)
@@ -222,19 +281,32 @@ def scrutins_bascule(*, portee: str | None = None, k: int | None = None) -> pl.D
     if portee:
         s = s.filter(pl.col("portee") == portee)
 
+    adopte = pl.col("n_pour") > pl.col("n_contre")
+    ecart = (pl.col("n_pour") - pl.col("n_contre")).abs()
+
     d = (
         s.with_columns(
-            (pl.col("n_pour") - pl.col("n_contre")).abs().alias("ecart"),
+            ecart.alias("ecart"),
+            adopte.alias("adopte"),
+            # Le nombre d'abstentionnistes qu'il aurait fallu faire changer de
+            # camp : `e` pour renverser une adoption, `e + 1` pour emporter un
+            # rejet, parce que l'égalité ne suffit pas à faire adopter.
+            pl.when(adopte).then(ecart).otherwise(ecart + 1).alias("abstentions_requises"),
         )
-        .filter(pl.col("n_abstention") >= pl.col("ecart"))
+        .filter(pl.col("n_abstention") >= pl.col("abstentions_requises"))
         .with_columns(
-            (pl.col("n_abstention") / pl.col("ecart").clip(lower_bound=1))
-            .alias("marge_de_bascule")
+            pl.when(pl.col("adopte"))
+            .then(pl.lit("rejet"))
+            .otherwise(pl.lit("adoption"))
+            .alias("bascule_vers"),
+            (pl.col("n_abstention") / pl.col("abstentions_requises"))
+            .alias("marge_de_bascule"),
         )
         .sort("ecart")
         .select(
-            "scrutin_uid", "date", "portee", "n_pour", "n_contre",
-            "n_abstention", "ecart", "sort_code", "titre",
+            "scrutin_uid", "date", "portee", "categorie", "n_pour", "n_contre",
+            "n_abstention", "ecart", "abstentions_requises", "bascule_vers",
+            "marge_de_bascule", "sort_code", "titre",
         )
     )
     return d.head(k) if k else d

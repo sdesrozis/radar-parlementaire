@@ -3,11 +3,23 @@
 <title>{{TITRE}}</title>
 <meta name="description" content="{{DESCRIPTION}}">
 <link rel="stylesheet" href="statique/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.2' fill='none' stroke='%2333327A' stroke-width='1.4'/><circle cx='8' cy='8' r='1.9' fill='%2333327A'/></svg>">
+
+<!-- `marque.png` est l'emblème du logo, découpé du fichier d'origine et recadré
+     dans un carré : le verrou complet porte le mot « RADAR », illisible à 32
+     pixels et redondant avec le texte de l'onglet. -->
+<link rel="icon" href="statique/marque.png" type="image/png">
+<link rel="apple-touch-icon" href="statique/marque.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{TITRE}}">
+<meta property="og:description" content="{{DESCRIPTION}}">
+<meta property="og:image" content="statique/logo.png">
+<meta name="twitter:card" content="summary">
 
 <header class="entete">
   <div class="cadre">
     <a class="marque" href="index.html">
+      <img class="embleme" src="statique/marque.png" alt="" width="256" height="256">
       <span class="m1">Radar</span><span class="m2">parlementaire</span>
     </a>
     <nav class="menu">
@@ -23,9 +35,47 @@
 {{CORPS}}
 </main>
 
+<!-- ══ NAVIGATION MOBILE ═══════════════════════════════════════════════
+     Sous 720 px, le menu de l'en-tête est masqué. Il l'était sans
+     remplacement : on arrivait sur une fiche de député, et il n'existait plus
+     aucun chemin vers les autres pages. Cette barre fixe est ce remplacement.
+     Elle est en fin de document et non dans l'en-tête, pour que l'ordre de
+     lecture au clavier et au lecteur d'écran reste marque → contenu → chemins.
+     ══════════════════════════════════════════════════════════════════════ -->
+<nav class="menu-mobile" aria-label="Navigation principale">
+  <a href="deputes.html"{{NAV_DEPUTES}}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path>
+    </svg>
+    <span>Chercher</span>
+  </a>
+  <a href="index.html"{{NAV_ACCUEIL}}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"></circle><path d="M12 16v-5M12 8h.01"></path>
+    </svg>
+    <span>Comprendre</span>
+  </a>
+  <a href="carte.html"{{NAV_CARTE}}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="1"></rect>
+      <path d="M4 10h16M4 15h16M10 4v16M15 4v16"></path>
+    </svg>
+    <span>Explorer</span>
+  </a>
+  <a href="methode.html"{{NAV_METHODE}}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <path d="M5 4h9l5 5v11H5z"></path><path d="M14 4v5h5M8 13h8M8 17h5"></path>
+    </svg>
+    <span>Méthode</span>
+  </a>
+</nav>
+
 <div class="filet-fin"></div>
 <footer class="cadre pied">
   <div class="grille">
+    <div>
+      <img class="pied-logo" src="statique/logo.png" alt="Radar parlementaire" width="120" height="120">
+    </div>
     <div>
       <h4>Source</h4>
       <p><a href="https://data.assemblee-nationale.fr">Open data de l'Assemblée nationale</a>,
@@ -43,8 +93,8 @@
       <h4>Notre règle</h4>
       <p>Aucune couleur ne désigne un groupe sur ce site. La couleur porte une grandeur
         ou une emphase&nbsp;; l'identité passe par le texte.</p>
-      <p>Le radar signale des écarts à la normale. Il ne produit aucune interprétation
-        politique&nbsp;: la lecture reste au lecteur.</p>
+      <p>Le bleu et le rouge de notre logo sont ceux du drapeau, et ne désignent rien
+        dans les données&nbsp;: aucun graphique du site ne les emploie.</p>
     </div>
     <div>
       <h4>Une erreur&nbsp;?</h4>

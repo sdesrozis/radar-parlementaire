@@ -54,12 +54,14 @@ from redaction import (
     phrase_portee,
     phrase_position,
     phrase_these,
+    reserve_denominateur,
     situer,
 )
 
 ICI = Path(__file__).parent
 GABARITS = ICI / "gabarits"
 STATIQUE = ICI / "statique"
+ASSETS = ICI / "assets"
 SORTIE = ICI / "sortie"
 
 
@@ -75,22 +77,24 @@ def rang_parmi(valeurs: list[float], x: float) -> int:
     return sum(1 for v in valeurs if v > x)
 
 
-def participation_engageants(donnees: Donnees) -> dict[str, tuple[float, int, int]]:
-    """Présence aux seuls votes qui engagent, pour tous les députés.
+def participation_engageants(tous: list[dict]) -> dict[str, dict]:
+    """Présence aux votes qui engagent, telle que `radar` la calcule — et pas autrement.
 
-    Reprend la définition de `site._statistiques_deputes` : le dénominateur ne
-    compte que les scrutins où le mandat courait. Le cube « texte » est déjà
-    construit par `Donnees.construire` — on ne le recalcule pas.
+    Ce générateur a longtemps refait la division ici, à partir du cube, en
+    oubliant le retrait des non-votants structurels que fait
+    `analyze.participation`. Deux chiffres coexistaient donc pour la même
+    mesure, jusqu'à 12,5 points d'écart. Il n'y a plus de calcul à cet endroit :
+    on relit ce que `vues.py` sert.
     """
-    cube = donnees.cube_texte
-    exprimes = (cube.exprime & cube.eligible).sum(axis=1)
-    eligibles = cube.eligible.sum(axis=1).astype(float)
-    taux = np.divide(exprimes, eligibles,
-                     out=np.full(cube.n_deputes, np.nan), where=eligibles > 0)
     return {
-        uid: (float(t), int(e), int(el))
-        for uid, t, e, el in zip(cube.deputes["acteur_uid"].to_list(), taux, exprimes, eligibles)
-        if not np.isnan(t)
+        d["acteur_uid"]: {
+            "taux": d["participation_engageants"],
+            "exprimes": d["votes_engageants"],
+            "eligibles": d["engageants_eligibles"],
+            "votables": d["engageants_votables"],
+        }
+        for d in tous
+        if d.get("participation_engageants") is not None
     }
 
 
@@ -145,10 +149,10 @@ class Site:
         self.portees = self.apercu["scrutins_par_portee"]
         self.n_texte = self.portees.get("texte", 0)
 
-        pe = participation_engageants(donnees)
+        pe = participation_engageants(self.tous)
         self.pe = pe
         uids = {d["acteur_uid"] for d in self.deputes}
-        self.d_part = distribution([t for u, (t, _, _) in pe.items() if u in uids])
+        self.d_part = distribution([p["taux"] for u, p in pe.items() if u in uids])
         self.d_diss = distribution(
             [d["taux_dissidence"] for d in self.deputes if d["taux_dissidence"] is not None])
         self.d_pos = distribution(
@@ -200,42 +204,63 @@ class Site:
 
     # -- carte ------------------------------------------------------------
 
-    def matrice_groupes_html(self) -> tuple[str, str]:
-        """Les en-têtes et les lignes du tableau des groupes.
+    def matrice_groupes_html(self) -> tuple[str, str, str]:
+        """Les en-têtes, les lignes du tableau des groupes, et l'écart des conventions.
 
         La teinte de chaque case est passée en `--t` et la feuille de style en
         fait une couleur : aucun code hexadécimal ne s'écrit ici, et la case
         reste lisible dans les deux thèmes.
+
+        **Chaque case porte les deux mesures**, la moyenne des taux de paires et
+        le taux agrégé sur tous les votes communs. Elles répondent à deux
+        questions différentes et diffèrent de plusieurs points ; n'en publier
+        qu'une sans nommer la convention ferait passer un choix de méthode pour
+        un fait. Le tableau bascule de l'une à l'autre par une classe, et le
+        nombre de paires est dans l'infobulle de chaque case.
         """
         mg = self.donnees.matrice_groupes()
-        ordre, cases = mg["ordre"], mg["cases"]
+        ordre = mg["ordre"]
 
         entetes = "".join(
             f'<th scope="col">{echapper(g)}</th>' for g in ordre
         )
 
+        ecart_max = 0.0
         lignes = []
-        for a, ligne in zip(ordre, cases):
+        for i, a in enumerate(ordre):
             tds = []
-            for b, v in zip(ordre, ligne):
+            for j, b in enumerate(ordre):
+                v = mg["cases"][i][j]
+                agrege = mg["cases_agregees"][i][j]
                 if v is None:
                     tds.append('<td class="mono">—</td>')
                     continue
+                if agrege is not None:
+                    ecart_max = max(ecart_max, abs(v - agrege))
                 classes = "mono fonce" if v > 0.6 else "mono"
                 if a == b:
                     classes += " soi"
-                tds.append(f'<td class="{classes}" style="--t:{v:.3f}">{pct(v, 0)}</td>')
+                infobulle = (
+                    f'{num(mg["paires"][i][j])} paires · '
+                    f'{num(mg["scrutins_communs"][i][j])} scrutins communs'
+                )
+                tds.append(
+                    f'<td class="{classes}" style="--t:{v:.3f}" title="{infobulle}">'
+                    f'<span class="par-paires">{pct(v, 0)}</span>'
+                    f'<span class="agregee">'
+                    f'{pct(agrege, 0) if agrege is not None else "—"}</span></td>'
+                )
             effectif = mg["effectifs"].get(a)
             lignes.append(
                 f'<tr><th scope="row">{echapper(a)}'
                 f'<span class="effectif">{num(effectif) if effectif else "—"}</span></th>'
                 + "".join(tds) + "</tr>"
             )
-        return entetes, "\n          ".join(lignes)
+        return entetes, "\n          ".join(lignes), dec(100 * ecart_max, 1)
 
     def carte(self) -> str:
         m = self.donnees.matrice_accords()
-        entetes, lignes_groupes = self.matrice_groupes_html()
+        entetes, lignes_groupes, ecart_conventions = self.matrice_groupes_html()
         textes = phrase_carte(m, m["groupes"])
 
         # La paire la plus élevée sert d'exemple chiffré dans le bloc « piège » :
@@ -257,6 +282,7 @@ class Site:
                 "EXEMPLE_NOM": echapper(m["paire_haute"]["a"]),
                 "ENTETES_GROUPES": entetes,
                 "LIGNES_MATRICE_GROUPES": lignes_groupes,
+                "ECART_CONVENTIONS": ecart_conventions,
                 "CARTE_JSON": json.dumps(m, ensure_ascii=False, separators=(",", ":")),
             },
             titre="Qui vote avec qui ? — Radar parlementaire",
@@ -278,6 +304,7 @@ class Site:
                 "PHRASE_PORTEE_2": p2,
                 "ENTRES_EN_COURS": num(self.apercu["entres_en_cours"]),
                 "BOOTSTRAP": num(self.apercu["bootstrap"]),
+                "BLOCS": num(self.apercu["blocs_bootstrap"]),
                 "MIN_COMMUNS": num(MIN_COMMUNS),
             },
             titre="Méthode — Radar parlementaire",
@@ -292,12 +319,17 @@ class Site:
         i, a, p = f["identite"], f["activite"], f["position"]
         groupe = self.groupes.get(i["groupe"])
 
-        taux, exprimes, eligibles = self.pe.get(uid, (0.0, 0, 0))
+        p_eng = self.pe.get(uid, {"taux": 0.0, "exprimes": 0, "eligibles": 0, "votables": 0})
+        taux = p_eng["taux"]
+        exprimes, eligibles, votables = (
+            p_eng["exprimes"], p_eng["eligibles"], p_eng["votables"])
         a["participation_engageants"] = taux
         a["votes_engageants"] = exprimes
-        # Le dénominateur est propre au député : un élu en cours de législature
-        # n'a pas pu voter les scrutins tenus avant son entrée en fonction.
+        # Le dénominateur est propre au député, et deux retraits l'ont formé : les
+        # scrutins hors mandat, et ceux où la source dit qu'il ne pouvait pas
+        # voter (ministre, président de séance). Cf. `analyze.participation`.
         a["engageants_eligibles"] = eligibles
+        a["engageants_votables"] = votables
 
         rang_part = rang_parmi(self.d_part["valeurs"], taux)
         rang_diss = rang_parmi(self.d_diss["valeurs"], a["taux_dissidence"] or 0)
@@ -366,11 +398,12 @@ class Site:
 
             "PART_ENG_PCT": pct(taux),
             "PART_ENG_N": num(exprimes),
-            "PART_ENG_DENOM": num(eligibles),
-            # Quand le mandat n'a pas couvert toute la législature, le dénominateur
-            # diffère du total : on le dit, sinon le chiffre paraît faux.
-            "PART_ENG_RESERVE": ("<br>tenus depuis son entrée en fonction"
-                                 if eligibles < self.n_texte else ""),
+            "PART_ENG_DENOM": num(votables),
+            # Le dénominateur affiché est celui qui a été divisé, et les deux
+            # retraits qui l'ont formé sont nommés : sans cela le chiffre paraît
+            # faux à quiconque compare aux totaux de la législature.
+            "PART_ENG_RESERVE": reserve_denominateur(
+                eligibles, votables, self.n_texte),
             "PART_TOUS": f"{taux:.4f}",
             "PART_TOUS_PCT": pct(a["participation"] or 0),
             "PART_PHRASE": part1,
@@ -416,13 +449,30 @@ class Site:
     def accueil(self) -> str:
         corps = (GABARITS / "accueil.html").read_text()
         return self.page(
-            corps, {"LIGNES_GROUPES": lignes_groupes_html(self.apercu["groupes"])},
+            corps,
+            {
+                "LIGNES_GROUPES": lignes_groupes_html(self.apercu["groupes"]),
+                # Le même index que l'annuaire : une seule recherche, un seul
+                # jeu de résultats. Cf. `recherche()` dans `radar.js`.
+                "ANNUAIRE_JSON": self.index_annuaire(),
+            },
             titre="Radar parlementaire — ce que fait votre député, avec le dénominateur",
             description=("Chaque chiffre sur l'activité des députés, recalculé depuis les votes "
                          "nominatifs de l'Assemblée nationale et affiché avec son dénominateur."),
             onglet="accueil")
 
-    def annuaire(self) -> str:
+    def index_annuaire(self) -> str:
+        """L'index des députés, servi tel quel à la recherche.
+
+        Les trois signaux sont **déjà mis en forme ici** : le pourcentage, la
+        virgule décimale et l'espace insécable sont du français, pas du calcul,
+        et `radar.js` n'a ni à les fabriquer ni à savoir qu'un taux manquant
+        n'est pas un zéro. Une valeur absente sort en chaîne vide, et la liste
+        affiche « — ».
+        """
+        def mesure(valeur, forme) -> str:
+            return "" if valeur is None else forme(valeur)
+
         index = [{
             "u": d["acteur_uid"],
             "n": d["nom_complet"],
@@ -432,12 +482,18 @@ class Site:
             "r": self.region.get(d["acteur_uid"], ""),
             "g": d["groupe"] or "",
             "gl": d["groupe_libelle"] or "",
-            "p": f"{pct(self.pe.get(d['acteur_uid'], (0.0, 0, 0))[0], 0)}{NBSP}%",
+            "pres": mesure(d.get("participation_engageants"),
+                           lambda v: f"{pct(v, 0)}{NBSP}%"),
+            "ecart": mesure(d.get("taux_dissidence"), lambda v: f"{pct(v, 1)}{NBSP}%"),
+            "pos": mesure(d.get("axe1"), dec),
         } for d in sorted(self.deputes, key=lambda x: x["nom_complet"])]
+        return json.dumps(index, ensure_ascii=False, separators=(",", ":"))
+
+    def annuaire(self) -> str:
         corps = (GABARITS / "annuaire.html").read_text()
         return self.page(
             corps,
-            {"ANNUAIRE_JSON": json.dumps(index, ensure_ascii=False, separators=(",", ":"))},
+            {"ANNUAIRE_JSON": self.index_annuaire()},
             titre="Trouver un député — Radar parlementaire",
             description=("Cherchez votre député par nom, département, région ou groupe "
                          "parlementaire, et lisez ses chiffres avec leur dénominateur."),
@@ -466,6 +522,12 @@ def main() -> None:
     if (SORTIE / "statique").exists():
         shutil.rmtree(SORTIE / "statique")
     shutil.copytree(STATIQUE, SORTIE / "statique")
+    # Les images de marque vivent dans `assets/` — elles ne sont ni du style ni
+    # du comportement — mais elles sont servies depuis `statique/`, parce que
+    # c'est le seul dossier que l'hébergeur voit.
+    for image in sorted(ASSETS.glob("*")):
+        if image.is_file():
+            shutil.copy2(image, SORTIE / "statique" / image.name)
 
     (SORTIE / "index.html").write_text(site.accueil())
     (SORTIE / "deputes.html").write_text(site.annuaire())

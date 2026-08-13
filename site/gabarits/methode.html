@@ -13,13 +13,13 @@
   <section class="cadre">
     <div class="these">
       <p>Un site qui publie des chiffres sur des personnes doit pouvoir être
-        contredit. C'est l'objet de cette page&nbsp;: elle donne assez de détail
-        pour que <em>n'importe qui puisse refaire les calculs</em> et constater
-        si nous nous sommes trompés.</p>
-      <p>Le code qui produit ce site est public, et les données viennent
-        intégralement de l'open data de l'Assemblée nationale. Rien n'est saisi
-        à la main, rien n'est corrigé à la main. <b>Si un chiffre est faux, c'est
-        que le calcul est faux</b> — et il doit être corrigé publiquement.</p>
+        contredit. C'est l'objet de cette page&nbsp;: elle donne <em>la
+        définition exacte et le dénominateur</em> de chaque mesure, pour qu'on
+        puisse la contester sur le fond.</p>
+      <p>Les données viennent intégralement de l'open data de l'Assemblée
+        nationale. Rien n'est saisi à la main, rien n'est corrigé à la main.
+        <b>Si un chiffre est faux, c'est que le calcul est faux</b> — et il doit
+        être corrigé publiquement.</p>
     </div>
   </section>
 
@@ -91,13 +91,23 @@
 
     <div class="lecture">
       <h3>Présence aux votes qui engagent</h3>
-      <p class="provenance">votes exprimés ÷ scrutins où le mandat courait</p>
+      <p class="provenance">votes exprimés ÷ scrutins où le député pouvait voter</p>
       <p>Le numérateur compte les « pour », « contre » et « abstention »
-        explicitement enregistrés. Le dénominateur ne compte que les scrutins
-        tenus <b>pendant le mandat du député</b>&nbsp;: {{ENTRES_EN_COURS}}
-        députés en exercice sont entrés en cours de législature, et leur taux
-        serait faussé s'il portait sur {{PORTEE_TEXTE}} scrutins qu'ils n'ont pas
-        pu voter.</p>
+        explicitement enregistrés. Le dénominateur se forme par <b>deux
+        retraits</b>, qui répondent à deux objections différentes&nbsp;:</p>
+      <p>D'abord les scrutins tenus <b>hors du mandat</b>&nbsp;:
+        {{ENTRES_EN_COURS}} députés en exercice sont entrés en cours de
+        législature, et leur taux serait faussé s'il portait sur
+        {{PORTEE_TEXTE}} scrutins qu'ils n'ont pas pu voter. Ensuite les
+        <b>non-votants structurels</b> — un membre du Gouvernement ou le
+        président de séance ne peut pas voter, et la source le dit
+        explicitement&nbsp;: ce ne sont pas des absences.</p>
+      <p><b>Ce dénominateur est unique sur tout le site.</b> C'est une règle et
+        non une évidence&nbsp;: les fiches ont un temps refait cette division
+        de leur côté en oubliant le second retrait, ce qui donnait deux chiffres
+        différents pour la même mesure — jusqu'à 12,5 points d'écart, sur 44
+        députés. Le nombre affiché sous chaque taux est celui qui a réellement
+        été divisé, et la fiche nomme les retraits quand il y en a.</p>
       <p>Un député dont la source ne contient <em>aucun</em> vote nominatif
         n'obtient pas 0&nbsp;%&nbsp;: il obtient une case vide et une phrase qui
         décrit la lacune. Une absence de donnée n'est pas une absence de vote.</p>
@@ -141,6 +151,16 @@
         {{BOOTSTRAP}} fois pour obtenir un intervalle, et chaque fiche indique
         combien d'autres députés ont un intervalle qui recouvre le sien. Quand
         deux zones se recouvrent, l'ordre entre les deux n'a pas de sens.</p>
+      <p><b>Le rééchantillonnage se fait par séance entière, et non scrutin par
+        scrutin.</b> C'est une précaution contre un excès de confiance&nbsp;:
+        les scrutins d'une même séance portent sur le même texte, dans le même
+        rapport de force, et se ressemblent bien plus que deux scrutins tirés au
+        hasard dans la législature. Les tirer un par un reviendrait à traiter
+        {{PORTEE_TEXTE}} votes comme {{PORTEE_TEXTE}} observations indépendantes
+        alors qu'ils forment {{BLOCS}} paquets — et à publier des intervalles
+        trop serrés, donc des classements trop assurés. Le dossier législatif
+        serait un meilleur niveau de regroupement encore&nbsp;; l'open data ne le
+        renseigne pas.</p>
       <p>Nous ne retenons qu'<b>une seule dimension</b>. Un second axe n'est
         ajouté que s'il prédit mieux des votes que le modèle n'a pas vus, ce qui
         se teste — et ne se suppose pas. C'est aussi la raison pour laquelle ce
@@ -149,12 +169,47 @@
         significative.</p>
 
       <h3>Cohésion d'un groupe</h3>
-      <p class="provenance">taux d'accord moyen entre toutes les paires de députés du même groupe</p>
+      <p class="provenance">taux d'accord moyen entre toutes les paires de députés du même groupe, en exercice</p>
       <p>Un groupe de quatre députés et un groupe de quatre-vingt-dix ne
         produisent pas des moyennes également stables. Les effectifs accompagnent
         donc toujours la mesure. Les non-inscrits (NI) ne sont pas un groupe et
         n'ont pas de ligne&nbsp;: leur « cohésion » n'a pas de sens, et ils sont
         exclus des comparaisons entre groupes.</p>
+      <p><b>Le périmètre du calcul est celui de l'effectif affiché à côté.</b>
+        La cohésion a un temps été calculée sur tous les députés ayant siégé
+        depuis 2024, y compris les partis, à côté d'un effectif ne comptant que
+        ceux en exercice&nbsp;: deux chiffres qui ne parlaient pas de la même
+        Assemblée, pour un écart allant jusqu'à 0,8 point. Les deux portent
+        maintenant sur les mêmes personnes.</p>
+
+      <h3>Accord entre deux groupes</h3>
+      <p class="provenance">deux conventions, publiées ensemble — voir <a href="carte.html">la page « Qui vote avec qui&nbsp;? »</a></p>
+      <p>Il n'existe pas <em>un</em> accord entre deux groupes. Il en existe
+        deux, selon ce à quoi l'on donne le même poids&nbsp;: la <b>moyenne des
+        taux de paires</b>, où chaque binôme compte pour un quel que soit le
+        nombre de scrutins qui l'a mesuré, et le <b>taux agrégé</b>, qui rapporte
+        tous les votes concordants à tous les votes communs et fait donc peser
+        davantage les binômes les plus longuement observés.</p>
+      <p>Les deux sont justes, elles répondent à deux questions différentes, et
+        elles s'écartent de plusieurs points. Le tableau des groupes affiche
+        l'une ou l'autre au choix, avec le nombre de paires de chaque case&nbsp;:
+        <b>publier une seule des deux sans nommer la convention ferait passer un
+        choix de méthode pour un fait.</b></p>
+
+      <h3>Nature d'une abstention</h3>
+      <p class="provenance">consigne de groupe, retrait individuel, ou indéterminée — sur le total des abstentions</p>
+      <p>Une abstention prend son sens de la position du groupe ce jour-là. Si le
+        groupe s'abstient aussi, c'est une <b>consigne</b>&nbsp;: une décision
+        collective de ne pas trancher. S'il vote pour ou contre, c'est un
+        <b>retrait</b>&nbsp;: une façon discrète de ne pas suivre.</p>
+      <p>Reste un troisième cas, et il compte&nbsp;: quand <b>le groupe n'avait
+        aucune ligne</b> — aucune position n'y réunissait la majorité absolue des
+        suffrages — il n'y a ni consigne à suivre ni consigne à quitter.
+        L'abstention est alors <b>indéterminée</b>. Elle n'est pas écartée du
+        calcul&nbsp;: elle est comptée comme telle, et les trois parts portent
+        sur l'ensemble des abstentions. Les répartir de force entre les deux
+        premières catégories inventerait une information&nbsp;; les écarter sans
+        le dire ferait porter les pourcentages sur un sous-ensemble muet.</p>
     </div>
   </section>
 
@@ -180,27 +235,28 @@
     </div>
   </section>
 
-  <!-- ══ REPRODUIRE ════════════════════════════════════════════════ -->
+  <!-- ══ DATE ET CORRECTIONS ═══════════════════════════════════════ -->
   <section class="cadre socle">
     <div class="lecture">
-      <p class="jalon">Vérifier par vous-même</p>
-      <h2>Refaire les calculs</h2>
-      <p>Le code est ouvert. Les commandes ci-dessous téléchargent les données
-        depuis l'Assemblée, reconstruisent les tables et régénèrent ce site à
-        l'identique.</p>
-      <pre class="commandes"><code>uv run radar update
-uv run python site/generer.py --servir</code></pre>
+      <p class="jalon">Ce que vous lisez, et quand</p>
+      <h2>Une photographie datée</h2>
       <p>Les données de cette version ont été construites le
-        <b>{{GENERE_LE}}</b>. Un chiffre lu ici plus tard peut avoir changé&nbsp;:
-        de nouveaux scrutins ont eu lieu, des députés sont entrés ou partis. La
-        date de calcul figure en bas de chaque page pour cette raison.</p>
+        <b>{{GENERE_LE}}</b>, à partir des archives publiées par l'Assemblée. Un
+        chiffre lu ici plus tard peut avoir changé&nbsp;: de nouveaux scrutins
+        ont eu lieu, des députés sont entrés ou partis, un groupe a changé de
+        composition. <b>La date de calcul figure en bas de chaque page</b> pour
+        cette raison — un taux sans sa date est aussi incomplet qu'un taux sans
+        son dénominateur.</p>
 
       <p class="jalon">Une erreur&nbsp;?</p>
       <h2>Comment la signaler</h2>
       <p>Chaque taux est publié avec son dénominateur précisément pour pouvoir
-        être recontrôlé. Si vous trouvez une erreur — un chiffre, un
-        rattachement de groupe, une date de mandat — elle doit être corrigée
-        publiquement, et la correction doit être visible.</p>
+        être recontrôlé&nbsp;: le numérateur, le dénominateur et la définition
+        étant donnés, n'importe qui peut refaire l'opération depuis la source
+        ouverte et nous opposer un autre résultat.</p>
+      <p>Si vous trouvez une erreur — un chiffre, un rattachement de groupe, une
+        date de mandat — elle doit être corrigée publiquement, et la correction
+        doit être visible.</p>
       <p><a href="carte.html">Voir la mesure d'ensemble</a> ·
         <a href="deputes.html">Chercher un député</a></p>
     </div>

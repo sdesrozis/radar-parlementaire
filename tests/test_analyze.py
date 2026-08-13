@@ -4,7 +4,13 @@ import numpy as np
 import polars as pl
 import pytest
 
-from radar.analyze import VoteCube, agreement, plus_proches
+from radar.analyze import (
+    VoteCube,
+    accord_entre_groupes,
+    agreement,
+    plus_proches,
+    sous_cube_deputes,
+)
 
 
 def cube_jouet() -> VoteCube:
@@ -106,3 +112,66 @@ class TestPlusProches:
         assert cube.index_depute("a") == 0
         with pytest.raises(KeyError, match="aucun député"):
             cube.index_depute("Zorglub")
+
+
+class TestAccordEntreGroupes:
+    """Les deux conventions, et pourquoi elles ne donnent pas le même nombre."""
+
+    def test_les_deux_conventions_sont_servies(self):
+        d = accord_entre_groupes(cube_jouet(), min_communs=1)
+        assert {"accord", "accord_agrege", "n_paires", "scrutins_communs"} <= set(d.columns)
+
+    def test_moyenne_de_paires_et_quotient_de_sommes_different(self):
+        """G2 réunit C (6 scrutins communs avec G1) et D (1 seul, à 100 %).
+
+        En moyenne non pondérée, la paire A↔D pèse autant que A↔C : 100 % et
+        1/6 se moyennent. En agrégé, D n'apporte qu'un vote sur treize. Les deux
+        chiffres sont justes, ils ne répondent pas à la même question — c'est
+        pourquoi le site publie la convention avec la valeur.
+        """
+        d = accord_entre_groupes(cube_jouet(), min_communs=1)
+        case = d.filter((pl.col("groupe_a") == "G1") & (pl.col("groupe_b") == "G2")).to_dicts()[0]
+        assert case["accord"] != pytest.approx(case["accord_agrege"])
+        # 4 paires inter-groupes : A↔C, A↔D, B↔C, B↔D.
+        assert case["n_paires"] == 4
+
+    def test_les_paires_trop_courtes_sortent_des_deux_mesures(self):
+        """Un seuil qui écarte une paire d'un taux doit l'écarter de l'autre.
+
+        Sinon les deux conventions ne portent plus sur la même population, et
+        leur écart cesse d'être interprétable.
+        """
+        d = accord_entre_groupes(cube_jouet(), min_communs=3)
+        case = d.filter((pl.col("groupe_a") == "G1") & (pl.col("groupe_b") == "G2")).to_dicts()[0]
+        # D (un seul vote) disparaît : il ne reste que A↔C et B↔C.
+        assert case["n_paires"] == 2
+        assert case["accord_agrege"] == pytest.approx(1 / 6)
+
+    def test_le_nombre_de_paires_ne_double_pas_dans_un_groupe(self):
+        d = accord_entre_groupes(cube_jouet(), min_communs=1)
+        case = d.filter((pl.col("groupe_a") == "G1") & (pl.col("groupe_b") == "G1")).to_dicts()[0]
+        assert case["n_paires"] == 1        # A↔B, comptée une fois
+
+
+class TestSousCubeDeputes:
+    def test_restreindre_les_lignes_conserve_les_scrutins(self):
+        cube = cube_jouet()
+        petit = sous_cube_deputes(cube, np.array([0, 2]))
+        assert petit.n_deputes == 2
+        assert petit.n_scrutins == cube.n_scrutins
+        assert petit.noms() == ["A", "C"]
+
+    def test_la_mesure_change_avec_le_perimetre(self):
+        """C'est la raison d'être de cette fonction, pas un effet de bord.
+
+        La cohésion de G2 calculée sur C et D n'est pas celle calculée sur C
+        seul — et c'est pourquoi elle doit porter sur les députés dont on
+        affiche l'effectif.
+        """
+        cube = cube_jouet()
+        entier = accord_entre_groupes(cube, min_communs=1)
+        sans_d = accord_entre_groupes(sous_cube_deputes(cube, np.array([0, 1, 2])), min_communs=1)
+        ligne = (pl.col("groupe_a") == "G1") & (pl.col("groupe_b") == "G2")
+        assert entier.filter(ligne)["accord"][0] != pytest.approx(
+            sans_d.filter(ligne)["accord"][0]
+        )

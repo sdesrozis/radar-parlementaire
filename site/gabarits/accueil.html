@@ -1,10 +1,46 @@
-  <!-- ══ MANIFESTE ═════════════════════════════════════════════════ -->
-  <section class="cadre manifeste">
+  <!-- ══ MANIFESTE ═════════════════════════════════════════════════
+       La recherche est ici, au-dessus de tout le reste. Elle y est parce
+       qu'un lecteur qui arrive sur ce site vient chercher quelqu'un, pas lire
+       une profession de foi : l'explication a sa place, elle n'a pas la
+       première. Le champ est le même que celui de l'annuaire, servi par le
+       même index et le même code — deux recherches divergeraient.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre manifeste" data-annuaire data-limite="6" data-vide="masquer">
     <p class="fil">Assemblée nationale · {{LEGISLATURE}}<sup>e</sup> législature</p>
     <h1>Ce que fait votre député, avec le dénominateur.</h1>
     <p class="appui">Un pourcentage sans son effectif est une opinion. Ce site recalcule
       chaque chiffre depuis les {{VOTES}} votes nominatifs publiés par l'Assemblée, et
       n'en affiche <em>aucun sans dire sur quoi il porte</em>.</p>
+
+    <div class="chercher-tete">
+      <div class="champ">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path>
+        </svg>
+        <input type="search" id="q" placeholder="Votre député : nom, département, circonscription…"
+               autocomplete="off" spellcheck="false" aria-label="Chercher un député">
+        <button class="effacer" id="effacer" hidden>effacer</button>
+      </div>
+
+      <div class="exemples">
+        <span>Essayez&nbsp;:</span>
+        <button data-exemple="Courson">Courson</button>
+        <button data-exemple="Gironde">Gironde</button>
+        <button data-exemple="75">Paris (75)</button>
+        <button data-exemple="Bretagne">Bretagne</button>
+      </div>
+
+      <p class="compteur" id="compteur" hidden></p>
+      <ul class="annuaire" id="resultats"></ul>
+      <div class="rien" id="rien" hidden>
+        <p>Aucun député ne correspond à «&nbsp;<b id="rien-q"></b>&nbsp;».</p>
+        <p style="font-size:15px">La recherche porte sur le nom, le département, son
+          numéro, la région et le groupe. <b>Les communes ne sont pas encore
+          reconnues.</b></p>
+      </div>
+      <p class="deborde" id="deborde" hidden><a href="deputes.html">Voir les
+        <b id="deborde-n"></b> résultats dans l'annuaire complet →</a></p>
+    </div>
 
     <dl class="perimetre">
       <div>
@@ -55,17 +91,6 @@
           et elle ne produit <b>aucune donnée publique</b>. Aucun chiffre de ce site
           ne la mesure — ni ne peut la juger.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- ══ COMMENCER ═════════════════════════════════════════════════ -->
-  <section class="cadre" style="padding-block: 52px; border-bottom: 1px solid var(--trait)">
-    <div class="lecture">
-      <p class="jalon">Commencer par le vôtre</p>
-      <h2 class="section-titre">Qui est votre député&nbsp;?</h2>
-      <p class="section-intro">Cherchez par nom, par département ou par région. Chaque fiche
-        explique ses chiffres au lieu de les afficher seuls.</p>
-      <p style="margin-top:26px"><a class="bouton" href="deputes.html">Chercher parmi les {{EN_EXERCICE}} députés →</a></p>
     </div>
   </section>
 
@@ -159,4 +184,7 @@
       à l'intérieur du groupe. Plus elle est large, moins «&nbsp;un député de ce
       groupe&nbsp;» veut dire quelque chose de précis.
     </p>
+    <p style="margin-top:30px"><a class="bouton" href="deputes.html">Chercher parmi les {{EN_EXERCICE}} députés →</a></p>
   </section>
+
+  <script>const ANNUAIRE = {{ANNUAIRE_JSON}};</script>

@@ -153,6 +153,10 @@ class Donnees:
     #: nombre : servir la constante plutôt que la valeur employée ferait
     #: annoncer 40 intervalles à un site généré avec `--bootstrap 0`.
     bootstrap: int = BOOTSTRAP
+    #: Cube restreint aux députés en exercice, construit à la demande par
+    #: `cube_en_exercice()`. Il sert à toute mesure publiée à côté d'un effectif
+    #: actuel — cf. `_table_groupes` et `matrice_groupes`.
+    _cube_actuel: VoteCube | None = None
 
     # -- construction ------------------------------------------------------
 
@@ -244,6 +248,10 @@ class Donnees:
                 "groupes": lignes(self.groupes),
                 "avec_amendements": self.avec_amendements,
                 "bootstrap": self.bootstrap,
+                # Le nombre de blocs du bootstrap : c'est lui, et non le nombre
+                # de scrutins, qui dit la taille réelle de l'échantillon derrière
+                # les intervalles. La page Méthode le publie.
+                "blocs_bootstrap": len(ideal.blocs_de_scrutins(self.cube_texte)),
                 "entres_en_cours": self._entres_en_cours(),
             }
         )
@@ -274,6 +282,10 @@ class Donnees:
             "num_departement", "num_circo", "en_exercice", "participation",
             "taux_dissidence", "part_abstention", "votes_exprimes", "axe1",
             "borne_basse", "borne_haute", "age", "cat_socio_pro",
+            # Servies ici pour que le site n'ait jamais à refaire la division :
+            # le taux, son numérateur et son dénominateur voyagent ensemble.
+            "participation_engageants", "votes_engageants",
+            "engageants_eligibles", "engageants_votables",
         ]
         if self.avec_amendements:
             colonnes += ["amendements", "taux_adoption"]
@@ -305,9 +317,16 @@ class Donnees:
                 "activite": {
                     k: r[k] for k in (
                         "scrutins_eligibles", "votes_exprimes", "non_votants_structurels",
-                        "participation", "part_pour", "part_contre", "part_abstention",
+                        "scrutins_votables", "participation",
+                        "part_pour", "part_contre", "part_abstention",
                         "votes_avec_ligne", "votes_dissidents", "taux_dissidence",
-                        "votes_engageants", "participation_engageants",
+                        # Les quatre colonnes de la présence aux votes qui
+                        # engagent : le numérateur, les deux retraits et le
+                        # dénominateur réellement divisé. Le site n'en recalcule
+                        # aucune — c'est ce qui garantit un seul chiffre.
+                        "votes_engageants", "engageants_eligibles",
+                        "engageants_structurels", "engageants_votables",
+                        "participation_engageants",
                     )
                 },
                 "position": {
@@ -605,8 +624,17 @@ class Donnees:
         Les effectifs accompagnent chaque groupe : une moyenne sur un groupe de
         quatre députés et une moyenne sur un groupe de quatre-vingt-dix ne se
         lisent pas de la même façon.
+
+        Deux valeurs par case, et non une : `cases` porte la moyenne non
+        pondérée des taux de paires, `cases_agregees` le quotient des sommes sur
+        tous les votes communs. Ce sont deux conventions différentes, elles
+        diffèrent de plusieurs points, et la page les publie toutes les deux
+        avec le nombre de paires — cf. `analyze.accord_entre_groupes`.
+
+        Le calcul porte sur `cube_en_exercice()`, pour que la mesure et
+        l'effectif affiché décrivent la même Assemblée.
         """
-        accords = analyze.accord_entre_groupes(self.cube)
+        accords = analyze.accord_entre_groupes(self.cube_en_exercice())
         table = self.groupes.filter(pl.col("effectif_actuel") > 0)
 
         ordre = [
@@ -619,13 +647,19 @@ class Donnees:
         ordre += [g for g in table["groupe"].to_list() if g not in ordre]
 
         effectifs = dict(table.select("groupe", "effectif_actuel").iter_rows())
-        cases = {(r["groupe_a"], r["groupe_b"]): r["accord"] for r in accords.to_dicts()}
+        par_case = {(r["groupe_a"], r["groupe_b"]): r for r in accords.to_dicts()}
+
+        def champ(nom: str) -> list[list]:
+            return [[(par_case.get((a, b)) or {}).get(nom) for b in ordre] for a in ordre]
 
         return _propre(
             {
                 "ordre": ordre,
                 "effectifs": {g: effectifs.get(g) for g in ordre},
-                "cases": [[cases.get((a, b)) for b in ordre] for a in ordre],
+                "cases": champ("accord"),
+                "cases_agregees": champ("accord_agrege"),
+                "paires": champ("n_paires"),
+                "scrutins_communs": champ("scrutins_communs"),
             }
         )
 
@@ -694,9 +728,28 @@ class Donnees:
             if uids[j] in par_uid
         ]
 
+    def cube_en_exercice(self) -> VoteCube:
+        """Le cube restreint aux députés siégeant aujourd'hui.
+
+        Le cube principal porte tous les députés ayant siégé depuis 2024, parce
+        que les fiches des anciens doivent rester calculables. Mais toute mesure
+        publiée **à côté d'un effectif actuel** doit porter sur ce même
+        périmètre : afficher « 24 députés, cohésion 87 % » quand les 87 % sont
+        calculés sur 31 personnes dont sept sont parties fait deux chiffres qui
+        ne parlent pas de la même Assemblée. L'écart atteignait 0,82 point.
+        """
+        if self._cube_actuel is None:
+            actifs = np.flatnonzero(self.cube.deputes["en_exercice"].to_numpy())
+            self._cube_actuel = analyze.sous_cube_deputes(self.cube, actifs)
+        return self._cube_actuel
+
     def _table_groupes(self) -> pl.DataFrame:
-        """Effectif, cohésion et moyennes d'activité par groupe."""
-        cohesion = analyze.cohesion_groupes(self.cube)
+        """Effectif, cohésion et moyennes d'activité par groupe.
+
+        La cohésion se calcule sur `cube_en_exercice()` : c'est l'effectif
+        affiché dans la colonne d'à côté.
+        """
+        cohesion = analyze.cohesion_groupes(self.cube_en_exercice())
         moyennes = (
             self.deputes.filter(pl.col("en_exercice"))
             .group_by("groupe")
@@ -740,7 +793,8 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
     """
     part = analyze.participation(cube).select(
         "acteur_uid", "scrutins_eligibles", "votes_exprimes",
-        "non_votants_structurels", "participation",
+        "non_votants_structurels", pl.col("denominateur").alias("scrutins_votables"),
+        "participation",
     )
     diss = analyze.dissidence(cube, min_votes=1).select(
         "acteur_uid",
@@ -768,18 +822,18 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
         }
     )
 
-    engageants = analyze.build_cube(portee="texte", en_exercice_seulement=False)
-    e_exprime = (engageants.exprime & engageants.eligible).sum(axis=1)
-    e_eligible = engageants.eligible.sum(axis=1).astype(np.float64)
-    engagement = pl.DataFrame(
-        {
-            "acteur_uid": engageants.deputes["acteur_uid"],
-            "votes_engageants": e_exprime.astype(np.int64),
-            "participation_engageants": np.divide(
-                e_exprime, e_eligible,
-                out=np.full(engageants.n_deputes, np.nan), where=e_eligible > 0,
-            ),
-        }
+    # Même fonction que ci-dessus, sur l'autre assiette de scrutins : le
+    # dénominateur de présence ne se réécrit nulle part ailleurs. Cf.
+    # `analyze.participation`, qui retire aussi les non-votants structurels.
+    engagement = analyze.participation(
+        analyze.build_cube(portee="texte", en_exercice_seulement=False)
+    ).select(
+        "acteur_uid",
+        pl.col("votes_exprimes").alias("votes_engageants"),
+        pl.col("scrutins_eligibles").alias("engageants_eligibles"),
+        pl.col("non_votants_structurels").alias("engageants_structurels"),
+        pl.col("denominateur").alias("engageants_votables"),
+        pl.col("participation").alias("participation_engageants"),
     )
 
     return (

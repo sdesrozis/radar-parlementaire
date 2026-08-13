@@ -135,6 +135,12 @@ document.querySelectorAll(".bande").forEach((b) => oeil.observe(b));
 const pliage = (s) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+/* Un seul code de recherche pour l'accueil et l'annuaire. Deux implémentations
+   divergeraient : le même mot cherché à deux endroits ne doit pas donner deux
+   réponses. Les pages ne diffèrent que par deux attributs posés sur l'hôte —
+   `data-limite`, combien de résultats afficher, et `data-vide="masquer"`, qui
+   attend une frappe au lieu de dérouler les 574 sous le manifeste. */
+
 function recherche() {
   const hote = document.querySelector("[data-annuaire]");
   if (!hote || typeof ANNUAIRE === "undefined") return;
@@ -143,31 +149,59 @@ function recherche() {
   const effacer = document.querySelector("#effacer");
   const liste = document.querySelector("#resultats");
   const compteur = document.querySelector("#compteur");
+  const deborde = document.querySelector("#deborde");
+
+  const limite = parseInt(hote.dataset.limite || "0", 10) || Infinity;
+  const masquerAVide = hote.dataset.vide === "masquer";
 
   // L'index est plié une fois pour toutes, pas à chaque frappe.
   const index = ANNUAIRE.map((d) => ({ ...d, cle: pliage([d.n, d.d, d.dn, d.r, d.g, d.gl].join(" ")) }));
 
+  /* Les trois signaux d'un député, chacun avec ce qu'il mesure. Un nombre nu
+     dans une liste se lit comme une note ; le libellé en dit la nature, et la
+     fiche en donne le dénominateur. Une mesure absente affiche « — » et non
+     zéro — la règle vaut ici comme ailleurs. */
+  const mesures = (d) => [
+    ["présence", d.pres],
+    ["écart au groupe", d.ecart],
+    ["position", d.pos],
+  ].map(([libelle, valeur]) =>
+    `<span class="an-mesure"><b>${valeur || "—"}</b><i>${libelle}</i></span>`
+  ).join("");
+
   const dessiner = (q) => {
     const mots = pliage(q).split(" ").filter(Boolean);
-    const trouves = mots.length
-      ? index.filter((d) => mots.every((m) => d.cle.includes(m)))
-      : index;
+    const vide = !mots.length;
+    if (vide && masquerAVide) {
+      liste.innerHTML = "";
+      compteur.hidden = true;
+      document.querySelector("#rien").hidden = true;
+      if (deborde) deborde.hidden = true;
+      effacer.hidden = true;
+      return;
+    }
 
-    compteur.innerHTML = mots.length
-      ? `<b>${trouves.length}</b> député${trouves.length > 1 ? "s" : ""} sur ${index.length}`
-      : `<b>${index.length}</b> députés en exercice`;
+    const trouves = vide ? index : index.filter((d) => mots.every((m) => d.cle.includes(m)));
+    const montres = trouves.slice(0, limite);
 
-    liste.innerHTML = trouves.length
-      ? trouves.map((d) => `<li><a href="${d.u}.html">
+    compteur.hidden = false;
+    compteur.innerHTML = vide
+      ? `<b>${index.length}</b> députés en exercice`
+      : `<b>${trouves.length}</b> député${trouves.length > 1 ? "s" : ""} sur ${index.length}`;
+
+    liste.innerHTML = montres.map((d) => `<li><a href="${d.u}.html">
           <span class="an-nom">${d.n}</span>
           <span class="an-lieu">${d.d} · ${d.c}${d.c === "1" ? "re" : "e"}</span>
           <span class="an-grp">${d.g}</span>
-          <span class="an-chiffre">${d.p}</span>
-        </a></li>`).join("")
-      : "";
+          <span class="an-chiffres">${mesures(d)}</span>
+        </a></li>`).join("");
 
     document.querySelector("#rien").hidden = trouves.length > 0;
     if (!trouves.length) document.querySelector("#rien-q").textContent = q;
+    if (deborde) {
+      deborde.hidden = trouves.length <= montres.length;
+      document.querySelector("#deborde-n").textContent = trouves.length;
+    }
     effacer.hidden = !q;
   };
 
@@ -179,6 +213,14 @@ function recherche() {
   effacer.addEventListener("click", () => { champ.value = ""; dessiner(""); champ.focus(); });
   document.querySelectorAll("[data-exemple]").forEach((b) => {
     b.addEventListener("click", () => { champ.value = b.dataset.exemple; dessiner(b.dataset.exemple); champ.focus(); });
+  });
+
+  /* Entrée sur un résultat unique : c'est le cas le plus fréquent quand on
+     tape un nom de famille, et rien n'oblige alors à quitter le clavier. */
+  champ.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const premier = liste.querySelector("a");
+    if (premier) { e.preventDefault(); premier.click(); }
   });
 
   // « / » met le curseur dans la recherche, comme partout ailleurs.

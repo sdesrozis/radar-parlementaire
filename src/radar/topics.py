@@ -198,15 +198,27 @@ def frequences_hebdo(
     source: str = "tout", *, depuis: str | None = None, bigrammes: bool = True,
     filtrer_noms: bool = True,
 ) -> pl.DataFrame:
-    """Compte chaque terme par semaine ISO. Colonnes : `semaine`, `terme`, `n`.
+    """Compte chaque terme par semaine ISO.
 
-    Ajoute `n_documents`, le nombre de documents de la semaine, pour pouvoir
-    raisonner en fréquence relative et non en volume brut.
+    Colonnes : `semaine`, `terme`, `n_docs` (documents de la semaine contenant
+    le terme **au moins une fois**), `n` (occurrences brutes) et `n_documents`
+    (documents de la semaine, tous termes confondus).
+
+    **Deux comptages, et un seul sert de taux.** `n` est le nombre
+    d'occurrences : il compte dix fois un terme martelé dix fois dans un même
+    exposé sommaire. Rapporté au nombre de *documents*, il ne forme pas un taux,
+    parce que numérateur et dénominateur ne comptent pas la même chose — et les
+    documents sont hétérogènes, un titre de scrutin d'une ligne pesant autant
+    qu'un exposé tronqué à 600 caractères. `n_docs` est une **part de
+    documents** : borné par `n_documents`, comparable d'une semaine à l'autre,
+    insensible à la longueur des textes. C'est lui que `sujets_qui_montent`
+    divise. `n` reste servi parce qu'il est parlant à l'affichage, jamais comme
+    dénominateur.
     """
     exclus = noms_de_deputes() if filtrer_noms else frozenset()
     docs = corpus(source, depuis=depuis).with_columns(
         pl.col("date").dt.truncate("1w").alias("semaine")
-    )
+    ).with_row_index("doc")
     par_semaine = docs.group_by("semaine").agg(pl.len().alias("n_documents"))
 
     termes = (
@@ -220,9 +232,12 @@ def frequences_hebdo(
         .rename({"termes": "terme"})
         .filter(pl.col("terme").is_not_null())
         .group_by("semaine", "terme")
-        .agg(pl.len().alias("n"))
+        .agg(
+            pl.len().alias("n"),
+            pl.col("doc").n_unique().alias("n_docs"),
+        )
     )
-    return termes.join(par_semaine, on="semaine", how="left").sort("semaine", "n")
+    return termes.join(par_semaine, on="semaine", how="left").sort("semaine", "n_docs")
 
 
 # --------------------------------------------------------------------------
@@ -232,16 +247,25 @@ def frequences_hebdo(
 
 @dataclass(frozen=True)
 class Poussee:
+    """Une ligne de `sujets_qui_montent`, sous une forme affichable.
+
+    `n_docs` et non `n` : le comptage qui porte le taux est un nombre de
+    documents mentionnant le terme, pas un nombre d'occurrences.
+    """
+
     terme: str
     semaine: str
-    n: int
+    n_docs: int
+    n_documents: int
     attendu: float
     score: float
+    q_valeur: float
 
     def __str__(self) -> str:
         return (
-            f"{self.terme:35s} {self.n:5d} occurrences "
-            f"(attendu : {self.attendu:.1f}) — score {self.score:.1f}"
+            f"{self.terme:35s} {self.n_docs:5d} documents sur {self.n_documents} "
+            f"(attendu : {self.attendu:.1f}) — score {self.score:.1f}, "
+            f"q = {self.q_valeur:.3f}"
         )
 
 
@@ -250,11 +274,12 @@ def sujets_qui_montent(
     *,
     semaine: str | None = None,
     semaines_reference: int = 8,
-    min_occurrences: int = 8,
+    min_documents: int = 5,
     k: int = 25,
     source: str = "tout",
     seulement_hausses: bool = True,
     fusionner_ngrammes: bool = True,
+    fdr: float | None = 0.05,
 ) -> pl.DataFrame:
     """Les termes dont l'usage explose par rapport aux semaines précédentes.
 
@@ -262,35 +287,58 @@ def sujets_qui_montent(
     essentielle, et elle n'est pas cosmétique : le corpus hebdomadaire ne fait
     pas du tout la même taille d'une semaine à l'autre. Un seul texte peut
     produire des centaines d'amendements, et une semaine sans séance en produit
-    zéro. Comparer les occurrences brutes d'une semaine chargée à celles d'une
+    zéro. Comparer les comptages bruts d'une semaine chargée à ceux d'une
     semaine creuse revient donc à mesurer le calendrier parlementaire plutôt
-    que le débat — n'importe quel terme banal remonte comme « sujet qui monte »
-    simplement parce qu'il y avait plus de documents à lire.
+    que le débat.
 
-    On procède en deux temps :
+    **Le taux est une part de documents, pas un nombre d'occurrences.** C'est la
+    correction la plus importante de cette fonction, et elle change les
+    classements. Diviser des occurrences par un nombre de documents ne produit
+    pas un taux : un terme martelé dix fois dans un long exposé sommaire pèse
+    dix fois plus qu'un terme cité une fois dans un titre de scrutin, alors que
+    les deux documents comptent pour un au dénominateur. On mesure donc, pour
+    chaque terme, **la part des documents de la semaine qui le mentionnent au
+    moins une fois** — grandeur bornée par le nombre de documents, insensible à
+    leur longueur, et directement comparable d'une semaine à l'autre.
 
-    1. **le taux de référence** — combien de fois le terme apparaît par
-       document, sur les semaines précédentes prises ensemble ;
-    2. **l'attendu** — ce taux multiplié par le nombre de documents de la
-       semaine analysée. C'est le nombre d'occurrences qu'on devrait observer
-       si rien n'avait changé, *à volume de la semaine*.
+    On procède en trois temps :
 
-    Le score est ensuite de type Poisson : `(observé − attendu) / √(attendu + 1)`.
-    Le dénominateur est là parce qu'un comptage fluctue naturellement d'autant
-    plus qu'il est grand : passer de 100 à 130 est banal, passer de 2 à 32 ne
-    l'est pas. Le `+ 1` empêche un terme quasi inédit d'obtenir un score infini.
+    1. **le taux de référence** `p` — part des documents des semaines
+       précédentes qui mentionnent le terme ;
+    2. **l'attendu** — `p` multiplié par le nombre de documents de la semaine
+       analysée. C'est ce qu'on devrait observer si rien n'avait changé, *à
+       volume de la semaine* ;
+    3. **le test** — sous l'hypothèse « rien n'a changé », le nombre de
+       documents mentionnant le terme suit une binomiale `B(N, p)`. La
+       `p_valeur` est la probabilité d'observer au moins autant de mentions par
+       le seul hasard.
+
+    **Le contrôle des tests multiples n'est pas une coquetterie.** On teste
+    plusieurs milliers de termes chaque semaine : au seuil usuel de 5 %,
+    quelques centaines ressortiraient « significatifs » alors même que rien ne
+    bouge. La procédure de Benjamini-Hochberg convertit les `p_valeur` en
+    `q_valeur`, qui se lit comme la part de fausses découvertes acceptée parmi
+    les termes retenus. Avec `fdr=0.05`, au plus un terme signalé sur vingt est
+    un accident.
+
+    Le `score` reste `(observé − attendu) / √(attendu + 1)` et sert au
+    classement : il ordonne par ampleur là où la `q_valeur` ne fait que trier
+    l'admissible de l'inadmissible.
 
     Args:
         freqs: sortie de `frequences_hebdo()`, recalculée si absente.
         semaine: semaine analysée (`AAAA-MM-JJ`, un lundi). Par défaut la
             dernière semaine présente dans les données.
         semaines_reference: nombre de semaines servant de référence.
-        min_occurrences: plancher d'occurrences dans la semaine analysée.
+        min_documents: plancher de documents mentionnant le terme dans la
+            semaine analysée. Sous ce seuil, il n'y a rien à tester.
         seulement_hausses: écarter les termes en recul. Les garder n'a de sens
             que pour une analyse symétrique « ce dont on ne parle plus ».
         fusionner_ngrammes: masquer les mots seuls déjà couverts par une paire
             mieux classée, pour ne pas occuper trois lignes avec « mixte »,
             « paritaire » et « mixte paritaire ».
+        fdr: seuil de fausses découvertes. `None` renvoie tous les termes avec
+            leur `q_valeur`, sans filtrer — utile pour inspecter la frontière.
     """
     if freqs is None:
         freqs = frequences_hebdo(source)
@@ -319,46 +367,113 @@ def sujets_qui_montent(
     if not docs_reference or not docs_courant:
         raise ValueError("volume documentaire nul : impossible de normaliser")
 
-    courant = freqs.filter(pl.col("semaine") == cible).select("terme", "n")
+    courant = freqs.filter(pl.col("semaine") == cible).select("terme", "n_docs", "n")
     base = (
         freqs.filter(pl.col("semaine").is_in(reference))
         .group_by("terme")
-        .agg(pl.col("n").sum().alias("total_reference"))
-        # Taux par document sur la période de référence, ramené au volume de la
-        # semaine analysée : voilà ce qu'on devrait voir si rien n'avait bougé.
+        .agg(pl.col("n_docs").sum().alias("docs_reference"))
+        # Part des documents de référence mentionnant le terme, ramenée au
+        # volume de la semaine analysée : voilà ce qu'on devrait voir si rien
+        # n'avait bougé. La part est bornée à 1 — la somme des `n_docs` d'un
+        # terme présent dans tous les documents vaut exactement `docs_reference`.
         .with_columns(
-            (pl.col("total_reference") / docs_reference * docs_courant).alias("attendu")
+            (pl.col("docs_reference") / docs_reference).clip(0.0, 1.0).alias("part_reference")
         )
-        .select("terme", "attendu")
+        .select("terme", "part_reference")
     )
 
     classe = (
         courant.join(base, on="terme", how="left")
-        .with_columns(pl.col("attendu").fill_null(0.0))
-        .filter(pl.col("n") >= min_occurrences)
+        .with_columns(pl.col("part_reference").fill_null(0.0))
         .with_columns(
-            ((pl.col("n") - pl.col("attendu")) / (pl.col("attendu") + 1.0).sqrt())
+            (pl.col("part_reference") * docs_courant).alias("attendu"),
+            (pl.col("n_docs") / docs_courant).alias("part"),
+        )
+        .filter(pl.col("n_docs") >= min_documents)
+        .with_columns(
+            ((pl.col("n_docs") - pl.col("attendu")) / (pl.col("attendu") + 1.0).sqrt())
             .alias("score")
         )
         .filter(pl.col("score") > 0 if seulement_hausses else pl.lit(True))
-        .with_columns(
+    )
+
+    # Deux affectations et non une chaîne : `classe["p_valeur"]` doit être lu
+    # sur la table *après* ajout de la colonne, or Python évalue l'expression
+    # entière avant de réaffecter le nom.
+    p = _p_binomiale(
+        classe["n_docs"].to_list(), docs_courant, classe["part_reference"].to_list()
+    )
+    classe = classe.with_columns(pl.Series("p_valeur", p, dtype=pl.Float64))
+    classe = classe.with_columns(
+        pl.Series("q_valeur", _benjamini_hochberg(p), dtype=pl.Float64)
+    )
+
+    if fdr is not None:
+        classe = classe.filter(pl.col("q_valeur") <= fdr)
+
+    classe = (
+        classe.with_columns(
             pl.lit(cible).alias("semaine"),
             pl.lit(docs_courant).alias("n_documents"),
         )
         .sort("score", descending=True)
-        .select("semaine", "terme", "n", "attendu", "score", "n_documents")
+        .select("semaine", "terme", "n_docs", "n", "attendu", "part",
+                "score", "p_valeur", "q_valeur", "n_documents")
     )
-    if fusionner_ngrammes:
+    if fusionner_ngrammes and classe.height:
         classe = classe.filter(
             pl.Series(
                 _masque_redondances(
                     classe["terme"].to_list(),
-                    classe["n"].to_list(),
+                    classe["n_docs"].to_list(),
                     classe["attendu"].to_list(),
-                )
+                ),
+                dtype=pl.Boolean,
             )
         )
     return classe.head(k)
+
+
+def _p_binomiale(observes: list[int], n: int, parts: list[float]) -> list[float]:
+    """`P(X ≥ observé)` sous `B(n, part)`, terme par terme.
+
+    Un terme jamais vu dans la période de référence a une part nulle : la
+    binomiale lui donnerait une probabilité nulle, donc une significativité
+    infinie sur une seule mention. On lui substitue la plus petite part non
+    nulle observable, `1 / n_documents_de_référence` approché ici par `1 / n` —
+    c'est la règle de continuité usuelle, et elle évite qu'un mot inédit et
+    isolé écrase le classement.
+    """
+    from scipy.stats import binom
+
+    plancher = 1.0 / max(n, 1)
+    return [
+        float(binom.sf(int(k) - 1, n, min(max(p, plancher), 1.0)))
+        for k, p in zip(observes, parts)
+    ]
+
+
+def _benjamini_hochberg(p: list[float]) -> list[float]:
+    """`q`-valeurs de Benjamini-Hochberg, dans l'ordre d'entrée.
+
+    Plusieurs milliers de termes sont testés chaque semaine. Sans correction, le
+    seuil de 5 % laisse passer 5 % de bruit — soit, à cette échelle, plus de
+    « sujets qui montent » faux que de vrais. La `q`-valeur se lit comme la
+    proportion de fausses découvertes tolérée parmi les termes retenus.
+    """
+    m = len(p)
+    if not m:
+        return []
+    ordre = sorted(range(m), key=lambda i: p[i])
+    q = [0.0] * m
+    courant = 1.0
+    # Remontée depuis la plus grande `p`-valeur : la `q`-valeur est monotone,
+    # chaque rang hérite du minimum de ce qui le suit.
+    for rang in range(m - 1, -1, -1):
+        i = ordre[rang]
+        courant = min(courant, p[i] * m / (rang + 1))
+        q[i] = min(courant, 1.0)
+    return q
 
 
 def _masque_redondances(termes: list[str], effectifs: list[int],
@@ -419,17 +534,23 @@ def _masque_redondances(termes: list[str], effectifs: list[int],
 
 def serie_terme(terme: str, *, source: str = "tout",
                 freqs: pl.DataFrame | None = None) -> pl.DataFrame:
-    """Suivi hebdomadaire d'un terme donné, pour tracer sa courbe."""
+    """Suivi hebdomadaire d'un terme donné, pour tracer sa courbe.
+
+    La colonne à tracer est `part` — la fraction des documents de la semaine qui
+    mentionnent le terme. Tracer `n` donnerait la courbe du calendrier
+    parlementaire bien plus que celle du terme.
+    """
     if freqs is None:
         freqs = frequences_hebdo(source)
     cible = normaliser(terme)
-    semaines = freqs.select("semaine").unique()
+    semaines = freqs.group_by("semaine").agg(pl.col("n_documents").first())
     return (
         semaines.join(
-            freqs.filter(pl.col("terme") == cible).select("semaine", "n"),
+            freqs.filter(pl.col("terme") == cible).select("semaine", "n", "n_docs"),
             on="semaine",
             how="left",
         )
-        .with_columns(pl.col("n").fill_null(0))
+        .with_columns(pl.col("n").fill_null(0), pl.col("n_docs").fill_null(0))
+        .with_columns((pl.col("n_docs") / pl.col("n_documents")).alias("part"))
         .sort("semaine")
     )

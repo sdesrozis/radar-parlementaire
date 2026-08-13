@@ -123,12 +123,19 @@ def phrase_participation(a: dict, i: dict, dist: dict, rang_sup: int,
         f"{num(rang_sup)} députés votent plus souvent qu'{g['il']}.",
         f"C'est <b>dans la moyenne</b> de l'Assemblée, dont la médiane est à {pct(dist['mediane'])}{NBSP}%.",
     )
-    elig = a["engageants_eligibles"]
-    assiette = (f"Sur les {num(elig)} votes qui engagent réellement — l'ensemble d'un texte, "
-                f"une motion de censure — tenus depuis son entrée en fonction"
-                if elig < n_texte else
-                f"Sur les {num(elig)} votes qui engagent réellement — l'ensemble d'un texte, "
-                f"une motion de censure —")
+    # Le nombre cité est celui qui a été divisé — le dénominateur après retrait
+    # des scrutins hors mandat *et* des non-votants structurels. Citer les
+    # scrutins éligibles ici donnerait une phrase dont le taux ne se refait pas.
+    votables = a["engageants_votables"]
+    restrictions = []
+    if a["engageants_eligibles"] < n_texte:
+        restrictions.append("tenus depuis son entrée en fonction")
+    if a["engageants_eligibles"] > votables:
+        restrictions.append(f"auxquels {g['il']} pouvait prendre part")
+    assiette = (f"Sur les {num(votables)} votes qui engagent réellement — l'ensemble "
+                f"d'un texte, une motion de censure —")
+    if restrictions:
+        assiette += " " + " et ".join(restrictions)
     p1 = (f"{assiette}, {g['il']} en a exprimé <b>{num(a['votes_engageants'])}</b>. {situation}")
     p2 = (f"L'étalon n'est pas 100{NBSP}%. Le député le plus assidu de la législature "
           f"atteint {pct(dist['max'])}{NBSP}%, et le député médian manque "
@@ -306,11 +313,11 @@ def phrase_these(f: dict, d_diss: dict, d_part: dict, rang_diss: int, rang_part:
               f"pas contre un idéal à 100{NBSP}%.")
         return t1, t2
 
-    elig = a["engageants_eligibles"]
-    quand = ("depuis son entrée en fonction" if elig < n_texte
+    quand = ("depuis son entrée en fonction"
+             if a["engageants_eligibles"] < n_texte
              else "depuis le début de la législature")
     t1 = (f"{nom} a exprimé <em>{num(a['votes_engageants'])} des "
-          f"{num(elig)} votes qui engagent</em> {quand}, "
+          f"{num(a['engageants_votables'])} votes qui engagent</em> {quand}, "
           f"soit {pct(a['participation_engageants'])}{NBSP}%.")
     t2 = (f"C'est en dessous de la médiane de l'Assemblée ({pct(d_part['mediane'])}{NBSP}%), "
           f"mais l'étalon n'est pas 100{NBSP}%{NBSP}: le député le plus assidu de la "
@@ -432,6 +439,26 @@ def phrase_carte(m: dict, groupes_axe: list[dict]) -> dict[str, str]:
 
 
 # ── la page méthode ────────────────────────────────────────────────────────
+
+def reserve_denominateur(eligibles: int, votables: int, total: int) -> str:
+    """Ce que le dénominateur de présence a retiré, nommé retrait par retrait.
+
+    Le nombre affiché sous le taux est celui qui a été divisé. Quand il est
+    inférieur au total de la législature, le lecteur a raison de trouver le
+    chiffre suspect — et c'est à nous de dire pourquoi, pas à lui de deviner.
+    Deux retraits sont possibles, ils peuvent se cumuler, et ils ne disent pas
+    la même chose : le premier est une date d'entrée, le second une fonction qui
+    interdit de voter.
+    """
+    lignes = []
+    if eligibles < total:
+        lignes.append("tenus depuis son entrée en fonction")
+    manquants = eligibles - votables
+    if manquants > 0:
+        s = "s" if manquants > 1 else ""
+        lignes.append(f"hors {num(manquants)} scrutin{s} de non-votant structurel")
+    return ("<br>" + "<br>".join(lignes)) if lignes else ""
+
 
 def phrase_portee(apercu: dict) -> tuple[str, str]:
     """Le piège fondateur du site : tous les scrutins ne pèsent pas pareil.
