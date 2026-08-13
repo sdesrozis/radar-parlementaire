@@ -1,10 +1,14 @@
-"""Site local : une fiche par député, ses votes, ses statistiques.
+"""La frontière entre les algorithmes et ce qui les affiche.
 
-Le site ne calcule rien que les autres modules ne calculent déjà. Il ouvre une
-fenêtre sur eux, et c'est là que le piège se déplace : **une page web donne à
-un chiffre une autorité que sa définition ne lui donne pas**. Affiché seul,
-« 78 % de proximité » ressemble à une mesure ; il n'est qu'une moyenne sur un
-ensemble de scrutins qu'on a choisi.
+Ce module ne calcule rien que les autres ne calculent déjà : il assemble leurs
+sorties en vues prêtes à afficher, et s'arrête là. Il ne sait pas ce qu'est une
+page, un gabarit ni un serveur — c'est la condition pour que `radar` reste un
+paquet d'analyse, installable et utilisable sans le site.
+
+C'est aussi là que le piège se déplace : **une page web donne à un chiffre une
+autorité que sa définition ne lui donne pas**. Affiché seul, « 78 % de
+proximité » ressemble à une mesure ; il n'est qu'une moyenne sur un ensemble de
+scrutins qu'on a choisi.
 
 Trois précautions, en conséquence, sont câblées dans les données servies plutôt
 que laissées à la mise en page :
@@ -19,24 +23,19 @@ que laissées à la mise en page :
 3. **Le point idéal est servi avec son intervalle**, jamais seul. Sans lui, le
    classement laisse croire à un ordre là où les zones se recouvrent.
 
-Le serveur est celui de la bibliothèque standard : le site est local, mono-
-utilisateur, et il n'a aucune raison d'ajouter une dépendance. Tout est calculé
-une fois au démarrage (une douzaine de secondes) puis servi depuis la mémoire.
+Tout est calculé une fois par `Donnees.construire()` — une douzaine de secondes
+— puis lu depuis la mémoire. Le sérialiseur (`lignes`, `_propre`) est ici parce
+qu'il porte une garantie de correction, pas de mise en page : un NaN traversant
+la frontière casse la page qui le reçoit.
 """
 
 from __future__ import annotations
 
-import json
 import math
 import re
-import traceback
 from dataclasses import dataclass, field
 from datetime import date
-from functools import partial
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import parse_qs, unquote, urlparse
 
 import numpy as np
 import polars as pl
@@ -46,8 +45,15 @@ from .analyze import VoteCube
 from .config import EXPRESSED
 from .parse import load
 
-#: Dossier des fichiers statiques (HTML, CSS, JS) servis à la racine.
-WEB = Path(__file__).parent / "web"
+#: Scrutins en commun exigés pour qu'un taux d'accord soit publié. En deçà, le
+#: taux n'est pas bas : il n'existe pas. Une seule constante, parce que la page
+#: Méthode publie ce nombre et qu'il doit être celui du calcul.
+MIN_COMMUNS = 30
+
+#: Le même seuil sur les seuls votes qui engagent. Il est plus bas parce que
+#: l'assiette l'est aussi : exiger 30 scrutins communs sur les quelques centaines
+#: qui engagent écarterait des paires parfaitement mesurables.
+MIN_COMMUNS_TEXTE = 20
 
 #: Nombre de rééchantillonnages pour l'intervalle de confiance des positions.
 #: 40 suffit à séparer les zones qui se séparent ; au-delà, on paye du temps de
@@ -143,6 +149,10 @@ class Donnees:
     jaccard: np.ndarray | None = None
     cosign_communs: np.ndarray | None = None
     index_cosign: dict[str, int] = field(default_factory=dict)
+    #: Rééchantillonnages réellement effectués. La page Méthode publie ce
+    #: nombre : servir la constante plutôt que la valeur employée ferait
+    #: annoncer 40 intervalles à un site généré avec `--bootstrap 0`.
+    bootstrap: int = BOOTSTRAP
 
     # -- construction ------------------------------------------------------
 
@@ -153,8 +163,9 @@ class Donnees:
         cube_texte = analyze.build_cube(portee="texte", en_exercice_seulement=False)
 
         journal("accords deux à deux")
-        accord, communs = analyze.agreement(cube)
-        accord_texte, communs_texte = analyze.agreement(cube_texte, min_communs=20)
+        accord, communs = analyze.agreement(cube, min_communs=MIN_COMMUNS)
+        accord_texte, communs_texte = analyze.agreement(
+            cube_texte, min_communs=MIN_COMMUNS_TEXTE)
 
         journal("participation et dissidence")
         stats = _statistiques_deputes(cube)
@@ -198,6 +209,7 @@ class Donnees:
             index={u: i for i, u in enumerate(cube.deputes["acteur_uid"].to_list())},
             index_texte={u: i for i, u in enumerate(cube_texte.deputes["acteur_uid"].to_list())},
             avec_amendements=amendements is not None,
+            bootstrap=bootstrap,
             jaccard=None if reseau is None else reseau.jaccard(),
             cosign_communs=None if reseau is None else reseau.communs,
             index_cosign=(
@@ -231,8 +243,28 @@ class Donnees:
                 "fin": s["date"].max(),
                 "groupes": lignes(self.groupes),
                 "avec_amendements": self.avec_amendements,
-                "bootstrap": BOOTSTRAP,
+                "bootstrap": self.bootstrap,
+                "entres_en_cours": self._entres_en_cours(),
             }
+        )
+
+    def _entres_en_cours(self) -> int:
+        """Députés en exercice dont le mandat n'a pas couru toute la législature.
+
+        Leur dénominateur de présence est plus petit que celui des autres : la
+        page Méthode le dit, et ce nombre est ce qui rend la phrase vérifiable.
+        """
+        cube = self.cube_texte
+        eligibles = cube.eligible.sum(axis=1)
+        if not eligibles.size:
+            return 0
+        en_exercice = set(
+            self.deputes.filter(pl.col("en_exercice"))["acteur_uid"].to_list()
+        )
+        uids = cube.deputes["acteur_uid"].to_list()
+        plein = int(eligibles.max())
+        return sum(
+            1 for u, e in zip(uids, eligibles) if u in en_exercice and int(e) < plein
         )
 
     def liste_deputes(self) -> list[dict]:
@@ -436,6 +468,166 @@ class Donnees:
 
     def liste_groupes(self) -> list[dict]:
         return lignes(self.groupes)
+
+    def matrice_accords(self, *, min_communs: int = MIN_COMMUNS) -> dict:
+        """La matrice des accords deux à deux, prête à être dessinée.
+
+        C'est la réponse littérale à « qui vote avec qui » : pour chaque paire de
+        députés, la part des scrutins où ils ont voté pareil. Aucune projection,
+        aucune dimension inventée — la mesure elle-même, et son dénominateur.
+
+        **L'ordre porte l'argument.** Les députés sont rangés le long de l'axe
+        estimé par le modèle de points idéaux (`ideal.py`), et par rien d'autre :
+        ni par groupe, ni par ordre alphabétique. Les blocs qui apparaissent
+        alors n'ont pas été mis là par le classement, ils sortent des votes. Une
+        seconde permutation (`ordre_groupe`) est fournie pour comparer, mais elle
+        est la vue de contrôle, pas la vue par défaut.
+
+        Le transport est compact parce que la matrice ne l'est pas : 577 députés
+        font 166 176 paires. On envoie le triangle supérieur strict, l'accord
+        quantifié sur un octet et les scrutins communs sur deux, en base64 ; la
+        page reconstruit. Pour la paire `(i, j)` avec `i < j`, l'indice est
+        `i * n - i * (i + 1) // 2 + (j - i - 1)`.
+
+        Une paire sous `min_communs` scrutins en commun n'est pas un accord bas :
+        c'est une absence de mesure. Elle vaut `ABSENT` (255) et se dessine comme
+        un trou, jamais comme un zéro.
+        """
+        import base64
+
+        candidats = self.deputes.filter(
+            pl.col("en_exercice") & pl.col("axe1").is_not_null()
+        ).select("acteur_uid", "nom_complet", "groupe", "axe1").sort("axe1")
+
+        uids = candidats["acteur_uid"].to_list()
+        pris = [(u, self.index[u]) for u in uids if u in self.index]
+        uids = [u for u, _ in pris]
+        idx = np.array([i for _, i in pris], dtype=int)
+        n = len(idx)
+
+        table = candidats.filter(pl.col("acteur_uid").is_in(uids))
+        accord = self.accord[np.ix_(idx, idx)]
+        communs = self.communs[np.ix_(idx, idx)]
+
+        haut = np.triu_indices(n, k=1)
+        a = accord[haut]
+        c = communs[haut]
+
+        # 255 est réservé à « pas mesurable » : l'accord se quantifie sur 0..254.
+        octets = np.full(a.shape, 255, dtype=np.uint8)
+        mesurable = ~np.isnan(a) & (c >= min_communs)
+        octets[mesurable] = np.rint(np.clip(a[mesurable], 0.0, 1.0) * 254).astype(np.uint8)
+
+        groupes = table["groupe"].to_list()
+        medianes = {
+            g: float(np.median([x for x, gg in zip(table["axe1"].to_list(), groupes) if gg == g]))
+            for g in dict.fromkeys(groupes)
+        }
+        # Les groupes sont contigus dans cette permutation, et rangés entre eux
+        # par leur médiane sur l'axe : c'est la vue de contrôle.
+        ordre_groupe = sorted(
+            range(n), key=lambda p: (medianes[groupes[p]], table["axe1"][p])
+        )
+
+        # Les bornes de l'échelle de couleur sont celles des valeurs réellement
+        # observées, arrondies au vingtième, et elles sont renvoyées pour être
+        # affichées dans la légende. Une échelle dont on ne publie pas les bornes
+        # est un mensonge par cadrage, qu'elle soit tronquée ou non.
+        mesures = a[mesurable]
+        echelle_bas = float(np.floor(mesures.min() * 20) / 20) if mesures.size else 0.0
+        echelle_haut = float(np.ceil(mesures.max() * 20) / 20) if mesures.size else 1.0
+
+        # Les paires remarquables : de quoi écrire des phrases qui portent sur ce
+        # que la matrice contient réellement, plutôt que sur ce qu'on en attend.
+        li, lj = haut
+        memes = np.array([groupes[i] == groupes[j] for i, j in zip(li, lj)])
+
+        def paire_dite(k: int) -> dict:
+            i, j = int(li[k]), int(lj[k])
+            return {
+                "a": table["nom_complet"][i], "groupe_a": groupes[i],
+                "b": table["nom_complet"][j], "groupe_b": groupes[j],
+                "accord": float(a[k]), "communs": int(c[k]),
+            }
+
+        def extreme(masque: np.ndarray, plus_haut: bool) -> dict | None:
+            ou = np.flatnonzero(masque & mesurable)
+            if not ou.size:
+                return None
+            return paire_dite(int(ou[np.argmax(a[ou]) if plus_haut else np.argmin(a[ou])]))
+
+        tout = np.ones_like(mesurable)
+        # « NI » rassemble les non-inscrits : ce n'est pas un groupe, et le taux
+        # d'accord de deux non-inscrits ne mesure aucune ligne commune. Il est
+        # donc hors des superlatifs qui parlent de groupes, comme ailleurs.
+        vrai_groupe = np.array([groupes[i] != "NI" for i in li])
+
+        return _propre(
+            {
+                "n": n,
+                "min_communs": min_communs,
+                "absent": 255,
+                "paires": int(a.size),
+                "mesurables": int(mesurable.sum()),
+                "echelle_bas": echelle_bas,
+                "echelle_haut": echelle_haut,
+                "paire_haute": extreme(tout, True),
+                "paire_basse": extreme(tout, False),
+                "hors_groupe_haute": extreme(~memes, True),
+                "meme_groupe_basse": extreme(memes & vrai_groupe, False),
+                "deputes": [
+                    {"u": u, "n": nom, "g": g, "x": x}
+                    for u, nom, g, x in zip(
+                        uids, table["nom_complet"].to_list(), groupes, table["axe1"].to_list()
+                    )
+                ],
+                "accord_b64": base64.b64encode(octets.tobytes()).decode("ascii"),
+                "communs_b64": base64.b64encode(
+                    np.clip(np.nan_to_num(c, nan=0), 0, 65535).astype("<u2").tobytes()
+                ).decode("ascii"),
+                "ordre_groupe": ordre_groupe,
+                "groupes": [
+                    {"g": g, "n": groupes.count(g), "mediane": m}
+                    for g, m in sorted(medianes.items(), key=lambda kv: kv[1])
+                ],
+            }
+        )
+
+    def matrice_groupes(self) -> dict:
+        """La même mesure que `matrice_accords`, agrégée par groupe.
+
+        574 cases sont une forme ; 12 sur 12 sont un tableau qu'on lit. Les deux
+        disent la même chose, et la seconde est là pour que la première ne soit
+        pas seulement jolie.
+
+        L'ordre des lignes et des colonnes est celui des médianes sur l'axe
+        estimé — le même que la grande matrice, pour que les deux se comparent.
+        Les effectifs accompagnent chaque groupe : une moyenne sur un groupe de
+        quatre députés et une moyenne sur un groupe de quatre-vingt-dix ne se
+        lisent pas de la même façon.
+        """
+        accords = analyze.accord_entre_groupes(self.cube)
+        table = self.groupes.filter(pl.col("effectif_actuel") > 0)
+
+        ordre = [
+            r["groupe"] for r in
+            table.filter(pl.col("position_mediane").is_not_null())
+            .sort("position_mediane").to_dicts()
+        ]
+        # Un groupe sans médiane calculable n'a pas de place sur l'axe : il va
+        # en fin de tableau plutôt que d'être écarté sans le dire.
+        ordre += [g for g in table["groupe"].to_list() if g not in ordre]
+
+        effectifs = dict(table.select("groupe", "effectif_actuel").iter_rows())
+        cases = {(r["groupe_a"], r["groupe_b"]): r["accord"] for r in accords.to_dicts()}
+
+        return _propre(
+            {
+                "ordre": ordre,
+                "effectifs": {g: effectifs.get(g) for g in ordre},
+                "cases": [[cases.get((a, b)) for b in ordre] for a in ordre],
+            }
+        )
 
     # -- interne -----------------------------------------------------------
 
@@ -724,132 +916,3 @@ def _responsabilites(organes: pl.DataFrame) -> pl.DataFrame:
         .sort(["rang_type", "notable", "libelle"], descending=[False, True, False])
         .drop("rang_type")
     )
-
-
-# --------------------------------------------------------------------------
-# Serveur
-# --------------------------------------------------------------------------
-
-TYPES_MIME = {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8",
-    ".svg": "image/svg+xml",
-    ".png": "image/png",
-    ".json": "application/json; charset=utf-8",
-}
-
-
-class Handler(BaseHTTPRequestHandler):
-    """Routeur minimal : `/api/...` en JSON, le reste depuis `web/`."""
-
-    protocol_version = "HTTP/1.1"
-    server_version = "radar"
-
-    def __init__(self, *args, donnees: Donnees, silencieux: bool = True, **kwargs):
-        self.donnees = donnees
-        self.silencieux = silencieux
-        super().__init__(*args, **kwargs)
-
-    # Le journal par défaut écrit une ligne par requête sur stderr, y compris
-    # pour chaque fichier statique : illisible pour un site local.
-    def log_message(self, format: str, *args) -> None:  # noqa: A002
-        if not self.silencieux:
-            super().log_message(format, *args)
-
-    def do_GET(self) -> None:  # noqa: N802
-        url = urlparse(self.path)
-        chemin = unquote(url.path)
-        params = parse_qs(url.query)
-        try:
-            if chemin.startswith("/api/"):
-                self._api(chemin, params)
-            else:
-                self._statique(chemin)
-        except KeyError as e:
-            self._envoyer_json({"erreur": f"introuvable : {e}"}, code=404)
-        except ValueError as e:
-            self._envoyer_json({"erreur": str(e)}, code=400)
-        except BrokenPipeError:
-            pass
-        except Exception as e:  # noqa: BLE001
-            # Sans ce filet, une erreur ferme la connexion sans rien dire et le
-            # navigateur n'affiche qu'un échec réseau : l'erreur va dans la page.
-            traceback.print_exc()
-            self._envoyer_json({"erreur": f"{type(e).__name__}: {e}"}, code=500)
-
-    # -- routes ------------------------------------------------------------
-
-    def _api(self, chemin: str, params: dict[str, list[str]]) -> None:
-        d = self.donnees
-        morceaux = [p for p in chemin.split("/") if p][1:]  # sans "api"
-
-        def entier(nom: str, defaut: int) -> int:
-            return int(params.get(nom, [defaut])[0])
-
-        def texte(nom: str) -> str | None:
-            v = params.get(nom, [None])[0]
-            return v or None
-
-        match morceaux:
-            case ["apercu"]:
-                return self._envoyer_json(d.apercu())
-            case ["deputes"]:
-                return self._envoyer_json(d.liste_deputes())
-            case ["deputes", uid]:
-                return self._envoyer_json(d.fiche(uid))
-            case ["deputes", uid, "votes"]:
-                return self._envoyer_json(
-                    d.votes_du_depute(
-                        uid,
-                        portee=texte("portee"),
-                        seulement_dissidents=texte("dissidents") == "1",
-                        limite=entier("limite", 200),
-                    )
-                )
-            case ["scrutins"]:
-                return self._envoyer_json(
-                    d.liste_scrutins(
-                        portee=texte("portee"),
-                        categorie=texte("categorie"),
-                        q=texte("q"),
-                        limite=entier("limite", 100),
-                        decalage=entier("decalage", 0),
-                    )
-                )
-            case ["scrutins", uid]:
-                return self._envoyer_json(d.scrutin(uid))
-            case ["groupes"]:
-                return self._envoyer_json(d.liste_groupes())
-        raise KeyError(chemin)
-
-    def _statique(self, chemin: str) -> None:
-        nom = "index.html" if chemin in ("/", "") else chemin.lstrip("/")
-        fichier = (WEB / nom).resolve()
-        # Un chemin qui remonte hors de `web/` n'a rien à faire ici, même en local.
-        if not fichier.is_file() or WEB.resolve() not in fichier.parents:
-            fichier = WEB / "index.html"  # routes côté client : /depute/PA123
-        corps = fichier.read_bytes()
-        self._envoyer(corps, TYPES_MIME.get(fichier.suffix, "application/octet-stream"))
-
-    # -- réponses ----------------------------------------------------------
-
-    def _envoyer_json(self, charge: Any, code: int = 200) -> None:
-        corps = json.dumps(charge, ensure_ascii=False, allow_nan=False).encode("utf-8")
-        self._envoyer(corps, "application/json; charset=utf-8", code)
-
-    def _envoyer(self, corps: bytes, mime: str, code: int = 200) -> None:
-        self.send_response(code)
-        self.send_header("Content-Type", mime)
-        self.send_header("Content-Length", str(len(corps)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(corps)
-
-
-def servir(
-    donnees: Donnees, *, host: str = "127.0.0.1", port: int = 8000, silencieux: bool = True
-) -> ThreadingHTTPServer:
-    """Crée le serveur. À l'appelant d'appeler `serve_forever()`."""
-    handler = partial(Handler, donnees=donnees, silencieux=silencieux)
-    return ThreadingHTTPServer((host, port), handler)

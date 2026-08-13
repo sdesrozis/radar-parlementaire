@@ -9,16 +9,14 @@ description: Construire, étendre ou mettre à jour le site public du Radar parl
 
 ```bash
 uv run radar update                        # retélécharge et reconstruit les tables
-uv run python site/generer.py              # 579 pages en ~20 s
-open site/sortie/index.html
+uv run python site/generer.py --servir     # 581 pages en ~20 s, puis les sert
+python3 site/serveur.py                    # rouvrir sans recalculer, instantané
 ```
 
-Une seule commande, **aucun serveur** : le générateur appelle `Donnees.construire()`
-directement. Pour servir le dossier et tester le JavaScript en conditions réelles :
-
-```bash
-python3 -m http.server 8899 --directory site/sortie
-```
+Le générateur appelle `Donnees.construire()` directement — aucun serveur n'est requis
+pour produire les fichiers. `--servir` enchaîne sur `site/serveur.py`, qui sert
+`sortie/` exactement comme le fera l'hébergeur : **c'est le seul mode de relecture
+valable**, parce que la page carte charge un canvas et que `file://` ment sur le reste.
 
 Options : `--bootstrap 0` (rapide, mais pas d'intervalles de confiance, donc pas de
 bloc « position estimée ») et `--limite 5` (cinq fiches, pour une mise au point).
@@ -26,12 +24,19 @@ bloc « position estimée ») et `--limite 5` (cinq fiches, pour une mise au poi
 ## Statique / dynamique : la frontière
 
 ```
-site/statique/style.css   STATIQUE  système visuel — copié tel quel dans sortie/
-site/statique/radar.js    STATIQUE  bande des 577 + recherche — copié tel quel
-site/gabarits/*.html      STATIQUE  structure + textes pédagogiques, jetons {{...}}
-site/generer.py           DYNAMIQUE chiffres, distributions, phrases choisies
-site/sortie/              PRODUIT   jetable, régénéré à chaque fois
+src/radar/                ALGORITHMES  aucun HTML/CSS/JS — la CI le vérifie
+src/radar/vues.py         FRONTIÈRE    données prêtes à afficher, zéro mise en page
+site/statique/style.css   STATIQUE     système visuel — copié tel quel dans sortie/
+site/statique/radar.js    STATIQUE     bande des 577 + recherche — copié tel quel
+site/statique/carte.js    STATIQUE     la matrice des accords en canvas
+site/gabarits/*.html      STATIQUE     structure + textes pédagogiques, jetons {{...}}
+site/redaction.py         RÉDACTION    les phrases — aucune importation, aucun calcul
+site/generer.py           ORCHESTRE    quel gabarit, quel jeton, quel fichier
+site/sortie/              PRODUIT      jetable, régénéré à chaque fois
 ```
+
+**Un calcul ne s'écrit jamais dans `site/`.** S'il manque un chiffre, il se calcule
+dans `radar/` et s'expose par `vues.py`. C'est ce qui garde le paquet publiable seul.
 
 **Un fichier de `statique/` ne doit jamais contenir de jeton `{{...}}`** : il est copié
 sans substitution, et un jeton non remplacé casse tout le fichier. C'est arrivé une fois
@@ -106,10 +111,29 @@ moitié, le site produit 577 fiches qui se ressemblent.
 ## État actuel
 
 Fait : fiche de député (577), accueil pédagogique, annuaire avec recherche par nom,
-département, numéro, région et groupe.
+département, numéro, région et groupe, **carte « Qui vote avec qui ? »** (matrice des
+164 451 paires en canvas), **page Méthode**.
 
 À faire, dans cet ordre : la recherche par **commune** (l'open data ne publie pas la
 composition des circonscriptions — il faut une table externe), la page « cette semaine »
-branchée sur `radar/alerts.py`, les pages scrutin et groupe, le glossaire, la page
-Méthode, puis la publication (nom de domaine, hébergement, polices auto-hébergées,
-images OpenGraph).
+branchée sur `radar/alerts.py`, les pages scrutin et groupe, le glossaire, puis la
+publication (mentions légales, décision d'indexation, nom de domaine, images
+OpenGraph).
+
+## La carte des accords
+
+`Donnees.matrice_accords()` renvoie le triangle supérieur strict : accord quantifié sur
+un octet, scrutins communs sur deux, en base64. 460 Ko gzippés incrustés dans la page —
+la pré-compression n'aide pas, le base64 annule le gain.
+
+Deux pièges déjà rencontrés, à ne pas refaire :
+
+**`const` dans un script classique ne crée pas de propriété sur `window`.** `carte.js`
+lisait `window.DONNEES_CARTE`, obtenait `undefined` et sortait en silence : canvas vide,
+aucune erreur en console. On lit l'identifiant nu gardé par `typeof`, comme `radar.js`
+le fait pour `DONNEES`.
+
+**Le bas de la rampe est un indigo pâle, jamais le gris du papier.** Sinon une case à
+0 % d'accord et une case *non mesurable* sont deux gris voisins — le site afficherait
+une absence de donnée comme un zéro, ce qu'il reproche à tout le monde. L'absence se
+distingue par la teinte (grise, achromatique), pas par la clarté.

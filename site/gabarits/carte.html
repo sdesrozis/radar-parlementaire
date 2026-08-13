@@ -1,0 +1,179 @@
+  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════ -->
+  <section class="cadre chapeau">
+    <p class="fil">Toutes les paires de députés</p>
+    <h1>Qui vote avec qui&nbsp;?</h1>
+    <p class="sous-titre-fiche">
+      {{PAIRES}} paires de députés, chacune mesurée sur les scrutins où les deux
+      ont voté. Pas une carte&nbsp;: la mesure elle-même.
+    </p>
+  </section>
+
+  <!-- ══ LA THÈSE ══════════════════════════════════════════════════ -->
+  <section class="cadre">
+    <div class="these">
+      <p>{{THESE}}</p>
+      <p>{{THESE_SUITE}}</p>
+    </div>
+  </section>
+
+  <!-- ══ SOCLE PÉDAGOGIQUE ═════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Avant de regarder</p>
+      <h2>Ce que vous allez voir</h2>
+      <p>Imaginez un immense tableau à double entrée. Les {{N_DEPUTES}} députés en
+        ligne, les mêmes {{N_DEPUTES}} en colonne. À l'intersection de deux
+        d'entre eux, une case&nbsp;: <b>la part des scrutins où ils ont voté la
+        même chose</b>. Plus la case est foncée, plus les deux votent pareil.</p>
+      <p>Un tableau de {{N_DEPUTES}} sur {{N_DEPUTES}}, cela fait {{PAIRES}} cases.
+        Aucune ne peut porter d'étiquette&nbsp;: elles sont trop petites. C'est
+        justement l'intérêt — <b>on ne regarde plus des députés, on regarde une
+        forme</b>. Survolez une case pour retrouver les deux noms, leur taux
+        d'accord et, comme partout sur ce site, le nombre de scrutins sur lequel
+        il a été calculé.</p>
+
+      <p class="jalon">Ce qui compte le plus</p>
+      <h2>L'ordre des lignes n'a pas été choisi par nous</h2>
+      <p>Un tableau comme celui-ci ne veut rien dire tant qu'on n'a pas dit dans
+        quel ordre les députés sont rangés. Si on les rangeait par groupe, on
+        verrait des carrés — et on n'aurait rien appris&nbsp;: on aurait dessiné
+        le classement qu'on a soi-même imposé.</p>
+      <p>Ils sont donc rangés <b>le long de l'axe estimé à partir de leurs seuls
+        votes</b>, décrit sur la <a href="methode.html">page Méthode</a>. Ce
+        modèle ne connaît ni les noms des groupes, ni les étiquettes politiques,
+        ni qui siège où&nbsp;: il ne voit que des « pour » et des « contre ».
+        {{PHRASE_ORDRE}}</p>
+    </div>
+  </section>
+
+  <!-- ══ LA MATRICE ════════════════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Les {{PAIRES}} paires</p>
+
+    <div class="carte-outils">
+      <div class="bascules" role="group" aria-label="Ordre des députés">
+        <button type="button" data-ordre="axe" aria-pressed="true">Rangés par leurs votes</button>
+        <button type="button" data-ordre="groupe" aria-pressed="false">Rangés par groupe</button>
+      </div>
+      <p class="provenance carte-etat" id="carte-etat">{{LEGENDE_ORDRE}}</p>
+    </div>
+
+    <div class="carte-scene">
+      <div class="carte-toile">
+        <canvas id="carte" width="{{N_DEPUTES}}" height="{{N_DEPUTES}}"
+                role="img" aria-label="{{ALT_MATRICE}}"></canvas>
+        <div class="carte-viseur" hidden></div>
+      </div>
+
+      <aside class="carte-lecture" id="carte-lecture">
+        <p class="carte-invite">Survolez le tableau.</p>
+        <div class="carte-paire" hidden>
+          <p class="carte-nom carte-nom-a"></p>
+          <p class="carte-nom carte-nom-b"></p>
+          <p class="carte-taux"></p>
+          <p class="provenance carte-denominateur"></p>
+        </div>
+      </aside>
+    </div>
+
+    <!-- L'échelle commence à la plus faible valeur observée, pas à zéro, et le
+         dit : une échelle tronquée muette est un mensonge par cadrage. -->
+    <div class="carte-echelle">
+      <span class="mono">{{ECHELLE_BAS}}&nbsp;%</span>
+      <div class="rampe" aria-hidden="true"></div>
+      <span class="mono">{{ECHELLE_HAUT}}&nbsp;% d'accord</span>
+      <span class="carte-cle"><i class="pastille-absent"></i> moins de
+        {{MIN_COMMUNS}} scrutins en commun&nbsp;: rien à mesurer</span>
+    </div>
+
+    <div class="legende-bande">
+      <span><i>Une case = une paire de députés</i></span>
+      <span><i>La diagonale n'est pas une mesure&nbsp;: c'est chacun avec lui-même</i></span>
+    </div>
+
+    <!-- La couche 2 de la charte : ce que la mesure écarte. Toujours. -->
+    <details class="piege">
+      <summary>Ce que ce tableau ne dit pas</summary>
+      <p><b>Un accord n'est pas une entente.</b> Deux députés qui votent pareil
+        ne se sont peut-être jamais parlé, et peuvent voter pareil pour des
+        raisons opposées — l'un pour ce que le texte contient, l'autre contre ce
+        qu'il ne contient pas. Le vote enregistre une position finale, pas un
+        motif.</p>
+      <p><b>La quasi-totalité des scrutins sont des amendements.</b> Sur
+        {{SCRUTINS}} scrutins, {{PORTEE_DETAIL}} portent sur un détail de texte
+        ({{PART_DETAIL_PCT}}&nbsp;%) et {{PORTEE_TEXTE}} seulement sur l'ensemble
+        d'un texte ou une motion de censure. Deux députés peuvent s'accorder à
+        {{EXEMPLE_HAUT}}&nbsp;% sur l'ensemble et beaucoup moins sur ce qui
+        engage. Ce tableau prend tous les scrutins&nbsp;; les fiches individuelles
+        donnent les deux lectures côte à côte, et c'est leur écart qui informe.</p>
+      <p><b>Une case pâle peut être un désaccord ou une absence.</b> Ne pas voter
+        n'est pas voter contre. Les scrutins où l'un des deux n'a pas exprimé de
+        vote sortent du dénominateur au lieu d'être comptés comme des désaccords
+        — c'est pourquoi le nombre de scrutins communs change à chaque paire, et
+        c'est pourquoi il est affiché.</p>
+      <p><b>Sous {{MIN_COMMUNS}} scrutins en commun, nous n'affichons rien.</b> Un
+        taux calculé sur une poignée de votes n'est pas une mesure, c'est un
+        accident d'échantillon.</p>
+    </details>
+  </section>
+
+  <!-- ══ LES GROUPES ═══════════════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">La même mesure, à l'échelle des groupes</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{N_GROUPES}}</div>
+        <p class="provenance valeur-note">
+          groupes ayant au moins un député en exercice<br>
+          rangés par leur médiane sur l'axe
+        </p>
+      </div>
+      <div>
+        <p class="enclair">{{PHRASE_GROUPES}}</p>
+        <p class="enclair">{{PHRASE_GROUPES_2}}</p>
+      </div>
+    </div>
+
+    <div class="tableau-defile">
+      <table class="matrice-groupes">
+        <caption class="provenance">Part des scrutins où deux députés de ces
+          groupes votent pareil, en moyenne sur toutes les paires possibles.</caption>
+        <thead>
+          <tr><th scope="col"><span class="visuellement-cache">Groupe</span></th>{{ENTETES_GROUPES}}</tr>
+        </thead>
+        <tbody>
+          {{LIGNES_MATRICE_GROUPES}}
+        </tbody>
+      </table>
+    </div>
+
+    <details class="piege">
+      <summary>Pourquoi aucune de ces cases n'est colorée par groupe</summary>
+      <p>Aucune couleur ne désigne un groupe politique sur ce site. Les rouges de
+        deux groupes de gauche, comme les trois bleus de droite, sont
+        indistinguables de façon fiable — daltonisme ou non. Ici la couleur porte
+        une grandeur, le taux d'accord, et rien d'autre&nbsp;; l'identité des
+        groupes passe uniquement par le texte.</p>
+      <p>Un groupe très petit produit des moyennes instables&nbsp;: quelques
+        députés suffisent à déplacer la ligne entière. Les effectifs sont donnés
+        dans la première colonne pour que vous puissiez en tenir compte.</p>
+    </details>
+  </section>
+
+  <!-- ══ SUITE ═════════════════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Pour aller plus loin</p>
+      <h2>Un tableau ne remplace pas une fiche</h2>
+      <p>Cette page montre une forme d'ensemble. Elle ne dit rien de ce que
+        {{EXEMPLE_NOM}} fait de son mandat, ni de ce que son taux d'accord avec
+        untel signifie pour lui. Chaque député a une fiche où les mêmes données
+        sont reprises une à une, avec leur dénominateur et ce qu'elles écartent.</p>
+      <p><a href="deputes.html">Chercher un député par son nom, son département
+        ou son groupe</a> · <a href="methode.html">Comment tout ceci est
+        calculé</a></p>
+    </div>
+  </section>
+
+  <script>const DONNEES_CARTE = {{CARTE_JSON}};</script>
+  <script src="statique/carte.js"></script>

@@ -1,0 +1,207 @@
+  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════ -->
+  <section class="cadre chapeau">
+    <p class="fil">Comment tout ceci est calculé</p>
+    <h1>Méthode</h1>
+    <p class="sous-titre-fiche">
+      Chaque chiffre de ce site a une définition exacte et un dénominateur.
+      Cette page les donne, ainsi que ce qu'ils écartent.
+      <span class="etat">Calculé le {{GENERE_LE}}</span>
+    </p>
+  </section>
+
+  <!-- ══ LA THÈSE ══════════════════════════════════════════════════ -->
+  <section class="cadre">
+    <div class="these">
+      <p>Un site qui publie des chiffres sur des personnes doit pouvoir être
+        contredit. C'est l'objet de cette page&nbsp;: elle donne assez de détail
+        pour que <em>n'importe qui puisse refaire les calculs</em> et constater
+        si nous nous sommes trompés.</p>
+      <p>Le code qui produit ce site est public, et les données viennent
+        intégralement de l'open data de l'Assemblée nationale. Rien n'est saisi
+        à la main, rien n'est corrigé à la main. <b>Si un chiffre est faux, c'est
+        que le calcul est faux</b> — et il doit être corrigé publiquement.</p>
+    </div>
+  </section>
+
+  <!-- ══ LA SOURCE ═════════════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">D'où viennent les données</p>
+      <h2>Une seule source, publique</h2>
+      <p>Tout vient de <a href="https://data.assemblee-nationale.fr">l'open data
+        de l'Assemblée nationale</a>, publié sous Licence Ouverte 2.0. Nous
+        téléchargeons les archives brutes — la liste des députés et leurs
+        mandats, les organes (commissions, groupes), le dépouillement nominatif
+        de chaque scrutin — et nous reconstruisons nos propres tables.</p>
+      <p><b>Aucun chiffre publié par l'Assemblée n'est repris tel quel.</b> Les
+        totaux affichés ici sont recalculés depuis les votes individuels. C'est
+        plus long, et c'est la seule façon de savoir ce qu'un nombre contient.</p>
+
+      <p class="jalon">Le périmètre</p>
+      <h2>Ce que couvre ce site, et ce qu'il ne couvre pas</h2>
+      <p>{{LEGISLATURE}}<sup>e</sup> législature, du {{DEBUT}} au {{FIN}}&nbsp;:
+        <b>{{SCRUTINS}} scrutins</b>, <b>{{VOTES}} votes nominatifs</b>,
+        <b>{{DEPUTES}} députés</b> ayant siégé, dont {{EN_EXERCICE}} en exercice
+        à la date du calcul.</p>
+      <p>Ce site ne mesure <em>que le vote en séance publique</em>. Il ne mesure
+        ni le travail en commission, ni les questions au gouvernement, ni la
+        présence en circonscription, ni les rapports, ni les auditions. Un député
+        peu présent aux scrutins peut travailler énormément ailleurs. <b>Aucun
+        chiffre de ce site ne mesure le travail d'un député.</b></p>
+    </div>
+  </section>
+
+  <!-- ══ LE PIÈGE FONDATEUR ════════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Le piège qui gouverne tout le reste</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{PART_DETAIL_PCT}}&nbsp;%</div>
+        <p class="provenance valeur-note">
+          des {{SCRUTINS}} scrutins portent sur un détail de texte<br>
+          {{PORTEE_TEXTE}} seulement engagent l'ensemble d'un texte
+        </p>
+      </div>
+      <div>
+        <p class="enclair">{{PHRASE_PORTEE}}</p>
+        <p class="enclair">{{PHRASE_PORTEE_2}}</p>
+      </div>
+    </div>
+
+    <details class="piege">
+      <summary>Pourquoi nous distinguons deux assiettes de scrutins</summary>
+      <p>Un « scrutin public » peut être le vote solennel sur un projet de loi de
+        finances comme le vote sur un amendement rédactionnel déposé à trois
+        heures du matin. Les compter ensemble, c'est laisser les seconds décider
+        du résultat, puisqu'ils sont {{PART_DETAIL_PCT}}&nbsp;% du total.</p>
+      <p>Nous appelons <b>votes qui engagent</b> les scrutins sur l'ensemble d'un
+        texte, les motions de censure et les déclarations de politique générale.
+        Les fiches donnent systématiquement les deux lectures, et c'est leur
+        écart qui informe&nbsp;: deux députés très proches sur les amendements
+        peuvent diverger sur ce qui engage.</p>
+    </details>
+  </section>
+
+  <!-- ══ LES MESURES ═══════════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Définitions</p>
+      <h2>Chaque mesure, exactement</h2>
+    </div>
+
+    <div class="lecture">
+      <h3>Présence aux votes qui engagent</h3>
+      <p class="provenance">votes exprimés ÷ scrutins où le mandat courait</p>
+      <p>Le numérateur compte les « pour », « contre » et « abstention »
+        explicitement enregistrés. Le dénominateur ne compte que les scrutins
+        tenus <b>pendant le mandat du député</b>&nbsp;: {{ENTRES_EN_COURS}}
+        députés en exercice sont entrés en cours de législature, et leur taux
+        serait faussé s'il portait sur {{PORTEE_TEXTE}} scrutins qu'ils n'ont pas
+        pu voter.</p>
+      <p>Un député dont la source ne contient <em>aucun</em> vote nominatif
+        n'obtient pas 0&nbsp;%&nbsp;: il obtient une case vide et une phrase qui
+        décrit la lacune. Une absence de donnée n'est pas une absence de vote.</p>
+
+      <h3>Écart à la ligne de son groupe</h3>
+      <p class="provenance">votes contraires à la position majoritaire ÷ scrutins où le groupe avait une position majoritaire</p>
+      <p>La « ligne » n'est pas déclarée par les groupes&nbsp;: nous la déduisons.
+        Pour chaque scrutin, c'est la position qui réunit <b>plus de la moitié
+        des suffrages exprimés du groupe</b>. Quand aucune position n'y parvient,
+        le groupe était partagé&nbsp;: <b>ce scrutin sort du dénominateur</b>. Il
+        n'y a pas de ligne à enfreindre, donc rien à compter — ni dissidence, ni
+        conformité.</p>
+      <p>C'est ce qui distingue un député discipliné d'un député dont le groupe
+        ne se prononce jamais. Les deux auraient 0&nbsp;% avec un calcul naïf.</p>
+
+      <h3>Taux d'accord entre deux députés</h3>
+      <p class="provenance">scrutins où les deux ont voté pareil ÷ scrutins où les deux ont exprimé un vote</p>
+      <p>Le dénominateur est propre à chaque paire, et il est affiché à chaque
+        fois. Les scrutins où l'un des deux n'a pas voté sont <b>écartés</b>, pas
+        comptés comme des désaccords&nbsp;: ne pas voter n'est pas voter contre.
+        Sous {{MIN_COMMUNS}} scrutins en commun, nous n'affichons aucun taux — un
+        pourcentage calculé sur une poignée de votes est un accident
+        d'échantillon. Voir <a href="carte.html">la page « Qui vote avec
+        qui&nbsp;? »</a>.</p>
+
+      <h3>Position estimée à partir de ses votes</h3>
+      <p class="provenance">modèle de points idéaux, {{BOOTSTRAP}} rééchantillonnages pour l'intervalle</p>
+      <p>C'est la mesure la plus technique du site, et celle qui demande le plus
+        de précautions. L'idée&nbsp;: chercher le classement des députés sur une
+        ligne qui <em>prédit le mieux leurs votes</em>. Chaque scrutin y devient
+        une frontière, et chaque député une position par rapport à ces
+        frontières. Le modèle est estimé sur les seuls votes qui engagent.</p>
+      <p><b>Le modèle ne connaît aucune étiquette politique.</b> Il ne sait pas
+        qui siège dans quel groupe, ni ce que veulent dire « gauche » et
+        « droite ». Que l'axe qu'il trouve ressemble à un clivage connu est un
+        <em>résultat</em>, pas une hypothèse — et c'est pourquoi nous ne le
+        nommons jamais ainsi. Nous situons par des repères mesurés&nbsp;: « entre
+        la médiane du groupe X et celle du groupe Y ».</p>
+      <p><b>Un rang ne se lit jamais sans son intervalle.</b> Un député ayant peu
+        voté a une position mal déterminée. Nous rééchantillonnons les scrutins
+        {{BOOTSTRAP}} fois pour obtenir un intervalle, et chaque fiche indique
+        combien d'autres députés ont un intervalle qui recouvre le sien. Quand
+        deux zones se recouvrent, l'ordre entre les deux n'a pas de sens.</p>
+      <p>Nous ne retenons qu'<b>une seule dimension</b>. Un second axe n'est
+        ajouté que s'il prédit mieux des votes que le modèle n'a pas vus, ce qui
+        se teste — et ne se suppose pas. C'est aussi la raison pour laquelle ce
+        site ne publie pas de « carte politique » en deux dimensions&nbsp;: la
+        seconde dimension serait décorative, et elle serait lue comme
+        significative.</p>
+
+      <h3>Cohésion d'un groupe</h3>
+      <p class="provenance">taux d'accord moyen entre toutes les paires de députés du même groupe</p>
+      <p>Un groupe de quatre députés et un groupe de quatre-vingt-dix ne
+        produisent pas des moyennes également stables. Les effectifs accompagnent
+        donc toujours la mesure. Les non-inscrits (NI) ne sont pas un groupe et
+        n'ont pas de ligne&nbsp;: leur « cohésion » n'a pas de sens, et ils sont
+        exclus des comparaisons entre groupes.</p>
+    </div>
+  </section>
+
+  <!-- ══ CE QUE ÇA NE DIT PAS ══════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Les limites, en clair</p>
+    <div class="lecture">
+      <h2>Cinq choses que ce site ne peut pas vous dire</h2>
+      <ol class="liste-limites">
+        <li><b>Pourquoi quelqu'un a voté ainsi.</b> Un vote enregistre une
+          position finale, jamais un motif. Deux députés peuvent voter pareil
+          pour des raisons opposées.</li>
+        <li><b>Si un député travaille bien.</b> Le vote en séance est une
+          fraction visible d'un mandat. Nous mesurons cette fraction, et rien
+          d'autre.</li>
+        <li><b>Ce que vaut une position.</b> Le site situe, il ne juge pas. Aucun
+          chiffre n'est présenté comme bon ou mauvais.</li>
+        <li><b>Ce qui se passe hors des scrutins publics.</b> Beaucoup de textes
+          sont adoptés sans scrutin public&nbsp;; ceux-là sont invisibles ici.</li>
+        <li><b>Ce que la source ne publie pas.</b> Quand une donnée manque, nous
+          l'affichons comme manquante. Nous ne la remplaçons jamais par zéro.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ══ REPRODUIRE ════════════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Vérifier par vous-même</p>
+      <h2>Refaire les calculs</h2>
+      <p>Le code est ouvert. Les commandes ci-dessous téléchargent les données
+        depuis l'Assemblée, reconstruisent les tables et régénèrent ce site à
+        l'identique.</p>
+      <pre class="commandes"><code>uv run radar update
+uv run python site/generer.py --servir</code></pre>
+      <p>Les données de cette version ont été construites le
+        <b>{{GENERE_LE}}</b>. Un chiffre lu ici plus tard peut avoir changé&nbsp;:
+        de nouveaux scrutins ont eu lieu, des députés sont entrés ou partis. La
+        date de calcul figure en bas de chaque page pour cette raison.</p>
+
+      <p class="jalon">Une erreur&nbsp;?</p>
+      <h2>Comment la signaler</h2>
+      <p>Chaque taux est publié avec son dénominateur précisément pour pouvoir
+        être recontrôlé. Si vous trouvez une erreur — un chiffre, un
+        rattachement de groupe, une date de mandat — elle doit être corrigée
+        publiquement, et la correction doit être visible.</p>
+      <p><a href="carte.html">Voir la mesure d'ensemble</a> ·
+        <a href="deputes.html">Chercher un député</a></p>
+    </div>
+  </section>

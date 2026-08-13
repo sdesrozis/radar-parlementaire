@@ -1,0 +1,62 @@
+name: tests
+
+# Les tests ne touchent jamais au réseau : ils travaillent sur des tables
+# fabriquées à la main. C'est ce qui permet de les lancer à chaque poussée sans
+# retélécharger les 1,7 Go de l'open data — la génération du site, elle, en a
+# besoin et n'a donc rien à faire ici.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Installer les dépendances
+        run: uv sync --extra dev
+
+      - name: Lancer les tests
+        run: uv run pytest -q
+
+  # Le paquet doit rester installable et utilisable seul : c'est toute la raison
+  # d'avoir sorti le site de `src/radar/`. Ce travail échoue si quelqu'un y
+  # réintroduit une importation vers `site/`.
+  paquet-autonome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Installer le seul paquet, sans le site
+        run: uv sync --no-dev
+
+      - name: Le paquet s'importe et expose sa frontière
+        run: |
+          uv run python -c "
+          from radar import analyze, ideal, vues
+          assert hasattr(vues, 'Donnees')
+          print('radar importable sans le site')
+          "
+
+      - name: Aucun HTML, CSS ou JavaScript dans le paquet
+        run: |
+          trouves=$(find src/radar -name '*.html' -o -name '*.css' -o -name '*.js')
+          if [ -n "$trouves" ]; then
+            echo "Le paquet contient des fichiers de site :"
+            echo "$trouves"
+            exit 1
+          fi
+          echo "src/radar/ ne contient aucun fichier de site"

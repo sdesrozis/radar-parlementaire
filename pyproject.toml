@@ -3,6 +3,8 @@ name = "radar"
 version = "0.1.0"
 description = "Radar politique : votes, amendements et interventions de l'Assemblée nationale"
 readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{ name = "Sylvain Desroziers", email = "sylvain.desroziers@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [

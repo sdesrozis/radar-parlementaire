@@ -55,29 +55,61 @@ uv run radar rapport                         # Markdown + figures PNG
 uv run radar rapport --pdf                   # et la version PDF
 uv run radar rapport --semaine 2026-06-15 --pdf
 
-# Le site local : une fiche par député, ses votes, les scrutins
-uv run radar site                            # http://127.0.0.1:8000
+# Le site : une fiche par député, la matrice des accords, la méthode
+uv run python site/generer.py --servir       # http://127.0.0.1:8000
 ```
 
 Le PDF est produit par reportlab, sans dépendance système : pas besoin
 d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 
-## Le site local
+## Le site
 
-`radar site` calcule tout au démarrage — une douzaine de secondes — puis sert
-depuis la mémoire, avec le serveur de la bibliothèque standard : pas de
-dépendance web, pas de base de données, rien qui écoute au-delà de la machine
-sauf `--host` explicite.
+Le site est **statique** : `site/generer.py` construit les données une fois puis
+écrit 581 fichiers HTML dans `site/sortie/`. Aucun serveur en production, aucune
+API, aucune base de données — ce qu'on regarde en local est exactement ce qui
+sera en ligne.
 
 ```bash
-uv run radar site --port 8000 --bootstrap 40   # 0 : démarrage plus rapide, positions sans intervalle
+uv run python site/generer.py --servir   # recalcule tout, puis sert (~20 s)
+python3 site/serveur.py                  # rouvre ce qui est déjà généré, instantané
 ```
 
-Quatre vues : **les députés** (liste triable, participation, dissidence,
-position estimée), **la fiche** d'un député, **les scrutins** avec le
-dépouillement nominatif groupe par groupe, **les groupes** avec leur cohésion et
-l'étendue interne des positions. Une cinquième page, *Méthode*, dit ce que
-chaque chiffre écarte.
+La seconde forme n'a aucune dépendance — ni `uv`, ni `radar`, ni polars. Relire
+le site ne doit pas coûter les vingt secondes que coûte le reconstruire, sans
+quoi on prend l'habitude d'ouvrir `file://`, qui ment sur les chemins.
+
+Options : `--bootstrap 0` (démarrage plus rapide, positions sans intervalle) et
+`--limite 5` (cinq fiches, pour une mise au point).
+
+Quatre pages : **l'accueil** pédagogique, **l'annuaire** des députés avec
+recherche par nom, département, région et groupe, **la fiche** d'un député, et
+**« Qui vote avec qui ? »** — les 164 451 paires de députés dessinées d'un coup,
+rangées non par groupe mais le long de l'axe estimé à partir des seuls votes.
+Une cinquième, *Méthode*, donne la définition exacte et le dénominateur de
+chaque mesure, puis ce qu'aucune d'elles ne peut dire.
+
+### La frontière algorithmes / site
+
+Le paquet `src/radar/` ne contient **aucune ligne de HTML, CSS ou JavaScript**,
+et la CI échoue si l'on en réintroduit. Il s'installe et s'utilise seul, sans
+que le site existe. La frontière est `radar/vues.py` : il assemble les sorties
+des algorithmes en vues prêtes à afficher, et ne sait pas ce qu'est une page.
+
+```
+src/radar/        les algorithmes           →  publiable seul
+  vues.py         la frontière
+site/
+  generer.py      l'orchestration           →  consomme radar, ne calcule rien
+  redaction.py    les phrases
+  gabarits/       la structure
+  statique/       le système visuel
+  serveur.py      le mode développement
+```
+
+`redaction.py` est séparé pour une raison qui n'est pas cosmétique : un chiffre
+est vrai ou faux, une phrase qui le commente peut être exacte et malhonnête à la
+fois. Ce sont deux métiers, ils se relisent différemment. Le module n'a aucune
+importation — il reçoit des dictionnaires et rend des chaînes.
 
 La fiche affiche systématiquement ce que la ligne de commande fait afficher à la
 demande : le taux avec son dénominateur, la position avec son intervalle, et
@@ -497,9 +529,15 @@ src/radar/
     abstention.py l'abstention comme objet d'analyse
     viz.py        graphiques matplotlib
     pdf.py        rendu PDF du bulletin (reportlab)
-    site.py       site local : API JSON + serveur de la bibliothèque standard
-    web/          la page unique servie par `radar site` (HTML, CSS, JS)
+    vues.py       la frontière : données prêtes à afficher, aucune mise en page
     cli.py        interface en ligne de commande
+site/
+    generer.py    orchestration : quel gabarit, quel jeton, quel fichier
+    redaction.py  les phrases (aucune importation, aucun calcul)
+    serveur.py    le mode développement : sert sortie/ comme le fera l'hébergeur
+    gabarits/     la structure des pages, jetons {{...}}
+    statique/     système visuel et comportement (CSS, JS)
+    sortie/       produit, jetable, régénéré à chaque fois
 notebooks/
     _generer.py                  source des cinq notebooks
     01_prise_en_main.ipynb

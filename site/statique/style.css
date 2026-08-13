@@ -563,3 +563,154 @@ h1 {
   text-transform: uppercase; color: var(--encre-3);
   padding-top: 22px; margin-top: 40px; border-top: 1px solid var(--trait);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LA MATRICE DES ACCORDS
+   Une seule rampe, du papier creux vers l'accent : elle porte une grandeur
+   (le taux d'accord) et jamais une identité de groupe.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.carte-outils {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 14px 22px;
+  margin-bottom: 22px;
+}
+.bascules { display: inline-flex; border: 1px solid var(--trait-fort); border-radius: 3px; }
+.bascules button {
+  font-family: var(--sans); font-size: 14px; color: var(--encre-2);
+  background: none; border: 0; padding: 9px 16px; cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.bascules button + button { border-left: 1px solid var(--trait-fort); }
+.bascules button:hover { color: var(--encre); }
+.bascules button[aria-pressed="true"] { background: var(--accent); color: var(--papier-haut); }
+.carte-etat { flex: 1 1 22ch; margin: 0; max-width: 56ch; }
+
+.carte-scene { display: grid; gap: 30px; align-items: start; }
+@media (min-width: 900px) { .carte-scene { grid-template-columns: minmax(0, 1fr) 22rem; } }
+
+.carte-toile { position: relative; line-height: 0; }
+.carte-toile canvas {
+  width: 100%; height: auto; display: block;
+  image-rendering: pixelated;                 /* une case = un carré net */
+  border: 1px solid var(--trait);
+  background: var(--papier-creux);
+  cursor: crosshair;
+}
+/* Le viseur : deux filets fins, parce qu'à cette densité le curseur seul ne
+   permet pas de savoir quelle case on lit. */
+.carte-viseur { position: absolute; inset: 0; pointer-events: none; }
+.carte-viseur::before, .carte-viseur::after {
+  content: ""; position: absolute; background: var(--accent-vif); opacity: 0.55;
+}
+.carte-viseur::before { left: 0; right: 0; top: 0; height: 1px; }
+.carte-viseur::after { top: 0; bottom: 0; left: 0; width: 1px; }
+
+.carte-lecture {
+  border-top: 2px solid var(--encre); padding-top: 16px; min-height: 12rem;
+}
+.carte-invite { margin: 0; color: var(--encre-3); font-size: 15px; }
+.carte-nom {
+  font-family: var(--serif); font-size: 19px; line-height: 1.3; margin: 0 0 2px;
+}
+.carte-nom .grp {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  color: var(--encre-3); margin-left: 7px;
+}
+.carte-nom-b { color: var(--encre-2); }
+.carte-taux {
+  font-family: var(--serif); font-size: clamp(2rem, 4vw, 2.6rem);
+  letter-spacing: -0.03em; margin: 14px 0 4px;
+}
+.carte-denominateur { margin: 0; }
+
+.carte-echelle {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  margin-top: 26px; font-size: 12px; color: var(--encre-2);
+}
+/* La rampe reprend exactement les bornes peintes par carte.js : un indigo très
+   pâle — jamais le gris du papier, réservé à l'absence de mesure. */
+.carte-echelle .rampe {
+  flex: 0 1 220px; height: 10px; border: 1px solid var(--trait);
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--accent) 12%, var(--papier-creux)), var(--accent));
+}
+.carte-cle { display: inline-flex; align-items: center; gap: 7px; }
+.pastille-absent {
+  width: 11px; height: 11px; background: var(--trait);
+  border: 1px solid var(--trait-fort); display: inline-block;
+}
+
+/* La matrice des groupes : lisible d'un coup d'œil, contrairement aux 574. */
+.tableau-defile { overflow-x: auto; margin-top: 8px; }
+.matrice-groupes { border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+.matrice-groupes caption {
+  caption-side: bottom; text-align: left; padding-top: 14px; max-width: 70ch;
+}
+.matrice-groupes th, .matrice-groupes td {
+  padding: 7px 9px; text-align: center; white-space: nowrap;
+  border: 1px solid var(--papier);
+}
+.matrice-groupes thead th { font-weight: 600; color: var(--encre-2); }
+.matrice-groupes tbody th { text-align: left; font-weight: 600; }
+.matrice-groupes tbody th .effectif {
+  font-weight: 400; color: var(--encre-3); margin-left: 8px;
+}
+.matrice-groupes td.soi { outline: 1px solid var(--trait-fort); outline-offset: -1px; }
+
+.visuellement-cache {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+/* La teinte d'une case porte son taux, calculé côté Python et passé en `--t`.
+   Aucune valeur n'est écrite ici : ce fichier ne connaît aucun chiffre. */
+.matrice-groupes td[style*="--t"] {
+  background: color-mix(in srgb, var(--accent) calc(12% + var(--t) * 88%), var(--papier-creux));
+}
+.matrice-groupes td.fonce { color: var(--papier-haut); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGE MÉTHODE
+   Une page de définitions : la provenance en mono sous chaque titre, et
+   la définition elle-même en prose. Pas de grand chiffre, pas de bande.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* `.lecture h3` porte une définition, pas une décoration : la ligne de
+   provenance qui le suit en `--mono` est le dénominateur de la mesure. */
+.lecture h3 {
+  font-family: var(--serif); font-weight: 500;
+  font-size: clamp(1.25rem, 2.2vw, 1.5rem); letter-spacing: -0.015em;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--trait);
+}
+.lecture h3 + .provenance {
+  margin: 0 0 16px; color: var(--encre-3); font-size: 12.5px; line-height: 1.5;
+}
+
+/* Même dispositif visuel que `.limites ul`, sans hériter de son conteneur :
+   `.limites` est une classe de *section* et porte `padding-block` + bordure. */
+.liste-limites {
+  list-style: none; padding: 0; margin: 24px 0 0;
+  display: grid; gap: 1px; background: var(--trait);
+  border: 1px solid var(--trait); border-radius: 3px; overflow: hidden;
+  counter-reset: limite;
+}
+.liste-limites li {
+  background: var(--papier); padding: 18px 22px 18px 52px; position: relative;
+  font-size: 15.5px; color: var(--encre-2); line-height: 1.6;
+}
+.liste-limites li::before {
+  counter-increment: limite; content: counter(limite);
+  position: absolute; left: 22px; top: 18px;
+  font-family: var(--mono); font-size: 12px; color: var(--encre-3);
+}
+.liste-limites li b { color: var(--encre); font-weight: 600; }
+
+.commandes {
+  margin: 20px 0; padding: 16px 18px; overflow-x: auto;
+  background: var(--papier-creux); border: 1px solid var(--trait); border-radius: 3px;
+}
+.commandes code {
+  font-family: var(--mono); font-size: 13px; line-height: 1.75;
+  color: var(--encre); white-space: pre;
+}
