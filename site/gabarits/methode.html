@@ -261,9 +261,42 @@
         étant donnés, n'importe qui peut refaire l'opération depuis la source
         ouverte et nous opposer un autre résultat.</p>
       <p>Si vous trouvez une erreur — un chiffre, un rattachement de groupe, une
-        date de mandat — elle doit être corrigée publiquement, et la correction
-        doit être visible.</p>
+        date de mandat — écrivez à <a href="mailto:{{CONTACT}}">{{CONTACT}}</a>.
+        Elle sera corrigée publiquement, et la correction sera visible&nbsp;:
+        les <a href="corrections.html">{{N_CORRECTIONS}} corrections déjà
+        faites</a> sont datées, chiffrées et rattachées au commit qui les
+        applique.</p>
       <p><a href="carte.html">Voir la mesure d'ensemble</a> ·
-        <a href="deputes.html">Chercher un député</a></p>
+        <a href="deputes.html">Chercher un député</a> ·
+        <a href="mentions.html">Qui édite ce site</a></p>
+    </div>
+  </section>
+
+  <!-- ══ CITER ═════════════════════════════════════════════════════
+       Un chiffre qu'on ne sait pas citer ne sort pas du site. Les deux
+       références sont distinctes à dessein : la note spécifie les mesures et
+       ne bouge qu'à la révision, le logiciel les calcule et bouge à chaque
+       version. Un article qui discute une définition cite la première ; un
+       travail qui rejoue les calculs cite les deux.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Reprendre ces chiffres ailleurs</p>
+      <h2>Comment citer ce travail</h2>
+      <p>Les chiffres de ce site sont libres de reprise. Une seule condition, et
+        elle est méthodologique avant d'être juridique&nbsp;: <b>citer la source
+        et la date de calcul</b>. Un taux se recalcule à chaque mise à jour de
+        l'open data&nbsp;; sans sa date, il n'est pas vérifiable.</p>
+
+      <p class="jalon">Dans un article</p>
+      <p class="citation-texte">{{CITATION_COURTE}}</p>
+
+      <p class="jalon">Dans un travail académique</p>
+      <p>Citez la <b>note méthodologique</b> pour les définitions et le
+        <b>logiciel</b> pour les calculs&nbsp;:</p>
+      <pre class="citation-bib"><code>{{CITATION_BIBTEX}}</code></pre>
+      <p class="provenance">Le dépôt porte un fichier
+        <a href="{{DEPOT}}/blob/main/CITATION.cff">CITATION.cff</a> que GitHub
+        et Zenodo lisent directement.</p>
     </div>
   </section>

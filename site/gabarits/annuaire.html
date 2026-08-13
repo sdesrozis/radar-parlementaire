@@ -49,4 +49,30 @@
     </div>
   </section>
 
+  <!-- ══ L'INDEX COMPLET, EN HTML ══════════════════════════════════════
+       La recherche ci-dessus fabrique ses résultats en JavaScript. Elle est
+       excellente pour qui sait déjà quel nom taper, et invisible pour tout le
+       reste : un lecteur sans JavaScript, un lecteur d'écran qui parcourt les
+       liens, et surtout un moteur de recherche — qui ne trouvait donc aucun
+       chemin vers les {{EN_EXERCICE}} fiches, chacune n'étant atteignable que
+       par le plan du site.
+
+       Cet index est ce chemin. Il n'est pas une seconde implémentation de la
+       recherche : il ne filtre rien, ne calcule rien et n'affiche aucune
+       mesure. Il ne fait qu'une chose que le JavaScript ne peut pas faire —
+       exister avant lui.
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="cadre socle" id="index">
+    <div class="lecture">
+      <p class="jalon">Sans passer par la recherche</p>
+      <h2>Les {{EN_EXERCICE}} députés, par département</h2>
+      <p>La liste complète, dans l'ordre des départements et des
+        circonscriptions. Utile pour parcourir plutôt que pour chercher — et
+        c'est par ces liens qu'un moteur de recherche atteint les fiches.</p>
+    </div>
+    <div class="index-departements">
+      {{INDEX_DEPARTEMENTS}}
+    </div>
+  </section>
+
   <script>const ANNUAIRE = {{ANNUAIRE_JSON}};</script>

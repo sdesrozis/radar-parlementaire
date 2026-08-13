@@ -1,0 +1,67 @@
+# Comment citer ce travail. Format Citation File Format 1.2.0, que GitHub et
+# Zenodo lisent directement — le bouton « Cite this repository » de GitHub sort
+# de ce fichier.
+#
+# Deux références, et c'est voulu : la note méthodologique spécifie les mesures
+# et ne bouge qu'à la révision, le logiciel les calcule et bouge à chaque
+# version. Un article qui discute une définition cite la première ; un travail
+# qui rejoue les calculs cite les deux.
+#
+# `version` doit rester égale à celle de `pyproject.toml`, d'où le site tire la
+# sienne.
+
+cff-version: 1.2.0
+message: >-
+  Si vous utilisez le Radar parlementaire dans un travail académique, de
+  recherche ou professionnel, merci de citer à la fois la note méthodologique
+  et le logiciel.
+title: >-
+  Radar parlementaire : votes, amendements et sujets de l'Assemblée nationale
+abstract: >-
+  Chaîne de traitement et site public transformant l'open data de l'Assemblée
+  nationale française en indicateurs d'activité parlementaire : présence aux
+  scrutins, écart à la ligne de groupe, cohésion, accord entre députés et
+  positions estimées par un modèle de points idéaux. Chaque mesure est publiée
+  avec son dénominateur, son périmètre et son incertitude.
+type: software
+authors:
+  - family-names: Desroziers
+    given-names: Sylvain
+    email: contact@radar-parlementaire.fr
+version: 0.1.0
+license: AGPL-3.0-or-later
+repository-code: https://github.com/sdesrozis/radar
+url: https://radar-parlementaire.fr
+keywords:
+  - Assemblée nationale
+  - données ouvertes
+  - scrutins publics
+  - points idéaux
+  - cohésion de groupe
+  - transparence
+  - reproductibilité
+
+references:
+  - type: report
+    title: >-
+      Mesurer l'activité de l'Assemblée nationale à partir de ses données
+      ouvertes : définitions, dénominateurs et incertitudes
+    authors:
+      - family-names: Desroziers
+        given-names: Sylvain
+    institution:
+      name: Radar parlementaire
+    year: 2026
+    url: https://radar-parlementaire.fr/methode/note-methodologique.pdf
+    license: CC-BY-4.0
+
+  - type: data
+    title: Open data de l'Assemblée nationale
+    authors:
+      - name: Assemblée nationale
+    url: https://data.assemblee-nationale.fr
+    license: etalab-2.0
+    notes: >-
+      Source unique de tous les chiffres. Aucun chiffre publié par l'Assemblée
+      n'est repris tel quel : les totaux sont recalculés depuis le
+      dépouillement nominatif.

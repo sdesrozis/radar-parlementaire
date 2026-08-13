@@ -616,9 +616,64 @@ figures dans `data/out/`.
   l'Assemblée, ce qui évite toute dépendance à un tiers, mais CIVIX peut être
   utile pour des requêtes ponctuelles.
 
+# Citer
+
+Si vous utilisez le Radar parlementaire dans un travail académique, de recherche
+ou professionnel, citez **la note méthodologique et le logiciel**. La première
+spécifie les mesures et ne bouge qu'à la révision ; le second les calcule et
+bouge à chaque version. Un article qui discute une définition cite la note ; un
+travail qui rejoue les calculs cite les deux.
+
+```bibtex
+@techreport{desroziers2026radarnote,
+  author      = {Desroziers, Sylvain},
+  title       = {Mesurer l'activité de l'Assemblée nationale à partir de ses
+                 données ouvertes : définitions, dénominateurs et incertitudes},
+  institution = {Radar parlementaire},
+  type        = {Note méthodologique},
+  year        = {2026},
+  url         = {https://radar-parlementaire.fr/methode/note-methodologique.pdf}
+}
+
+@software{desroziers2026radarlogiciel,
+  author  = {Desroziers, Sylvain},
+  title   = {Radar parlementaire : votes, amendements et sujets de
+             l'Assemblée nationale},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/sdesrozis/radar},
+  license = {AGPL-3.0-or-later},
+  note    = {Données : open data de l'Assemblée nationale, Licence Ouverte 2.0}
+}
+```
+
+Dans un article de presse, la forme courte suffit — mais **la date de calcul en
+fait partie** : un taux se recalcule à chaque mise à jour de la source, et sans
+sa date il n'est pas vérifiable.
+
+> Radar parlementaire, Sylvain Desroziers, 2026. Calculs de l'auteur d'après
+> l'open data de l'Assemblée nationale, données au JJ mois AAAA.
+> https://radar-parlementaire.fr
+
+Le fichier [`CITATION.cff`](CITATION.cff) porte les mêmes références au format
+Citation File Format ; c'est lui qui alimente le bouton « Cite this repository »
+de GitHub. Sa version doit rester égale à celle de `pyproject.toml`, dont le
+site et les deux références tirent la leur.
+
 # Sources et licence
 
 Données : [open data de l'Assemblée nationale](https://data.assemblee-nationale.fr),
 Licence Ouverte 2.0. Le radar ne modifie pas les données sources ; tous les
 agrégats sont recalculés depuis le dépouillement nominatif et reproductibles
 avec `radar build`.
+
+Code sous **AGPL-3.0-or-later** ([`LICENSE`](LICENSE)). Note méthodologique sous
+**CC BY 4.0**. Les chiffres publiés par le site sont libres de reprise avec leur
+source et leur date de calcul.
+
+Le site est édité par Sylvain Desroziers, sans financement, sans publicité et
+sans lien avec un parti, un élu ou un groupe parlementaire — cf. la page
+[« Qui édite ce site »](https://radar-parlementaire.fr/mentions.html). Les
+erreurs trouvées dans les chiffres publiés sont inscrites au
+[registre des corrections](https://radar-parlementaire.fr/corrections.html),
+alimenté par [`site/corrections.toml`](site/corrections.toml).

@@ -28,6 +28,7 @@ import json
 import re
 import shutil
 import time
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -76,6 +77,25 @@ NOTE_CHEMIN = "methode/note-methodologique.pdf"
 # partage. Une URL relative suffit à la navigation ; un moteur de recherche et
 # un aperçu de lien, eux, exigent l'adresse complète.
 BASE = "https://radar-parlementaire.fr"
+
+# Le registre des corrections : une donnée, pas du code. Il s'édite sans toucher
+# à ce fichier, et son format est documenté en tête du TOML.
+CORRECTIONS = ICI / "corrections.toml"
+
+# L'identité de l'éditeur. Elle est écrite ici et nulle part ailleurs : le pied
+# de page, les mentions légales et les deux références bibliographiques la
+# tirent toutes de ces constantes, pour qu'un changement de nom ou d'adresse ne
+# puisse pas laisser une page en arrière.
+EDITEUR = "Sylvain Desroziers"
+EDITEUR_BIB = "Desroziers, Sylvain"
+CONTACT = "contact@radar-parlementaire.fr"
+DEPOT = "https://github.com/sdesrozis/radar"
+DEPOT_COURT = "github.com/sdesrozis/radar"
+
+# La version du paquet, lue là où elle est déclarée. La réécrire ici en ferait
+# une seconde source de vérité, qui divergerait à la première publication.
+VERSION = tomllib.loads(
+    (ICI.parent / "pyproject.toml").read_text())["project"]["version"]
 
 
 # ── distributions : la matière de la bande des 577 ─────────────────────────
@@ -162,6 +182,139 @@ def bloc_note_html() -> str:
     )
 
 
+def corrections_lues() -> list[dict]:
+    """Le registre, du plus récent au plus ancien.
+
+    L'ordre est celui de la lecture : on vient sur cette page pour savoir si un
+    chiffre lu récemment a bougé, pas pour parcourir une histoire du projet.
+    """
+    if not CORRECTIONS.exists():
+        return []
+    entrees = tomllib.loads(CORRECTIONS.read_text())["correction"]
+    return sorted(entrees, key=lambda c: c["date"], reverse=True)
+
+
+def registre_html(entrees: list[dict]) -> str:
+    """Le registre en HTML.
+
+    Aucun champ n'est facultatif : une correction sans son avant/après ne
+    permet pas à un lecteur de savoir s'il doit se corriger, et n'aurait donc
+    pas dû être écrite. La génération s'arrête plutôt que de publier une entrée
+    creuse.
+    """
+    obligatoires = ("date", "titre", "portee", "erreur", "cause", "effet", "pages", "commit")
+
+    def prose(texte: str) -> str:
+        """Échappe, puis rend les `identifiants` en chasse fixe.
+
+        Une correction nomme presque toujours la fonction fautive. L'écrire
+        entre accents graves dans le TOML est la façon naturelle de le faire ;
+        sans cette conversion, les accents graves s'affichaient tels quels.
+        L'échappement passe d'abord, pour qu'un texte ne puisse pas injecter de
+        balise par ce chemin.
+        """
+        return re.sub(r"`([^`]+)`", r"<code>\1</code>", echapper(texte.strip()))
+
+    lignes = []
+    for c in entrees:
+        vides = [k for k in obligatoires if not str(c.get(k, "")).strip()]
+        if vides:
+            raise SystemExit(
+                f"correction « {c.get('titre', '?')} » : champs vides {sorted(vides)}")
+        lignes.append(
+            '<li class="correction">\n'
+            '        <div class="correction-tete">\n'
+            f'          <span class="correction-date mono">{jour(c["date"])}</span>\n'
+            f'          <span class="etiq-portee">{echapper(c["portee"])}</span>\n'
+            f'          <h3>{echapper(c["titre"])}</h3>\n'
+            '        </div>\n'
+            f'        <p><b>Ce qui était faux.</b> {prose(c["erreur"])}</p>\n'
+            f'        <p><b>Pourquoi.</b> {prose(c["cause"])}</p>\n'
+            f'        <p class="correction-effet"><b>Ce que ça change.</b> '
+            f'{prose(c["effet"])}</p>\n'
+            '        <p class="provenance">Pages concernées&nbsp;: '
+            f'{echapper(c["pages"])} · correctif '
+            f'<a class="mono" href="{DEPOT}/commit/{c["commit"]}">{c["commit"]}</a></p>\n'
+            '      </li>'
+        )
+    return "\n      ".join(lignes)
+
+
+def index_departements_html(deputes: list[dict]) -> str:
+    """Les députés en exercice, groupés par département, en liens HTML.
+
+    C'est le seul endroit du site où les {{EN_EXERCICE}} fiches sont atteignables
+    sans JavaScript. L'annuaire fabrique ses résultats à la frappe : excellent
+    pour chercher, inexistant pour un moteur, qui n'y voyait aucun lien et ne
+    découvrait donc les fiches que par le plan du site — sans jamais savoir
+    laquelle compte.
+    """
+    par_departement: dict[tuple, list[dict]] = {}
+    for d in deputes:
+        # Le numéro de département est une chaîne : « 2A » et « 976 » n'ont pas
+        # d'ordre numérique commun, et le tri lexicographique sur une chaîne
+        # zéro-remplie donne l'ordre officiel.
+        cle = (str(d["num_departement"] or "zz"), d["departement"] or "Sans département")
+        par_departement.setdefault(cle, []).append(d)
+
+    blocs = []
+    for (num, nom), membres in sorted(par_departement.items()):
+        membres.sort(key=lambda d: (int(d["num_circo"] or 0), d["nom_complet"]))
+        liens = "\n          ".join(
+            f'<li><a href="{d["acteur_uid"]}.html">{echapper(d["nom_complet"])}'
+            f'<span class="circo mono">{d["num_circo"]}{ordinal(d["num_circo"])}</span></a></li>'
+            for d in membres
+        )
+        blocs.append(
+            '<div class="index-dep">\n'
+            f'        <h3><span class="mono">{echapper(num)}</span> {echapper(nom)}</h3>\n'
+            f'        <ul>\n          {liens}\n        </ul>\n'
+            '      </div>'
+        )
+    return "\n      ".join(blocs)
+
+
+def citations(calcule_le: str) -> tuple[str, str]:
+    """La citation courte et les deux références BibTeX.
+
+    Deux entrées et non une : la note spécifie les mesures et ne bouge qu'à la
+    révision, le logiciel les calcule et bouge à chaque version. Un article qui
+    discute une définition cite la première ; un travail qui rejoue les calculs
+    cite les deux. Aucune n'est écrite à la main — le nom, la version et la date
+    viennent des constantes et du calcul en cours.
+    """
+    annee = date.today().year
+    cle = f"desroziers{annee}radar"
+    courte = (
+        f"Radar parlementaire, {EDITEUR}, {annee}. Calculs de l'auteur d'après "
+        f"l'open data de l'Assemblée nationale, données au {calcule_le}. "
+        f"{BASE}"
+    )
+    bibtex = f"""@techreport{{{cle}note,
+  author      = {{{EDITEUR_BIB}}},
+  title       = {{Mesurer l'activité de l'Assemblée nationale à partir de ses
+                 données ouvertes : définitions, dénominateurs et incertitudes}},
+  institution = {{Radar parlementaire}},
+  type        = {{Note méthodologique}},
+  year        = {{{annee}}},
+  url         = {{{BASE}/{NOTE_CHEMIN}}},
+  note        = {{Version du {calcule_le}}}
+}}
+
+@software{{{cle}logiciel,
+  author  = {{{EDITEUR_BIB}}},
+  title   = {{Radar parlementaire : votes, amendements et sujets de
+             l'Assemblée nationale}},
+  year    = {{{annee}}},
+  version = {{{VERSION}}},
+  url     = {{{DEPOT}}},
+  license = {{AGPL-3.0-or-later}},
+  note    = {{Données : open data de l'Assemblée nationale,
+             Licence Ouverte 2.0 ; calcul du {calcule_le}}}
+}}"""
+    return courte, bibtex
+
+
 def lignes_groupes_html(groupes: list[dict]) -> str:
     lignes = []
     for g in sorted(groupes, key=lambda x: -x["effectif_actuel"]):
@@ -213,8 +366,21 @@ class Site:
             key=lambda g: g["position_mediane"])
         self.genere_le = jour(date.today().isoformat())
 
+        self.corrections = corrections_lues()
+        self.citation_courte, self.citation_bibtex = citations(self.genere_le)
+
         self.base = (GABARITS / "base.html").read_text()
         self.commun = {
+            "BASE_URL": BASE,
+            "EDITEUR": echapper(EDITEUR),
+            "CONTACT": CONTACT,
+            "DEPOT": DEPOT,
+            "DEPOT_COURT": DEPOT_COURT,
+            "VERSION": VERSION,
+            # Le pied de page annonce le nombre de corrections : c'est ce qui
+            # rend la promesse vérifiable d'un coup d'œil, et ce qui interdit
+            # de laisser le registre prendre du retard sans que ça se voie.
+            "N_CORRECTIONS": num(len(self.corrections)),
             "LEGISLATURE": self.apercu["legislature"],
             "DEBUT": jour(self.apercu["debut"]),
             "FIN": jour(self.apercu["fin"]),
@@ -231,12 +397,21 @@ class Site:
     # -- rendu ------------------------------------------------------------
 
     def page(self, corps: str, jetons: dict, *, titre: str, description: str,
-             onglet: str = "") -> str:
+             chemin: str, onglet: str = "") -> str:
+        """Assemble une page.
+
+        `chemin` est son adresse relative à la racine — `""` pour l'accueil.
+        Elle sert deux fois : à la balise canonique, qui dit au moteur laquelle
+        de plusieurs adresses possibles fait foi, et à `og:url`, que les
+        aperçus de lien affichent. Elle est obligatoire pour qu'une page ne
+        puisse pas être écrite en oubliant de se nommer.
+        """
         html = self.base.replace("{{CORPS}}", corps)
         tout = {
             **self.commun, **jetons,
             "TITRE": echapper(titre),
             "DESCRIPTION": echapper(description),
+            "CANONIQUE": f"{BASE}/{chemin}",
             "NAV_ACCUEIL": ' aria-current="page"' if onglet == "accueil" else "",
             "NAV_DEPUTES": ' aria-current="page"' if onglet == "deputes" else "",
             "NAV_CARTE": ' aria-current="page"' if onglet == "carte" else "",
@@ -337,7 +512,7 @@ class Site:
                 f"Les {num(m['paires'])} paires de députés de l'Assemblée nationale, "
                 f"chacune mesurée sur les scrutins où les deux ont voté."
             ),
-            onglet="carte")
+            chemin="carte.html", onglet="carte")
 
     # -- méthode ----------------------------------------------------------
 
@@ -354,11 +529,42 @@ class Site:
                 "BLOCS": num(self.apercu["blocs_bootstrap"]),
                 "MIN_COMMUNS": num(MIN_COMMUNS),
                 "BLOC_NOTE": bloc_note_html(),
+                "CITATION_COURTE": echapper(self.citation_courte),
+                "CITATION_BIBTEX": echapper(self.citation_bibtex),
             },
             titre="Méthode — Radar parlementaire",
             description=("La définition exacte de chaque mesure du Radar parlementaire, "
                          "son dénominateur, et ce qu'elle n'est pas capable de dire."),
-            onglet="methode")
+            chemin="methode.html", onglet="methode")
+
+    # -- mentions légales et registre des corrections ----------------------
+
+    def mentions(self) -> str:
+        """Qui édite, avec quel argent, et sous quelles licences.
+
+        Cette page manquait, et c'était le manque le plus coûteux du site : des
+        chiffres nominatifs sur des élus, publiés par personne. Elle ne contient
+        aucune mesure — seulement ce qui permet de savoir qui opposer à un
+        chiffre qu'on conteste.
+        """
+        return self.page(
+            (GABARITS / "mentions.html").read_text(), {},
+            titre="Qui édite ce site — Radar parlementaire",
+            description=(
+                f"{EDITEUR} édite le Radar parlementaire : éditeur, hébergeur, "
+                "financement, indépendance, données personnelles et licences."),
+            chemin="mentions.html")
+
+    def corrections_page(self) -> str:
+        return self.page(
+            (GABARITS / "corrections.html").read_text(),
+            {"CORRECTIONS": registre_html(self.corrections)},
+            titre="Corrections — Radar parlementaire",
+            description=(
+                f"Les {num(len(self.corrections))} erreurs trouvées dans les chiffres "
+                "publiés par le Radar parlementaire : ce qu'elles valaient, ce qu'elles "
+                "valent, et le correctif qui les a réparées."),
+            chemin="corrections.html")
 
     # -- fiche ------------------------------------------------------------
 
@@ -490,7 +696,7 @@ class Site:
             description=(f"{i['nom_complet']}, député{'e' if i.get('civilite') == 'Mme' else ''} "
                          f"de {i['departement']} ({i['groupe']}) : présence aux votes, écarts à la "
                          f"ligne de son groupe et position estimée, chaque chiffre avec son dénominateur."),
-            onglet="deputes")
+            chemin=f"{uid}.html", onglet="deputes")
 
     # -- accueil et annuaire ----------------------------------------------
 
@@ -507,7 +713,7 @@ class Site:
             titre="Radar parlementaire — ce que fait votre député, avec le dénominateur",
             description=("Chaque chiffre sur l'activité des députés, recalculé depuis les votes "
                          "nominatifs de l'Assemblée nationale et affiché avec son dénominateur."),
-            onglet="accueil")
+            chemin="", onglet="accueil")
 
     def index_annuaire(self) -> str:
         """L'index des députés, servi tel quel à la recherche.
@@ -541,11 +747,14 @@ class Site:
         corps = (GABARITS / "annuaire.html").read_text()
         return self.page(
             corps,
-            {"ANNUAIRE_JSON": self.index_annuaire()},
+            {
+                "ANNUAIRE_JSON": self.index_annuaire(),
+                "INDEX_DEPARTEMENTS": index_departements_html(self.deputes),
+            },
             titre="Trouver un député — Radar parlementaire",
             description=("Cherchez votre député par nom, département, région ou groupe "
                          "parlementaire, et lisez ses chiffres avec leur dénominateur."),
-            onglet="deputes")
+            chemin="deputes.html", onglet="deputes")
 
 
 def ecrire_index_moteurs(uids: list[str]) -> None:
@@ -557,7 +766,8 @@ def ecrire_index_moteurs(uids: list[str]) -> None:
     trouvable quand quelqu'un cherche comment un chiffre a été obtenu.
     """
     aujourdhui = date.today().isoformat()
-    urls = ["", "deputes.html", "carte.html", "methode.html"]
+    urls = ["", "deputes.html", "carte.html", "methode.html",
+            "corrections.html", "mentions.html"]
     if NOTE_SOURCE.exists():
         urls.append(NOTE_CHEMIN)
     urls += [f"{uid}.html" for uid in uids]
@@ -598,6 +808,22 @@ def main() -> None:
     site.region = dict(donnees.deputes.select(["acteur_uid", "region"]).iter_rows())
 
     SORTIE.mkdir(exist_ok=True)
+    # Les pages d'une génération précédente sont effacées avant d'écrire les
+    # nouvelles. Sans cela, une page retirée du site — ou renommée — restait
+    # dans `sortie/` et partait chez l'hébergeur à la publication suivante :
+    # c'est ainsi qu'une page « Soutenir » abandonnée est restée en ligne,
+    # sans lien entrant, absente du plan du site, avec un appel au don que
+    # plus rien dans le projet ne soutenait. Une page que le générateur ne
+    # produit plus ne doit exister nulle part.
+    #
+    # Seuls les HTML de la racine sont concernés : `.vercel` porte l'identité
+    # du projet chez l'hébergeur, et `statique/` et `methode/` sont réécrits
+    # juste après.
+    perimes = [f for f in SORTIE.glob("*.html")]
+    for f in perimes:
+        f.unlink()
+    if perimes:
+        print(f"  · {len(perimes)} pages de la génération précédente effacées")
     if (SORTIE / "statique").exists():
         shutil.rmtree(SORTIE / "statique")
     shutil.copytree(STATIQUE, SORTIE / "statique")
@@ -619,7 +845,10 @@ def main() -> None:
     (SORTIE / "deputes.html").write_text(site.annuaire())
     (SORTIE / "carte.html").write_text(site.carte())
     (SORTIE / "methode.html").write_text(site.methode())
-    print("  · accueil, annuaire, carte et méthode")
+    (SORTIE / "mentions.html").write_text(site.mentions())
+    (SORTIE / "corrections.html").write_text(site.corrections_page())
+    print(f"  · accueil, annuaire, carte, méthode, mentions et corrections "
+          f"({len(site.corrections)} entrées au registre)")
 
     cibles = site.deputes[: args.limite] if args.limite else site.deputes
     for n, d in enumerate(cibles, 1):

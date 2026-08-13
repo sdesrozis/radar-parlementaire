@@ -28,6 +28,7 @@ devait se garder d'un `../`.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import webbrowser
 from functools import partial
@@ -35,6 +36,11 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 SORTIE = Path(__file__).parent / "sortie"
+
+# Le port par défaut, que `$PORT` peut imposer. La convention vaut pour tous les
+# lanceurs qui attribuent eux-mêmes un port libre : sans elle, deux relectures
+# simultanées du site se disputent le 8000 et la seconde ne démarre pas.
+PORT = int(os.environ.get("PORT") or 8000)
 
 
 class _Silencieux(SimpleHTTPRequestHandler):
@@ -47,7 +53,7 @@ class _Silencieux(SimpleHTTPRequestHandler):
         pass
 
 
-def servir(dossier: Path, *, host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPServer:
+def servir(dossier: Path, *, host: str = "127.0.0.1", port: int = PORT) -> ThreadingHTTPServer:
     """Crée le serveur sur `dossier`. À l'appelant d'appeler `serve_forever()`.
 
     L'écoute est locale par défaut : le site n'est pas exposé au réseau sans un
@@ -56,7 +62,7 @@ def servir(dossier: Path, *, host: str = "127.0.0.1", port: int = 8000) -> Threa
     return ThreadingHTTPServer((host, port), partial(_Silencieux, directory=str(dossier)))
 
 
-def ouvrir(dossier: Path, *, port: int = 8000, navigateur: bool = True) -> None:
+def ouvrir(dossier: Path, *, port: int = PORT, navigateur: bool = True) -> None:
     """Sert `dossier` jusqu'à Ctrl+C. C'est la boucle, pas seulement le serveur."""
     s = servir(dossier, port=port)
     url = f"http://127.0.0.1:{port}/"
@@ -73,7 +79,7 @@ def ouvrir(dossier: Path, *, port: int = 8000, navigateur: bool = True) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Sert le site déjà généré, sans le recalculer.")
-    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--port", type=int, default=PORT)
     p.add_argument("--sans-navigateur", action="store_true",
                    help="ne pas ouvrir le navigateur au démarrage")
     args = p.parse_args()

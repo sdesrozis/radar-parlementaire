@@ -1,0 +1,217 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# LE REGISTRE DES CORRECTIONS
+#
+# Le pied de page de chaque page promet qu'un chiffre faux « est corrigé
+# publiquement ». Ce fichier est l'endroit où cette promesse s'exécute : il
+# n'existe pas d'autre trace publique d'une correction, et une correction faite
+# sans être écrite ici n'a pas été rendue publique.
+#
+# Une entrée s'ajoute **au moment du correctif**, pas après coup. Elle doit
+# permettre à un lecteur qui aurait cité l'ancien chiffre de savoir exactement
+# ce qui a changé et de combien : c'est la seule raison d'être du registre.
+#
+#   date     jour du correctif (AAAA-MM-JJ)
+#   titre    la mesure touchée, nommée comme le site la nomme
+#   portee   "chiffre"  un nombre publié était faux
+#            "methode"  le nombre ne change pas, sa définition oui
+#            "site"     ni chiffre ni méthode : la page elle-même
+#   erreur   ce qui était faux, à l'indicatif, sans atténuation
+#   cause    pourquoi c'était faux — la mécanique, pas l'excuse
+#   effet    avant → après, chiffré chaque fois qu'un chiffre existe
+#   pages    les pages du site qui affichaient l'ancienne valeur
+#   commit   l'empreinte git du correctif, pour aller lire le code
+#
+# Ce fichier est une donnée, pas du code : il s'édite sans toucher au
+# générateur, et `generer.py` le rend tel quel.
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[correction]]
+date = "2026-08-13"
+titre = "Présence aux votes qui engagent"
+portee = "chiffre"
+erreur = """
+Deux chiffres coexistaient pour la même mesure. `analyze.participation()`
+retirait du dénominateur les non-votants structurels — ministres, présidents de
+séance — ; la fiche de député refaisait la division de son côté sans ce retrait,
+et affichait donc une présence plus basse que la vraie."""
+cause = """
+Le calcul était écrit à deux endroits. Celui du générateur de site avait été
+écrit en premier et n'a pas suivi la correction apportée à l'autre."""
+effet = """
+Jusqu'à 12,5 points d'écart entre les deux chiffres, sur 43 députés. Il n'existe
+plus qu'une fonction ; elle renvoie le dénominateur qu'elle a divisé, et la
+fiche affiche ce nombre-là en nommant ses deux retraits."""
+pages = "Les 577 fiches de député, l'annuaire"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Scrutins qui ont basculé"
+portee = "chiffre"
+erreur = """
+Le nombre de scrutins dont l'issue tenait à peu de voix était surévalué : le
+décompte incluait des égalités où rien ne basculait."""
+cause = """
+Le seuil de bascule n'est pas le même selon le résultat. L'égalité fait échouer
+une adoption, mais ne suffit pas à emporter un rejet. La condition `a >= e`,
+appliquée aux deux cas, comptait donc des scrutins qui n'ont jamais failli
+changer de sens."""
+effet = "752 scrutins avant, 717 après."
+pages = "Méthode"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Accord entre deux groupes"
+portee = "methode"
+erreur = """
+Un seul taux d'accord entre groupes était publié, sans que la convention de
+calcul soit nommée. Il en existe deux, qui répondent à deux questions
+différentes : la moyenne des taux de paires donne le même poids à chaque paire
+de députés, le taux agrégé donne le même poids à chaque vote."""
+cause = """
+Le choix avait été fait sans être documenté. Publier une convention sans la
+nommer fait passer une décision de méthode pour un fait."""
+effet = """
+Les deux conventions s'écartent de 4,38 points. Les deux sont désormais
+calculées, publiées avec leur nombre de paires, et la carte bascule de l'une à
+l'autre."""
+pages = "Qui vote avec qui"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Décomposition de l'abstention"
+portee = "chiffre"
+erreur = """
+Les abstentions dont le groupe n'avait pas de ligne étaient écartées en
+silence. Les parts publiées portaient donc sur 89,9 % des abstentions, et rien
+ne le disait — un lecteur qui les additionnait n'obtenait pas le total."""
+cause = """
+La décomposition ne prévoyait que deux catégories, consigne suivie et retrait
+individuel. Les cas sans ligne de groupe n'entraient dans ni l'une ni l'autre et
+disparaissaient du dénominateur."""
+effet = """
+Une troisième catégorie « indéterminée » les compte. Les trois parts portent
+maintenant sur le total des abstentions."""
+pages = "Méthode"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Intervalle de la position estimée"
+portee = "methode"
+erreur = """
+Les intervalles publiés autour de la position estimée étaient trop serrés : ils
+traitaient les scrutins comme des observations indépendantes."""
+cause = """
+Les scrutins d'une même séance portent sur le même texte, dans le même rapport
+de force, et se ressemblent beaucoup plus que deux scrutins tirés au hasard dans
+la législature. Les rééchantillonner un par un revenait à faire comme si
+l'échantillon comptait 245 observations indépendantes."""
+effet = """
+Le rééchantillonnage tire désormais des blocs entiers — le dossier législatif
+quand la source le renseigne, la séance sinon. Les 245 scrutins forment 173
+paquets, et les intervalles se sont élargis en conséquence."""
+pages = "Les fiches de député, Méthode"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Cohésion des groupes"
+portee = "chiffre"
+erreur = """
+La cohésion d'un groupe portait sur tous les députés y ayant siégé depuis 2024,
+alors qu'elle était affichée à côté d'un effectif ne comptant que les députés en
+exercice. Les deux nombres décrivaient deux assemblées différentes."""
+cause = """
+Le filtre « en exercice » était appliqué à l'effectif et pas au calcul de
+cohésion."""
+effet = """
+Le calcul et l'effectif portent désormais sur la même population, les députés
+en exercice. Une cohésion lue à côté d'un effectif décrit maintenant bien le
+groupe que cet effectif dénombre."""
+pages = "Accueil, les fiches de député"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Sujets qui montent"
+portee = "methode"
+erreur = """
+Le score des sujets divisait un nombre d'occurrences par un nombre de documents.
+Ce n'est pas un taux : un terme martelé dix fois dans un même exposé des motifs
+pesait dix fois."""
+cause = """
+Le numérateur comptait les occurrences, le dénominateur comptait les documents.
+Deux unités différentes de part et d'autre de la division."""
+effet = """
+On mesure la part des documents qui mentionnent le terme, on teste sous une loi
+binomiale, et on contrôle le taux de fausses découvertes — à plusieurs milliers
+de termes par semaine, 5 % sans correction laissait passer plus de faux signaux
+que de vrais."""
+pages = "Aucune : la mesure n'est pas encore publiée sur le site"
+commit = "aaf78dd"
+
+[[correction]]
+date = "2026-08-12"
+titre = "Parts de cosignatures entre groupes"
+portee = "chiffre"
+erreur = """
+Les parts de cosignatures d'un groupe totalisaient entre 0,40 et 0,80 au lieu
+de 1, avec un déficit variable d'un groupe à l'autre. Les groupes n'étaient donc
+pas comparables entre eux — le seul usage qu'on puisse faire d'une part."""
+cause = """
+La matrice des cosignatures est symétrique : à l'intérieur d'un groupe, chaque
+paire y figure deux fois, et sa diagonale porte le nombre d'amendements signés
+par chaque député, pas des liens. Le numérateur en tenait compte, le
+dénominateur non."""
+effet = """
+Même convention partout : chaque paire une fois, la diagonale jamais. La part
+LFI→ECOS passe de 0,1 % à 0,3 %. Quatre tests verrouillent la propriété, dont
+l'invariance à la diagonale."""
+pages = "Aucune : la mesure n'est pas encore publiée sur le site"
+commit = "bac3dfb"
+
+[[correction]]
+date = "2026-08-12"
+titre = "Ligne du groupe, et écarts à cette ligne"
+portee = "methode"
+erreur = """
+La ligne d'un groupe était sa position la plus fréquente. Or il y a trois
+positions possibles et non deux : « la plus fréquente » ne veut pas dire
+« majoritaire ». Un groupe qui vote 5 pour, 7 contre et 5 abstentions avait
+ainsi une ligne à 41 %, et ses dix autres membres étaient comptés comme
+s'écartant d'une consigne qui n'existait pas."""
+cause = """
+Le calcul confondait un groupe qui n'a pas tranché avec un groupe dont une
+partie enfreint une consigne."""
+effet = """
+Une ligne doit désormais dépasser la majorité absolue. L'effet est marginal sur
+les classements — 3,1 % des votes s'écartent de la ligne, contre 3,3 % avant —
+mais dominant sur les alertes, qui distinguent maintenant « fracture » et
+« groupe partagé » : quatre des alertes les plus fortes de la semaine du
+20 juillet relevaient du second cas."""
+pages = "Les 577 fiches de député, l'annuaire, l'accueil"
+commit = "c7a1a1b"
+
+[[correction]]
+date = "2026-08-11"
+titre = "Ce que l'abstention veut dire"
+portee = "methode"
+erreur = """
+Le projet justifiait l'exclusion des abstentions du modèle de positions en
+affirmant qu'une abstention n'est pas une position intermédiaire. C'était une
+assertion, pas un résultat — et elle est fausse dans la majorité des cas."""
+cause = """
+L'affirmation n'avait jamais été testée. Elle servait à justifier un choix de
+modèle qui, lui, restait bon pour une autre raison."""
+effet = """
+Mesuré hors modèle, en replaçant les abstentionnistes sur un axe estimé sans
+eux, leur position médiane tombe entre les deux camps dans 71 % des scrutins.
+La justification publiée est désormais la bonne, et elle est structurelle : le
+modèle logistique à deux paramètres est binaire par construction. La limite est
+plus embarrassante que ce qui était écrit — on écarte une position qui porte de
+l'information — et elle est dite comme telle."""
+pages = "Méthode"
+commit = "537df20"

@@ -4,6 +4,11 @@
 <meta name="description" content="{{DESCRIPTION}}">
 <link rel="stylesheet" href="statique/style.css">
 
+<!-- L'adresse de référence de cette page. Sans elle, une même fiche atteinte
+     avec un paramètre de suivi ou par une autre adresse compte pour deux pages
+     distinctes, qui se concurrencent. -->
+<link rel="canonical" href="{{CANONIQUE}}">
+
 <!-- `marque.png` est l'emblème du logo, découpé du fichier d'origine et recadré
      dans un carré : le verrou complet porte le mot « RADAR », illisible à 32
      pixels et redondant avec le texte de l'onglet. -->
@@ -11,9 +16,16 @@
 <link rel="apple-touch-icon" href="statique/marque.png">
 
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Radar parlementaire">
+<meta property="og:locale" content="fr_FR">
 <meta property="og:title" content="{{TITRE}}">
 <meta property="og:description" content="{{DESCRIPTION}}">
-<meta property="og:image" content="statique/logo.png">
+<meta property="og:url" content="{{CANONIQUE}}">
+<!-- Absolue, et pas `statique/logo.png` : le chemin relatif était résolu par le
+     navigateur mais pas par les robots qui fabriquent les aperçus de lien. Ils
+     lisent la balise hors de tout document et n'ont aucune base pour la
+     résoudre — l'aperçu partait donc sans image, sur les 581 pages. -->
+<meta property="og:image" content="{{BASE_URL}}/statique/logo.png">
 <meta name="twitter:card" content="summary">
 
 <header class="entete">
@@ -98,9 +110,24 @@
     </div>
     <div>
       <h4>Une erreur&nbsp;?</h4>
+      <!-- Cette promesse est restée trois versions sans destination. Un site qui
+           s'engage à corriger publiquement et n'indique aucun endroit où lire ses
+           corrections demande une confiance qu'il ne rend pas. -->
       <p>Chaque chiffre est accompagné de son dénominateur pour pouvoir être recalculé.
-        Si l'un d'eux est faux, il doit être corrigé publiquement.</p>
+        Si l'un d'eux est faux, il est corrigé publiquement&nbsp;:
+        <a href="corrections.html">les {{N_CORRECTIONS}} corrections déjà faites</a>
+        sont datées et chiffrées.</p>
       <p class="provenance">Calculé le {{GENERE_LE}}</p>
+    </div>
+    <div>
+      <h4>Le projet</h4>
+      <ul>
+        <li><a href="mentions.html">Qui édite ce site</a></li>
+        <li><a href="corrections.html">Registre des corrections</a></li>
+        <li><a href="methode.html">Méthode et note méthodologique</a></li>
+        <li><a href="{{DEPOT}}">Code source</a> (AGPL-3.0)</li>
+        <li><a href="mailto:{{CONTACT}}">{{CONTACT}}</a></li>
+      </ul>
     </div>
   </div>
 </footer>

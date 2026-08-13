@@ -153,27 +153,45 @@ a:hover { text-decoration-color: var(--accent); }
 }
 .entete .cadre {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 24px; height: 70px;
+  gap: 24px; height: 88px;
 }
-.marque { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+.marque { display: flex; align-items: center; gap: 13px; text-decoration: none; }
 /* L'emblème du logo, découpé du fichier d'origine. Il occupait 28 px : à cette
    taille, le fronton, les colonnes et l'aiguille du cadran se confondaient en
    une tache, et la marque n'était plus lisible que par son texte. À 34 px les
-   trois motifs se séparent. La source fait 256 px : l'agrandissement ne coûte
-   aucune netteté, y compris sur écran à haute densité.
+   trois motifs se séparaient, mais l'ensemble — emblème et mot — pesait encore
+   moins que le menu posé en face : sur une page de fiche, le premier élément
+   que l'œil rencontrait était le nom du député, et le site n'était nulle part.
+   À 46 px avec le mot à l'avenant, la marque tient le coin sans écraser le
+   contenu. La source fait 256 px : l'agrandissement ne coûte aucune netteté,
+   y compris sur écran à haute densité.
    `align-self: baseline` le poserait sur la ligne d'écriture, où il flotterait
    au-dessus du texte : il est centré, et un demi-pixel de descente l'aligne
    optiquement sur les capitales de « RADAR ». */
 .marque .embleme {
-  flex: none; width: 34px; height: 34px;
+  flex: none; width: 46px; height: 46px;
   transform: translateY(0.5px);
 }
+/* « RADAR » passe en pleine encre : à `--encre-2`, le mot reculait derrière les
+   entrées de menu qui, elles, s'allument au survol. La marque doit être le seul
+   élément de l'en-tête qui n'a pas besoin d'être survolé pour se voir. */
 .marque .m1 {
-  font-family: var(--mono); font-size: 13px; font-weight: 600;
-  letter-spacing: 0.22em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 16px; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--encre);
 }
-.marque .m2 { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--encre-2); }
-@media (max-width: 420px) { .marque .m2 { display: none; } }
+.marque .m2 {
+  font-family: var(--serif); font-style: italic; font-size: 21px;
+  color: var(--encre-2);
+}
+@media (max-width: 720px) {
+  .entete .cadre { height: 74px; }
+  .marque .embleme { width: 40px; height: 40px; }
+  .marque .m1 { font-size: 14px; }
+  .marque .m2 { font-size: 18px; }
+}
+/* Le mot « parlementaire » ne disparaît plus qu'au tout dernier ressort : c'est
+   lui qui dit de quel radar il s'agit, et l'emblème seul ne le dit à personne. */
+@media (max-width: 380px) { .marque .m2 { display: none; } }
 .menu { display: flex; gap: 26px; font-size: 14.5px; }
 .menu a { text-decoration: none; color: var(--encre-2); padding: 4px 0; border-bottom: 1.5px solid transparent; }
 .menu a:hover { color: var(--encre); }
@@ -935,3 +953,106 @@ h1 {
   font-family: var(--mono); font-size: 12px; color: var(--encre-3);
 }
 .liste-limites li b { color: var(--encre); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   REGISTRE DES CORRECTIONS
+   Une correction se lit comme une fiche d'incident, pas comme un billet : on
+   y vient pour savoir si un chiffre qu'on a cité a bougé, et de combien. La
+   date et l'avant/après sont donc les deux seuls éléments mis en avant.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.registre { list-style: none; padding: 0; margin: 8px 0 0; }
+.correction {
+  border-top: 1px solid var(--trait);
+  padding: 30px 0 34px; max-width: var(--lecture);
+}
+.correction:last-child { border-bottom: 1px solid var(--trait); }
+.correction-tete {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 14px;
+  margin-bottom: 16px;
+}
+.correction-date { font-size: 12.5px; color: var(--encre-3); }
+.correction-tete h3 {
+  font-family: var(--serif); font-weight: 500; font-size: 1.32rem;
+  letter-spacing: -0.015em; margin: 0; flex-basis: 100%;
+}
+/* La nature de la correction, en trois valeurs. C'est une étiquette de tri, pas
+   un jugement : elle reste en gris, jamais en signal — un registre dont les
+   entrées s'allument en ocre se lirait comme une liste d'alertes. */
+.etiq-portee {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--encre-2); font-weight: 600;
+  border: 1px solid var(--trait-fort); border-radius: 2px; padding: 2px 7px;
+}
+.correction p { font-size: 15.5px; line-height: 1.65; color: var(--encre-2); margin: 0 0 11px; }
+.correction p b { color: var(--encre); font-weight: 600; }
+/* L'avant/après est le seul passage que quelqu'un de pressé doit lire. */
+.correction-effet {
+  background: var(--papier-creux); border-left: 2px solid var(--accent);
+  padding: 13px 17px; border-radius: 0 3px 3px 0; margin: 14px 0 12px !important;
+}
+.correction .provenance { margin-top: 12px; }
+.correction .provenance a { color: var(--encre-2); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INDEX PAR DÉPARTEMENT
+   Le seul chemin vers les 577 fiches qui existe sans JavaScript. Il se
+   parcourt à l'œil : deux colonnes de noms, le numéro de circonscription en
+   chasse fixe pour qu'il ne se confonde pas avec le nom.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.index-departements {
+  margin-top: 30px;
+  columns: 260px 4; column-gap: 34px;
+}
+.index-dep { break-inside: avoid; margin: 0 0 26px; }
+.index-dep h3 {
+  font-family: var(--sans); font-size: 12.5px; font-weight: 600;
+  letter-spacing: 0.04em; margin: 0 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--trait);
+}
+.index-dep h3 .mono { color: var(--encre-3); font-size: 11.5px; margin-right: 6px; }
+.index-dep ul { list-style: none; padding: 0; margin: 0; }
+.index-dep li { margin: 0 0 3px; }
+.index-dep a {
+  display: flex; justify-content: space-between; gap: 10px;
+  text-decoration: none; color: var(--encre-2); font-size: 14px;
+  line-height: 1.45; padding: 2px 0;
+}
+.index-dep a:hover { color: var(--accent-vif); }
+.index-dep .circo { color: var(--encre-3); font-size: 11px; flex: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CITER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.citation-texte {
+  font-family: var(--serif); font-size: 16.5px; line-height: 1.62;
+  color: var(--encre); background: var(--papier-creux);
+  border-left: 2px solid var(--trait-fort);
+  padding: 16px 20px; border-radius: 0 3px 3px 0; margin: 0 0 26px;
+}
+.citation-bib {
+  background: var(--papier-creux); border: 1px solid var(--trait);
+  border-radius: 3px; padding: 18px 20px; margin: 0 0 14px;
+  overflow-x: auto;
+}
+.citation-bib code {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.62;
+  color: var(--encre-2); white-space: pre;
+}
+
+/* Une liste de définitions courtes, sans le décor numéroté de `.liste-limites`. */
+.liste-nette { list-style: none; padding: 0; margin: 20px 0 24px; }
+.liste-nette li {
+  font-size: 15.5px; line-height: 1.62; color: var(--encre-2);
+  padding: 9px 0 9px 16px; border-left: 1px solid var(--trait);
+  margin-bottom: 2px;
+}
+.liste-nette li b { color: var(--encre); font-weight: 600; }
+.correction code {
+  font-family: var(--mono); font-size: 0.86em;
+  background: var(--papier-creux); border: 1px solid var(--trait);
+  border-radius: 2px; padding: 1px 5px; color: var(--encre);
+}
+.correction-effet code { background: var(--papier); }

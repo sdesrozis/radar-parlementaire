@@ -111,16 +111,54 @@ moitié, le site produit 577 fiches qui se ressemblent.
 ## État actuel
 
 Fait : fiche de député (577), accueil pédagogique **ouvert par la recherche**, annuaire
-avec recherche par nom, département, numéro, région et groupe, **carte « Qui vote avec
-qui ? »** (matrice des 164 451 paires en canvas, paire épinglable au clic, au tactile,
-au clavier ou par le nom), **page Méthode**, **barre de navigation mobile**, marque
-tirée de `site/assets/logo.png`.
+avec recherche par nom, département, numéro, région et groupe **plus l'index HTML des
+577 par département**, **carte « Qui vote avec qui ? »** (matrice des 164 451 paires en
+canvas, paire épinglable au clic, au tactile, au clavier ou par le nom), **page
+Méthode** avec le bloc « comment citer », **page Mentions** (éditeur, hébergeur,
+financement, licences), **registre des corrections**, **barre de navigation mobile**,
+marque tirée de `site/assets/logo.png`.
 
 À faire, dans cet ordre : la recherche par **commune** (l'open data ne publie pas la
 composition des circonscriptions — il faut une table externe), la page « cette semaine »
-branchée sur `radar/alerts.py`, les pages scrutin et groupe, le glossaire, puis la
-publication (mentions légales, décision d'indexation, nom de domaine, image OpenGraph
-dédiée — le logo y sert de solution d'attente).
+branchée sur `radar/alerts.py`, les pages scrutin et groupe, le glossaire, l'image
+OpenGraph dédiée (le logo y sert de solution d'attente), puis les adresses lisibles
+(`/deputes/prenom-nom-departement-n` plutôt que `PA1008.html`, avec la table de
+redirections que ça impose).
+
+## Le registre des corrections
+
+`site/corrections.toml` est une **donnée**, pas du code : une entrée s'ajoute sans
+toucher au générateur, et son format est documenté en tête du fichier.
+
+**Une correction s'écrit au moment du correctif, dans le même commit.** Le pied de page
+annonce le nombre d'entrées et la page Méthode y renvoie : un registre en retard se voit.
+`tests/test_corrections.py` vérifie que chaque entrée est complète, que sa portée est
+l'une des trois, que sa date est passée, que son avant/après est chiffré ou explicité, et
+que son empreinte désigne un commit qui existe.
+
+Ce qui n'y entre pas : les erreurs de la source — quand l'Assemblée corrige un scrutin,
+nos chiffres changent au recalcul suivant sans que ce soit notre erreur — et les ajouts
+de mesure ou de page, que le journal du dépôt porte déjà.
+
+## Ce que `sortie/` ne garde pas
+
+`generer.py` **efface les HTML de la racine** avant d'écrire les nouveaux. Une page
+retirée du site restait sinon dans `sortie/` et repartait chez l'hébergeur : c'est ainsi
+qu'une page « Soutenir » abandonnée est restée en ligne, sans lien entrant, absente du
+plan du site, avec un appel au don que plus rien ne soutenait.
+
+Une page se déclare donc **à trois endroits** : elle s'écrit dans `main()`, elle entre
+dans `ecrire_index_moteurs()`, et elle reçoit un lien depuis le pied de page de
+`base.html`. Une page qui manque au deuxième point n'est pas trouvable ; au troisième,
+elle est orpheline — ce qui revient au même.
+
+## Métadonnées : ce qui doit être absolu
+
+`page()` exige un `chemin` : il alimente `<link rel="canonical">` et `og:url`. **Une URL
+d'aperçu de lien ne peut pas être relative** — les robots qui fabriquent les vignettes
+lisent la balise hors de tout document et n'ont aucune base pour la résoudre.
+`og:image` était `statique/logo.png` et partait donc sans image sur les 581 pages ; il
+passe par `{{BASE_URL}}`.
 
 ## La marque
 

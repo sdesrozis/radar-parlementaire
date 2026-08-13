@@ -4,8 +4,9 @@
     {
       "name": "site",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["site/serveur.py"],
-      "port": 8000
+      "runtimeArgs": ["site/serveur.py", "--sans-navigateur"],
+      "port": 8000,
+      "autoPort": true
     }
   ]
 }

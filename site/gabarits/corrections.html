@@ -1,0 +1,79 @@
+  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════ -->
+  <section class="cadre chapeau">
+    <p class="fil">Ce que ce site a publié de faux</p>
+    <h1>Corrections</h1>
+    <p class="sous-titre-fiche">
+      Chaque erreur trouvée dans un chiffre publié ici, ce qu'elle valait, et ce
+      qu'elle vaut maintenant.
+      <span class="etat">{{N_CORRECTIONS}} corrections</span>
+    </p>
+  </section>
+
+  <!-- ══ LA THÈSE ══════════════════════════════════════════════════ -->
+  <section class="cadre">
+    <div class="these">
+      <p>Le pied de page de ce site promet qu'un chiffre faux <em>est corrigé
+        publiquement</em>. Cette page est l'endroit où cette promesse
+        s'exécute&nbsp;: si une correction n'y figure pas, elle n'a pas été
+        rendue publique.</p>
+      <p>Un registre de corrections n'est pas un aveu de faiblesse. C'est ce qui
+        distingue un chiffre qu'on peut citer d'un chiffre qu'on doit croire.
+        <b>Un site qui n'a jamais rien corrigé n'a jamais rien vérifié.</b></p>
+    </div>
+  </section>
+
+  <!-- ══ CE QU'UNE ENTRÉE CONTIENT ═════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Comment lire cette page</p>
+      <h2>Une entrée sert à retrouver ce qu'on avait lu</h2>
+      <p>Chaque entrée dit ce qui était faux, <b>pourquoi</b> ça l'était, et
+        <b>de combien</b> le chiffre a bougé. C'est le minimum pour que
+        quelqu'un qui aurait cité l'ancienne valeur — dans un article, un
+        mémoire, une intervention — sache s'il doit se corriger à son tour.</p>
+      <p>Chaque entrée porte l'empreinte du correctif dans le
+        <a href="{{DEPOT}}">dépôt de code</a>&nbsp;: on peut aller lire la
+        ligne exacte qui a changé, et les tests qui empêchent l'erreur de
+        revenir.</p>
+      <p>Trois natures de correction sont distinguées. Un
+        <b class="etiq-portee">chiffre</b> faux&nbsp;: un nombre affiché n'était
+        pas le bon. Une <b class="etiq-portee">méthode</b> corrigée&nbsp;: le
+        nombre ne change pas ou peu, mais ce qu'il mesure n'était pas ce qui
+        était annoncé. Un défaut du <b class="etiq-portee">site</b>&nbsp;: ni
+        l'un ni l'autre, la page elle-même.</p>
+    </div>
+  </section>
+
+  <!-- ══ LE REGISTRE ═══════════════════════════════════════════════ -->
+  <section class="cadre">
+    <div class="lecture">
+      <p class="jalon">Le registre</p>
+    </div>
+    <ol class="registre">
+      {{CORRECTIONS}}
+    </ol>
+  </section>
+
+  <!-- ══ CE QUE LE REGISTRE NE COUVRE PAS ══════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <details class="piege">
+        <summary>Ce que ce registre ne dit pas</summary>
+        <p>Il ne recense que les erreurs <b>trouvées</b>. Il ne prouve donc pas
+          qu'il n'en reste aucune, et le nombre d'entrées ne mesure rien —
+          ni la qualité du site, ni sa fiabilité. Un registre long peut
+          signaler un projet qui se relit beaucoup&nbsp;; un registre court, un
+          projet qui se relit peu.</p>
+        <p>Il ne couvre pas les erreurs de la source. Quand l'open data de
+          l'Assemblée nationale corrige un scrutin, les chiffres de ce site
+          changent au recalcul suivant sans qu'une entrée soit écrite ici&nbsp;:
+          ce n'est pas notre erreur, et nous n'avons pas les moyens de la
+          détecter. La date de calcul, affichée au pied de chaque page, est le
+          seul repère dans ce cas.</p>
+        <p>Il ne couvre pas non plus l'ajout d'une mesure, le changement d'un
+          texte ou la refonte d'une page&nbsp;: le
+          <a href="{{DEPOT}}">journal du dépôt</a> les porte tous, avec la même
+          exigence de motif.</p>
+      </details>
+    </div>
+  </section>
