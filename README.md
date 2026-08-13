@@ -62,29 +62,35 @@ uv run python site/generer.py --servir       # http://127.0.0.1:8000
 Le PDF est produit par reportlab, sans dépendance système : pas besoin
 d'installer pandoc ni un moteur LaTeX pour sortir le bulletin de la semaine.
 
-## Guide méthodologique LaTeX
+## La note méthodologique
 
-Le guide didactique des calculs est disponible dans
-[`docs/calculs_radar.tex`](docs/calculs_radar.tex). Sa compilation nécessite
-une distribution LaTeX incluant les paquets usuels (`babel`, `amsmath`,
-`booktabs`, `hyperref`). Depuis la racine du projet :
+[`docs/note-methodologique.tex`](docs/note-methodologique.tex) est la
+**spécification de référence** des calculs : chaque mesure affichée par le site
+y est définie formellement, avec son numérateur, son dénominateur, sa
+population de référence, ses exclusions et son incertitude. En cas de
+divergence entre ce document et le code, c'est le code qui a tort.
+
+Elle s'adresse autant au lecteur curieux qu'au contradicteur : on ne peut
+discuter un chiffre que si la règle qui l'a produit est écrite quelque part.
+
+Sa compilation nécessite une distribution LaTeX incluant les paquets usuels
+(`babel`, `amsmath`, `booktabs`, `fancyhdr`, `hyperref`) :
 
 ```bash
-cd docs
-latexmk -pdf calculs_radar.tex
+cd docs && latexmk -pdf note-methodologique.tex
 ```
 
-Sans `latexmk`, lancer deux fois `pdflatex` permet de générer aussi la table des
-matières et les renvois internes :
+Sans `latexmk`, lancer deux fois `pdflatex` génère aussi la table des matières
+et les renvois internes :
 
 ```bash
-cd docs
-pdflatex calculs_radar.tex
-pdflatex calculs_radar.tex
+cd docs && pdflatex note-methodologique.tex && pdflatex note-methodologique.tex
 ```
 
-Le fichier produit est `docs/calculs_radar.pdf`. Cette compilation est
-indépendante du PDF hebdomadaire, qui reste généré par ReportLab.
+Le fichier produit est `docs/note-methodologique.pdf`. `site/generer.py` le
+recopie dans `sortie/methode/` s'il existe, et la page Méthode s'y adapte
+seule. Cette compilation est indépendante du PDF hebdomadaire, qui reste
+généré par ReportLab.
 
 ## Le site
 

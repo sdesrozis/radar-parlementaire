@@ -153,15 +153,19 @@ a:hover { text-decoration-color: var(--accent); }
 }
 .entete .cadre {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 24px; height: 62px;
+  gap: 24px; height: 70px;
 }
-.marque { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-/* L'emblème du logo, découpé du fichier d'origine. `align-self: baseline` le
-   poserait sur la ligne d'écriture, où il flotterait au-dessus du texte : il
-   est centré, et un demi-pixel de descente l'aligne optiquement sur les
-   capitales de « RADAR ». */
+.marque { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+/* L'emblème du logo, découpé du fichier d'origine. Il occupait 28 px : à cette
+   taille, le fronton, les colonnes et l'aiguille du cadran se confondaient en
+   une tache, et la marque n'était plus lisible que par son texte. À 34 px les
+   trois motifs se séparent. La source fait 256 px : l'agrandissement ne coûte
+   aucune netteté, y compris sur écran à haute densité.
+   `align-self: baseline` le poserait sur la ligne d'écriture, où il flotterait
+   au-dessus du texte : il est centré, et un demi-pixel de descente l'aligne
+   optiquement sur les capitales de « RADAR ». */
 .marque .embleme {
-  flex: none; width: 28px; height: 28px;
+  flex: none; width: 34px; height: 34px;
   transform: translateY(0.5px);
 }
 .marque .m1 {
@@ -430,13 +434,51 @@ h1 {
 .face .dit { font-family: var(--serif); font-size: 1.5rem; line-height: 1.25; letter-spacing: -0.015em; margin: 0 0 12px; }
 .face .parce { margin: 0; font-size: 15px; color: var(--encre-2); line-height: 1.6; }
 
+/* ── la note méthodologique ────────────────────────────────────────────
+   Un lien vers un PDF de dix-huit pages, sur la page qui promet la
+   vérifiabilité, n'est pas une annexe : c'est la pièce que le lecteur
+   sceptique est venu chercher. Il a donc la forme d'un objet qu'on emporte,
+   pas d'un lien de plus dans un paragraphe.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.note-pdf {
+  display: flex; gap: 20px; align-items: flex-start;
+  margin: 4px 0 26px; padding: 22px 24px;
+  border: 1px solid var(--trait-fort); border-radius: 3px;
+  background: var(--papier-haut);
+  text-decoration: none;
+  transition: border-color .15s, background .15s;
+}
+.note-pdf:hover { border-color: var(--accent); background: var(--accent-voile); }
+.note-pdf-icone {
+  flex: none;
+  display: grid; place-items: center;
+  width: 46px; height: 58px;
+  border: 1.5px solid var(--accent); border-radius: 2px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; color: var(--accent);
+}
+.note-pdf-texte { display: block; }
+.note-pdf-texte b { display: block; font-size: 17px; margin-bottom: 5px; }
+.note-pdf-texte > span { display: block; color: var(--encre-2); font-size: 14.5px; line-height: 1.55; }
+.note-pdf-meta {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.04em;
+  color: var(--encre-3); margin-top: 9px;
+}
+@media (max-width: 560px) {
+  .note-pdf { flex-direction: column; gap: 14px; }
+}
+
 /* ── pied ──────────────────────────────────────────────────────────── */
 
 .pied { padding-block: 48px 72px; }
 .pied .grille { display: grid; gap: 30px; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
 /* Le logo complet, à sa seule place : le pied de page. Il est en couleurs et
-   loin de tout graphique, donc sans risque d'être lu comme une mesure. */
-.pied-logo { display: block; width: 108px; height: auto; }
+   loin de tout graphique, donc sans risque d'être lu comme une mesure. C'est
+   le seul endroit du site où la marque a le droit d'occuper de la place : à
+   108 px elle s'excusait d'être là, entre deux colonnes de texte qui la
+   dominaient. Elle tient maintenant sa colonne. */
+.pied-logo { display: block; width: min(168px, 100%); height: auto; }
 
 /* Le bleu d'encre du logo (#0A1F44) est presque noir : sur le papier sombre il
    disparaît, et le fronton devient une masse. On l'éclaircit — le drapeau reste

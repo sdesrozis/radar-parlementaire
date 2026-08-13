@@ -1,6 +1,11 @@
 % !TeX program = pdflatex
 % Document autonome : les résultats numériques changent avec les données,
 % mais les définitions et les formules décrites ici restent reproductibles.
+%
+% Ce fichier est la spécification de référence des calculs publiés sur
+% https://radar-parlementaire.fr. Toute mesure affichée par le site doit être
+% définie ici ; l'inverse n'est pas exigé. Quand un calcul change dans
+% src/radar/, ce document change dans le même commit.
 \documentclass[11pt,a4paper]{article}
 
 \usepackage[T1]{fontenc}
@@ -11,11 +16,43 @@
 \usepackage{amsmath,amssymb,mathtools}
 \usepackage{booktabs,array}
 \usepackage{xcolor}
-\usepackage{hyperref}
+\usepackage{fancyhdr}
+\PassOptionsToPackage{hyphens}{url}  % coupure des URL longues (avant hyperref)
 \usepackage{microtype}
+\usepackage{hyperref}   % chargé en dernier, comme le veut son manuel
+\Urlmuskip=0mu plus 1mu\relax
 
-\hypersetup{colorlinks=true,linkcolor=blue!55!black,urlcolor=blue!55!black,
-  pdftitle={Comprendre les calculs du Radar parlementaire}}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  urlcolor=blue!55!black,
+  citecolor=blue!55!black,
+  pdftitle={Mesurer l'activité de l'Assemblée nationale à partir de ses
+            données ouvertes : définitions, dénominateurs et incertitudes},
+  pdfauthor={Sylvain Desroziers},
+  pdfsubject={Note méthodologique du Radar parlementaire},
+  pdfkeywords={Assemblée nationale, données ouvertes, scrutins publics,
+               points idéaux, cohésion de groupe, cosignatures, transparence,
+               reproductibilité},
+  pdflang={fr-FR},
+  bookmarksnumbered=true,
+  % La table des matières imprimée s'arrête aux sections : à raison de quatre
+  % sous-sections chacune, la détailler coûtait trois pages sur dix-neuf. Les
+  % signets du lecteur PDF, eux, gardent les deux niveaux — c'est là qu'on
+  % navigue vraiment.
+  bookmarksdepth=2,
+}
+\setcounter{tocdepth}{1}
+
+% ── mise en page d'article ────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\itshape Radar parlementaire — note méthodologique}
+\fancyhead[R]{\footnotesize\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{%
+  \fancyhf{}\renewcommand{\headrulewidth}{0pt}\fancyfoot[C]{\footnotesize\thepage}}
+
 \setlength{\parskip}{0.55em}
 \setlength{\parindent}{0pt}
 \renewcommand{\arraystretch}{1.22}
@@ -27,32 +64,175 @@
 \newcommand{\important}[1]{\begin{quote}\small\color{blue!55!black}\textbf{À retenir.} #1\end{quote}}
 \newcommand{\prudence}[1]{\begin{quote}\small\color{red!55!black}\textbf{Prudence d'interprétation.} #1\end{quote}}
 
-\title{Comprendre les calculs du \emph{Radar parlementaire}\\
-\large Guide didactique pour l'étudiant·e en statistique et science politique}
-\author{Documentation méthodologique du projet \code{radar}}
-\date{\today}
+\title{\vspace{-1.2cm}
+Mesurer l'activité de l'Assemblée nationale\\à partir de ses données ouvertes\\[0.35em]
+\large Définitions, dénominateurs et incertitudes des indicateurs du
+\emph{Radar parlementaire}}
+
+\author{%
+  \normalsize\textbf{Sylvain Desroziers}\\[0.15em]
+  \small Citoyen. Sans affiliation institutionnelle, sans financement, sans parti.\\
+  \small\href{mailto:sylvain.desroziers@radar-parlementaire.fr}
+             {sylvain.desroziers@radar-parlementaire.fr}\\[0.5em]
+  \small\itshape Rédaction assistée par Claude (Anthropic) ;
+  voir la déclaration en section~\ref{sec:ia}.
+}
+\date{\small\today\\[0.3em]
+  \small Version de référence : \href{https://radar-parlementaire.fr/methode.html}
+                                     {radar-parlementaire.fr/methode.html}}
 
 \begin{document}
 \maketitle
+\thispagestyle{plain}
 
 \begin{abstract}
-Le projet \emph{Radar parlementaire} transforme les données ouvertes de
-l'Assemblée nationale en indicateurs sur les votes, les abstentions, les
-amendements et les cosignatures. Ce document explique \emph{ce qui est
-effectivement calculé}, avec les formules, les dénominateurs et les choix de
-méthode. L'objectif n'est pas de donner une étiquette politique à un député ni
-de mesurer sa « valeur » : il est de décrire, de manière reproductible, une
-partie observable de l'activité parlementaire.
+\noindent
+L'Assemblée nationale publie en données ouvertes le détail nominatif de ses
+scrutins publics, ses amendements et la composition de ses groupes. Ces
+fichiers sont accessibles à tous et lus par presque personne : leur format
+suppose des compétences que la citoyenneté ne devrait pas exiger. Le
+\emph{Radar parlementaire} les transforme en indicateurs consultables, et ce
+document spécifie ces indicateurs.
 
-Les résultats numériques varient lorsque de nouveaux scrutins arrivent. Le
-texte présente donc les calculs et des exemples jouets plutôt qu'un instantané
-des résultats.
+Nous décrivons chaque mesure publiée par le site : sa définition formelle, son
+numérateur, son dénominateur, la population sur laquelle elle porte, les
+observations qu'elle exclut et l'incertitude qui l'entoure. Sont couverts
+l'accord de vote entre députés et entre groupes, la participation, la cohésion
+et la dissidence, deux réductions descriptives (analyse en composantes
+principales et positionnement multidimensionnel), un modèle de points idéaux
+estimé avec ses intervalles par bootstrap de blocs, le traitement de
+l'abstention, le réseau de cosignatures d'amendements et la détection de
+sujets sous contrôle du taux de fausses découvertes.
+
+Deux principes gouvernent l'ensemble. Aucun taux n'est publié sans le
+dénombrement qui le produit : un pourcentage privé de son dénominateur n'est
+pas une information, c'est une opinion présentée comme un fait. Et aucun
+indicateur ne délivre de verdict : ces mesures décrivent une part observable
+de l'activité parlementaire, elles n'évaluent ni la qualité d'un élu ni la
+justesse d'une position. Le document est écrit pour être vérifié, y compris —
+et surtout — par qui souhaite démontrer qu'il se trompe.
 \end{abstract}
+
+\vspace{0.4em}
+\noindent\small\textbf{Mots-clés} — données ouvertes parlementaires ; scrutins
+publics ; points idéaux ; cohésion de groupe ; cosignatures ; transparence
+algorithmique ; reproductibilité.
+\normalsize
+
+\vspace{0.6em}
+\hrule
+\vspace{0.4em}
 
 \tableofcontents
 \newpage
 
-\section{Avant toute formule : quelle est la question ?}
+\section{Introduction}
+
+\subsection{Une transparence qui existe sans être accessible}
+
+L'\emph{open data} de l'Assemblée nationale est une réussite institutionnelle
+réelle et une impasse pratique. Chaque scrutin public y figure avec le vote
+nominatif de chaque député ; chaque amendement avec son auteur, ses
+cosignataires et son sort. Rien n'est caché. Mais la donnée est distribuée en
+archives compressées de plusieurs centaines de mégaoctets, en JSON issus d'une
+conversion XML dont les conventions ne sont documentées nulle part, et sans
+aucun indicateur dérivé. La transparence est juridiquement acquise et
+matériellement hors de portée.
+
+L'espace laissé vide se remplit tout seul. Il se remplit de chiffres cités
+sans source, de classements de « députés les plus absents » dont le
+dénominateur n'est jamais donné, de pourcentages d'accord calculés sur des
+échantillons choisis après coup. Ces chiffres circulent parce qu'ils sont les
+seuls disponibles sous une forme lisible, et non parce qu'ils sont justes.
+
+Le \emph{Radar parlementaire} occupe cet espace autrement : il recalcule
+chaque indicateur depuis les fichiers officiels et publie, avec chaque
+résultat, ce qui permet de le contester.
+
+\subsection{Ce que ce document ajoute au site}
+
+Un site qui affiche « 42~\% de présence » demande à être cru. Un site qui
+affiche « 42~\%, soit 178 scrutins sur 424 où l'élu pouvait voter, après
+retrait des scrutins antérieurs à son entrée en fonction et des non-votes
+imposés par une fonction incompatible » demande à être vérifié. La seconde
+formulation ne vaut que si la règle qu'elle invoque est écrite quelque part,
+précisément, une fois pour toutes. C'est ce document.
+
+Il remplit trois fonctions distinctes.
+
+\textbf{Une spécification.} Chaque mesure affichée par le site est définie ici
+formellement. Le code implémente cette spécification ; en cas de divergence,
+c'est le code qui a tort. Cette contrainte a déjà servi : plusieurs
+incohérences entre deux chemins de calcul d'une même grandeur ont été
+découvertes en écrivant les définitions plutôt qu'en lisant le code.
+
+\textbf{Un support pédagogique.} Les notions mobilisées — dénominateur
+conditionnel, indice de cohésion, variable latente, bootstrap de blocs,
+correction pour tests multiples — ne sont pas hors de portée d'un lecteur
+attentif, mais elles s'expliquent mal en légende d'un graphique. Elles sont
+introduites ici avec des exemples de petite taille, calculables à la main.
+
+\textbf{Une prise pour la contradiction.} C'est la fonction la plus
+importante. Un indicateur sur la vie politique sera contesté, et il doit
+l'être : un député dont le taux de dissidence est publié a le droit de savoir
+comment il a été obtenu, sur quels scrutins, avec quelle définition de la
+ligne de son groupe, et à partir de quel seuil le chiffre cesse d'être
+significatif. Sans ce document, cette contestation ne peut porter que sur la
+conclusion. Avec lui, elle porte sur la méthode — c'est-à-dire qu'elle devient
+un débat qu'on peut trancher.
+
+\subsection{Trois exigences}
+
+\textbf{Reproductibilité.} Les données sources sont publiques, le code est
+publié sous licence libre, et les tables intermédiaires sont archivées à
+chaque mise à jour. Un lecteur disposant d'une machine ordinaire peut
+reconstruire l'intégralité des chiffres du site.
+
+\textbf{Réfutabilité.} Chaque indicateur est accompagné de sa population de
+référence, de ses exclusions et, lorsque cela a un sens, de son incertitude.
+Une mesure dont l'échantillon est trop mince n'est pas affichée avec une
+précaution en petits caractères : elle n'est pas affichée.
+
+\textbf{Absence de verdict.} Le projet ne classe pas les députés en bons et en
+mauvais. Il ne pondère pas les scrutins par leur importance supposée, il ne
+construit pas de note de synthèse, il n'infère aucune intention. La section
+\ref{sec:lire} récapitule, indicateur par indicateur, ce que chacun ne
+démontre pas. Cette retenue n'est pas de la tiédeur : c'est la condition pour
+qu'un chiffre reste utilisable par des lecteurs qui ne partagent pas les mêmes
+convictions.
+
+\subsection{Ce dont ce travail hérite}
+
+Aucune des méthodes employées ici n'est nouvelle, et c'est délibéré : sur un
+objet politique, l'originalité méthodologique est un risque, pas un atout.
+L'analyse quantitative des scrutins nominatifs est un domaine constitué depuis
+près d'un siècle. L'indice de cohésion d'un groupe remonte à
+Rice~\cite{rice1928}. L'estimation d'une position latente à partir de votes
+binaires suit la lignée de Poole et Rosenthal~\cite{poole1985,poole1997}, dans
+la variante probabiliste formalisée par Clinton, Jackman et
+Rivers~\cite{clinton2004} ; l'application à un parlement européen
+multipartisan, plus proche du cas français que le bipartisme américain, doit
+beaucoup à Hix, Noury et Roland~\cite{hix2006}. Les outils statistiques
+auxiliaires sont classiques : indice de similarité de Jaccard~\cite{jaccard1901},
+positionnement multidimensionnel de Torgerson~\cite{torgerson1952}, bootstrap
+par blocs de Künsch~\cite{kunsch1989} pour tenir compte de la dépendance entre
+scrutins d'une même séance, et contrôle du taux de fausses découvertes de
+Benjamini et Hochberg~\cite{benjamini1995} pour la détection de sujets.
+
+L'apport de ce projet n'est donc pas méthodologique. Il est dans l'application
+systématique de ces méthodes à la législature en cours, dans leur mise à jour
+automatique, et dans la publication intégrale des dénominateurs.
+
+\subsection{Plan}
+
+La section~\ref{sec:question} pose les unités d'observation et le périmètre.
+La section~\ref{sec:cube} décrit le passage des fichiers bruts aux matrices de
+vote. Les sections~\ref{sec:proximite} à~\ref{sec:sujets} définissent les
+indicateurs, dans l'ordre où le site les présente. La
+section~\ref{sec:lire} récapitule les lectures abusives à éviter, et la
+section~\ref{sec:reproduire} indique comment tout reconstruire.
+
+\section{Avant toute formule : quelle est la question ?}\label{sec:question}
 
 Un calcul politique n'est jamais seulement une formule. Il suppose aussi une
 question, une unité d'observation et un périmètre. Ici, les unités élémentaires
@@ -77,7 +257,7 @@ nécessitent du contexte politique, qualitatif et institutionnel.
 population de référence. C'est pourquoi les fonctions du projet renvoient les
 comptes bruts avec les taux.}
 
-\section{Des fichiers bruts au cube de votes}
+\section{Des fichiers bruts au cube de votes}\label{sec:cube}
 
 \subsection{Nettoyer sans inventer de données}
 
@@ -123,10 +303,10 @@ situations sont politiquement identiques.
 \subsection{L'éligibilité : ne pas pénaliser un mandat qui n'avait pas commencé}
 
 Le cube contient enfin $E_{ij}$, l'indicatrice que le mandat de $i$ couvre la
-date du scrutin $j$. Si $d_j$ est la date du scrutin, $d_i^{\mathrm{début}}$ et
+date du scrutin $j$. Si $d_j$ est la date du scrutin, $d_i^{\text{début}}$ et
 $d_i^{\mathrm{fin}}$ les bornes du mandat, alors :
 \[
- E_{ij}=\ind\left(d_i^{\mathrm{début}}\leq d_j\leq
+ E_{ij}=\ind\left(d_i^{\text{début}}\leq d_j\leq
  d_i^{\mathrm{fin}}\right).
 \]
 Pour un mandat en cours, la borne de fin est considérée comme future. Cette
@@ -164,7 +344,7 @@ Elle est proche de $0$ pour un scrutin quasi unanime et de $0{,}5$ pour un
 scrutin très partagé. On peut l'utiliser pour retirer les votes joués d'avance,
 qui gonflent mécaniquement l'accord général.
 
-\section{Proximité de vote : compter les accords, puis seulement les diviser}
+\section{Proximité de vote : compter les accords, puis seulement les diviser}\label{sec:proximite}
 
 \subsection{La définition entre deux députés}
 
@@ -230,7 +410,7 @@ projet publie deux conventions :
 \begin{align*}
  \overline T_{GH}&=\frac{1}{|\mathcal P_{GH}|}
  \sum_{(i,k)\in\mathcal P_{GH}}T_{ik},\\
- T^{\mathrm{agrégé}}_{GH}&=
+ T^{\text{agrégé}}_{GH}&=
  \frac{\sum_{(i,k)\in\mathcal P_{GH}}K_{ik}}
  {\sum_{(i,k)\in\mathcal P_{GH}}M_{ik}}.
 \end{align*}
@@ -425,7 +605,7 @@ l'estimation, pas à déclarer ces scrutins sans intérêt.
 Le projet maximise une vraisemblance logistique pénalisée. Schématiquement, il
 cherche à maximiser :
 \[
- \ell=\sum_{i,j\ \mathrm{observés}}
+ \ell=\sum_{i,j\ \text{observés}}
  \left[Y_{ij}\log(p_{ij})+(1-Y_{ij})\log(1-p_{ij})\right]
  -\frac{\lambda_x}{2}\sum_i\|x_i\|^2
  -\frac{\lambda_\beta}{2}\sum_j\|\beta_j\|^2.
@@ -474,10 +654,10 @@ favorise les scrutins très déséquilibrés : prédire toujours la majorité es
 souvent correct. L'APRE (\emph{aggregate proportional reduction in error})
 compare donc les erreurs du modèle aux erreurs de ce prédicteur naïf :
 \[
- \mathrm{APRE}=\frac{E_0-E_{\mathrm{modèle}}}{E_0},
+ \mathrm{APRE}=\frac{E_0-E_{\text{modèle}}}{E_0},
 \]
 où $E_0$ est la somme des effectifs minoritaires de chaque scrutin, et
-$E_{\mathrm{modèle}}$ le nombre d'erreurs de classification. APRE $=0$ signifie
+$E_{\text{modèle}}$ le nombre d'erreurs de classification. APRE $=0$ signifie
 « pas mieux que toujours choisir la majorité » ; APRE $=1$ signifie aucune erreur.
 
 Pour choisir le nombre de dimensions et la pénalisation, une part des cellules
@@ -632,7 +812,7 @@ La part brute de liens hors groupe est mécaniquement plus grande dans un petit
 groupe. Pour le député $i$ du groupe $G$, le projet la compare à l'attendu sous
 mélange aléatoire :
 \[
- \mathrm{part\ observée}_i=\frac{\text{liens de $i$ hors de $G$}}
+ \text{part observée}_i=\frac{\text{liens de $i$ hors de $G$}}
  {\text{tous les liens de $i$}},\qquad
  \mathrm{part\ attendue}_i=\frac{N-|G|}{N-1}.
 \]
@@ -641,7 +821,7 @@ signale une ouverture hors groupe plus forte que ce que la seule taille du group
 produirait. Les non-inscrits sont exclus de cette mesure : « hors de son groupe »
 n'a alors pas de référence bien définie.
 
-\section{Détecter les sujets qui montent}
+\section{Détecter les sujets qui montent}\label{sec:sujets}
 
 \subsection{Corpus et unités de comptage}
 
@@ -697,7 +877,7 @@ attendu à 5\% parmi les signaux retenus, sous les hypothèses usuelles de la
 procédure. Enfin, des n-grammes parfaitement redondants sont fusionnés pour ne
 pas faire passer plusieurs fragments d'un même titre pour plusieurs sujets.
 
-\section{Lire les sorties sans leur faire dire plus qu'elles ne disent}
+\section{Lire les sorties sans leur faire dire plus qu'elles ne disent}\label{sec:lire}
 
 \begin{center}
 \begin{tabular}{>{\raggedright\arraybackslash}p{.25\linewidth}p{.31\linewidth}p{.31\linewidth}}
@@ -724,7 +904,7 @@ Une bonne lecture procède dans cet ordre :
   \item revenir au titre, au texte et au contexte politique du scrutin.
 \end{enumerate}
 
-\section{Reproduire et auditer}
+\section{Reproduire et auditer}\label{sec:reproduire}
 
 Les calculs décrits ici sont implémentés dans :
 
@@ -753,6 +933,152 @@ taux et quotient de sommes, l'orientation du modèle et l'APRE.
 \important{La reproductibilité ne consiste pas seulement à pouvoir relancer le
 code. Elle suppose de publier les définitions, les seuils, les exclusions et
 les incertitudes qui rendent un chiffre discutable.}
+
+\section{Limites connues}
+
+Les limites qui suivent ne sont pas des réserves de style. Chacune borne une
+conclusion que le lecteur pourrait être tenté de tirer.
+
+\textbf{Le scrutin public n'est pas le vote.} L'immense majorité des décisions
+de l'Assemblée se prend à main levée, sans trace nominative. Les scrutins
+publics sont un sous-ensemble non aléatoire : ils sont demandés, souvent
+précisément parce qu'un groupe veut rendre des positions visibles. Tout ce qui
+est mesuré ici porte sur cette fraction, et sur elle seule.
+
+\textbf{La participation mesurée n'est pas la présence.} Un député présent en
+commission, en circonscription ou en mission n'apparaît pas dans nos
+dénominateurs. Le taux publié dit à quelle fraction des scrutins publics
+auxquels il pouvait prendre part un élu a exprimé une position ; il ne dit
+rien de son travail parlementaire pris dans son ensemble.
+
+\textbf{Le point idéal est un artefact utile, pas une opinion.} L'axe estimé
+est la direction qui prédit le mieux les votes observés. Son orientation est
+fixée par convention, son échelle est arbitraire, et son interprétation
+substantielle dépend entièrement des textes soumis au vote pendant la période.
+Deux législatures ne sont pas comparables sur cette échelle.
+
+\textbf{L'appartenance de groupe est datée.} Les changements de groupe en
+cours de mandat sont traités à la date d'effet publiée par l'Assemblée. Les
+mesures agrégées par groupe portent donc sur une composition qui a varié à
+l'intérieur de la période d'observation.
+
+\textbf{La cosignature n'est pas la collaboration.} Signer un amendement est un
+acte peu coûteux, parfois collectif par défaut au sein d'un groupe. Le réseau
+décrit une pratique de signature, dont le rapport au travail réel est une
+question ouverte que ces données ne tranchent pas.
+
+\section{Disponibilité des données, du code et de ce document}
+
+\textbf{Données sources.} Jeux de données ouverts de l'Assemblée nationale,
+\url{https://data.assemblee-nationale.fr}, sous Licence Ouverte
+\textsc{Etalab}. Le projet enregistre pour chaque archive l'en-tête
+\code{Last-Modified} renvoyé par le serveur ; la date de la source est publiée
+sur le site à côté de la date de calcul.
+
+\textbf{Code.} Le paquet \code{radar} est publié sous licence
+\textsc{agpl}-3.0-or-later. Le choix de cette licence est délibéré : un
+outil dont l'objet est la transparence ne peut pas être réutilisé pour
+produire des chiffres dont la méthode resterait fermée.
+
+\textbf{Tables intermédiaires.} Elles ne sont pas encore archivées : chaque
+mise à jour reconstruit les tables et remplace les précédentes. Reconstruire
+l'état du site à une date passée suppose donc aujourd'hui que les archives
+amont soient encore disponibles dans la même version — ce que rien ne
+garantit. L'archivage d'un instantané par mise à jour est prévu ; tant qu'il
+n'est pas en place, cette limite est réelle et il faut la connaître.
+
+\textbf{Ce document.} Il est publié au format \textsc{pdf} avec le site, à
+l'adresse \url{https://radar-parlementaire.fr/methode/note-methodologique.pdf},
+et sa source \LaTeX{} est versionnée avec le code.
+
+\section{Déclaration sur l'usage d'outils d'assistance à la rédaction}
+\label{sec:ia}
+
+Ce document, ainsi qu'une part substantielle du code du projet, ont été
+rédigés avec l'assistance de \textbf{Claude}, modèle de langage développé par
+\textbf{Anthropic}, utilisé de manière interactive.
+
+Le périmètre de cette assistance a été large : formulation et structuration du
+texte, mise en forme \LaTeX{}, formalisation mathématique des définitions,
+rédaction et révision du code Python, et travail critique sur les choix de
+méthode — plusieurs incohérences entre indicateurs, dont deux définitions
+divergentes d'une même grandeur, ont été identifiées au cours de ces échanges.
+
+La responsabilité du contenu n'en est pas partagée pour autant. Les choix de
+méthode, les seuils, les décisions de ne pas publier une mesure jugée trop
+fragile, la vérification des résultats et l'ensemble du texte publié relèvent
+de l'auteur, qui en répond seul. Une erreur dans ce document est une erreur de
+l'auteur.
+
+Cette déclaration figure ici pour la même raison que tout le reste du
+document. Un projet qui exige des autres qu'ils exposent leur méthode ne peut
+pas dissimuler la sienne, y compris lorsqu'elle porte sur ses propres outils
+de travail. Mentionner un tel usage devient une pratique attendue dans
+l'édition scientifique ; nous considérons qu'elle l'est tout autant dès lors
+qu'on publie des chiffres sur la vie politique.
+
+\section*{Licence de ce document}
+\addcontentsline{toc}{section}{Licence de ce document}
+
+Ce texte est mis à disposition sous licence
+\href{https://creativecommons.org/licenses/by/4.0/deed.fr}
+     {Creative Commons Attribution 4.0 International} (\textsc{cc by} 4.0).
+Il peut être cité, reproduit, traduit et adapté, y compris pour le contredire,
+à condition d'en attribuer la paternité.
+
+\begin{thebibliography}{9}
+\addcontentsline{toc}{section}{Références}
+
+\bibitem{benjamini1995}
+Y.~Benjamini et Y.~Hochberg.
+\newblock Controlling the False Discovery Rate: A Practical and Powerful
+  Approach to Multiple Testing.
+\newblock \emph{Journal of the Royal Statistical Society, Series B},
+  57(1):289--300, 1995.
+
+\bibitem{clinton2004}
+J.~Clinton, S.~Jackman et D.~Rivers.
+\newblock The Statistical Analysis of Roll Call Data.
+\newblock \emph{American Political Science Review}, 98(2):355--370, 2004.
+
+\bibitem{hix2006}
+S.~Hix, A.~Noury et G.~Roland.
+\newblock Dimensions of Politics in the European Parliament.
+\newblock \emph{American Journal of Political Science}, 50(2):494--511, 2006.
+
+\bibitem{jaccard1901}
+P.~Jaccard.
+\newblock Étude comparative de la distribution florale dans une portion des
+  Alpes et du Jura.
+\newblock \emph{Bulletin de la Société vaudoise des sciences naturelles},
+  37:547--579, 1901.
+
+\bibitem{kunsch1989}
+H.~R.~Künsch.
+\newblock The Jackknife and the Bootstrap for General Stationary Observations.
+\newblock \emph{The Annals of Statistics}, 17(3):1217--1241, 1989.
+
+\bibitem{poole1985}
+K.~T.~Poole et H.~Rosenthal.
+\newblock A Spatial Model for Legislative Roll Call Analysis.
+\newblock \emph{American Journal of Political Science}, 29(2):357--384, 1985.
+
+\bibitem{poole1997}
+K.~T.~Poole et H.~Rosenthal.
+\newblock \emph{Congress: A Political-Economic History of Roll Call Voting}.
+\newblock Oxford University Press, 1997.
+
+\bibitem{rice1928}
+S.~A.~Rice.
+\newblock \emph{Quantitative Methods in Politics}.
+\newblock Alfred A. Knopf, New York, 1928.
+
+\bibitem{torgerson1952}
+W.~S.~Torgerson.
+\newblock Multidimensional Scaling: I. Theory and Method.
+\newblock \emph{Psychometrika}, 17(4):401--419, 1952.
+
+\end{thebibliography}
 
 \end{document}
 

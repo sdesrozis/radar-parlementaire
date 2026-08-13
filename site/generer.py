@@ -64,6 +64,19 @@ STATIQUE = ICI / "statique"
 ASSETS = ICI / "assets"
 SORTIE = ICI / "sortie"
 
+# La note méthodologique est compilée par LaTeX, hors de ce script : exiger un
+# moteur TeX pour générer le site rendrait la publication dépendante d'une
+# chaîne d'outils qui n'a rien à voir avec elle. On recopie le PDF s'il est là,
+# et la page Méthode s'adapte à son absence — un site amputé de son annexe reste
+# un site, un site qui refuse de se construire n'en est plus un.
+NOTE_SOURCE = ICI.parent / "docs" / "note-methodologique.pdf"
+NOTE_CHEMIN = "methode/note-methodologique.pdf"
+
+# Adresse canonique, pour le sitemap et les URL absolues des métadonnées de
+# partage. Une URL relative suffit à la navigation ; un moteur de recherche et
+# un aperçu de lien, eux, exigent l'adresse complète.
+BASE = "https://radar-parlementaire.fr"
+
 
 # ── distributions : la matière de la bande des 577 ─────────────────────────
 
@@ -113,6 +126,40 @@ def rangs_html(voisins: list[dict], surligne: str | None = None) -> str:
             f"</div>"
         )
     return "\n        ".join(lignes)
+
+
+def bloc_note_html() -> str:
+    """L'encart qui renvoie à la note méthodologique, ou rien si elle manque.
+
+    Le site ne prétend pas que le PDF existe quand il n'a pas été compilé : un
+    lien mort sur la page qui promet la vérifiabilité serait la contradiction
+    la plus visible du projet.
+    """
+    if not NOTE_SOURCE.exists():
+        return ""
+    mo = NOTE_SOURCE.stat().st_size / 1e6
+    return (
+        '<section class="cadre socle">\n'
+        '    <div class="lecture">\n'
+        '      <p class="jalon">La spécification complète</p>\n'
+        '      <a class="note-pdf" href="' + NOTE_CHEMIN + '">\n'
+        '        <span class="note-pdf-icone" aria-hidden="true">PDF</span>\n'
+        '        <span class="note-pdf-texte">\n'
+        '          <b>Note méthodologique</b>\n'
+        '          <span>Chaque mesure de ce site définie formellement&nbsp;: '
+        'numérateur, dénominateur, population de référence, exclusions et '
+        'incertitude. Les formules, les seuils, et les références aux travaux '
+        'dont les méthodes sont tirées.</span>\n'
+        '          <span class="note-pdf-meta">PDF · ' + dec(mo, 1) + '&nbsp;Mo · '
+        'sous licence CC BY 4.0</span>\n'
+        '        </span>\n'
+        '      </a>\n'
+        '      <p>C\'est le document de référence&nbsp;: si le site et la note '
+        'divergent, <b>c\'est le site qui a tort</b>. Il est écrit pour être '
+        'opposé au projet autant que pour l\'expliquer.</p>\n'
+        '    </div>\n'
+        '  </section>'
+    )
 
 
 def lignes_groupes_html(groupes: list[dict]) -> str:
@@ -306,6 +353,7 @@ class Site:
                 "BOOTSTRAP": num(self.apercu["bootstrap"]),
                 "BLOCS": num(self.apercu["blocs_bootstrap"]),
                 "MIN_COMMUNS": num(MIN_COMMUNS),
+                "BLOC_NOTE": bloc_note_html(),
             },
             titre="Méthode — Radar parlementaire",
             description=("La définition exacte de chaque mesure du Radar parlementaire, "
@@ -500,6 +548,37 @@ class Site:
             onglet="deputes")
 
 
+def ecrire_index_moteurs(uids: list[str]) -> None:
+    """`sitemap.xml` et `robots.txt`.
+
+    Sans sitemap, un moteur découvre les fiches en suivant les liens de
+    l'annuaire — et ignore le PDF de la note, qu'aucune page n'atteint par un
+    chemin qu'il sait remonter. Or c'est précisément le document qu'on veut
+    trouvable quand quelqu'un cherche comment un chiffre a été obtenu.
+    """
+    aujourdhui = date.today().isoformat()
+    urls = ["", "deputes.html", "carte.html", "methode.html"]
+    if NOTE_SOURCE.exists():
+        urls.append(NOTE_CHEMIN)
+    urls += [f"{uid}.html" for uid in uids]
+
+    lignes = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for u in urls:
+        lignes.append(
+            f"  <url><loc>{BASE}/{u}</loc><lastmod>{aujourdhui}</lastmod></url>")
+    lignes.append("</urlset>")
+    (SORTIE / "sitemap.xml").write_text("\n".join(lignes) + "\n")
+
+    (SORTIE / "robots.txt").write_text(
+        "User-agent: *\n"
+        "Allow: /\n"
+        f"Sitemap: {BASE}/sitemap.xml\n")
+    print(f"  · sitemap.xml ({len(urls)} URL) et robots.txt")
+
+
 def main() -> None:
     parseur = argparse.ArgumentParser(description=__doc__)
     parseur.add_argument("--bootstrap", type=int, default=40,
@@ -529,6 +608,13 @@ def main() -> None:
         if image.is_file():
             shutil.copy2(image, SORTIE / "statique" / image.name)
 
+    if NOTE_SOURCE.exists():
+        (SORTIE / "methode").mkdir(exist_ok=True)
+        shutil.copy2(NOTE_SOURCE, SORTIE / NOTE_CHEMIN)
+        print(f"  · note méthodologique ({NOTE_SOURCE.stat().st_size / 1e6:.1f} Mo)")
+    else:
+        print(f"  · note méthodologique absente ({NOTE_SOURCE}) — encart omis")
+
     (SORTIE / "index.html").write_text(site.accueil())
     (SORTIE / "deputes.html").write_text(site.annuaire())
     (SORTIE / "carte.html").write_text(site.carte())
@@ -540,6 +626,8 @@ def main() -> None:
         (SORTIE / f"{d['acteur_uid']}.html").write_text(site.fiche(d["acteur_uid"]))
         if n % 100 == 0 or n == len(cibles):
             print(f"  · fiches {n}/{len(cibles)}")
+
+    ecrire_index_moteurs([d["acteur_uid"] for d in cibles])
 
     poids = sum(f.stat().st_size for f in SORTIE.rglob("*") if f.is_file())
     pages = len(list(SORTIE.glob("*.html")))
