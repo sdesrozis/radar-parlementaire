@@ -17,3 +17,7 @@ wheels/
 # Données : téléchargées et reconstruites par `radar update`
 data/
 
+site/sortie/
+
+# Autorisations locales de Claude Code, propres à la machine
+.claude/settings.local.json

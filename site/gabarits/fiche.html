@@ -1,0 +1,199 @@
+
+  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════ -->
+  <section class="cadre chapeau">
+    <p class="fil">{{FIL}}</p>
+    <h1>{{NOM}}</h1>
+    <p class="sous-titre-fiche">
+      Siège avec le groupe <b>{{GROUPE_LIBELLE}}</b> ({{GROUPE}}).
+      {{IDENTITE_PHRASE}}
+      <span class="etat">{{ETAT}}</span>
+    </p>
+  </section>
+
+  <!-- ══ LA THÈSE ══════════════════════════════════════════════════ -->
+  <section class="cadre">
+    <div class="these">
+      <p>{{THESE}}</p>
+      <p>{{THESE_SUITE}}</p>
+    </div>
+  </section>
+
+  <!-- ══ SOCLE PÉDAGOGIQUE ═════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Avant de lire les chiffres</p>
+      <h2>À quoi sert un député&nbsp;?</h2>
+      <p>
+        Ils sont {{EN_EXERCICE}}, élus pour cinq ans, chacun dans une circonscription.
+        Leur travail tient en trois missions — et c'est seulement la première
+        qui laisse des traces chiffrées, celles que ce site mesure.
+      </p>
+    </div>
+    <div class="missions">
+      <div class="mission">
+        <h3>1 — Voter la loi</h3>
+        <p>Ils examinent les textes, proposent des <b>amendements</b> pour les modifier, puis votent
+          pour ou contre. Quand le vote est <b>public</b>, le nom de chaque votant est publié :
+          c'est la matière première de ce site.</p>
+      </div>
+      <div class="mission">
+        <h3>2 — Contrôler le gouvernement</h3>
+        <p>Questions au Gouvernement, commissions d'enquête, et l'arme ultime :
+          la <b>motion de censure</b>, qui peut renverser un gouvernement si
+          289 députés la votent.</p>
+      </div>
+      <div class="mission">
+        <h3>3 — Représenter son territoire</h3>
+        <p>Permanence, rendez-vous, dossiers locaux. C'est une grande partie du métier,
+          et elle ne produit <b>aucune donnée publique</b>. Aucun chiffre de ce site
+          ne la mesure — ni ne peut la juger.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ MESURE 1 — PARTICIPATION ══════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Mesure 1 — présence aux votes</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{PART_ENG_PCT}}<span class="unite">%</span></div>
+        <p class="provenance valeur-note">
+          <b>{{PART_ENG_N}}</b> votes exprimés<br>sur <b>{{PART_ENG_DENOM}}</b> votes qui engagent{{PART_ENG_RESERVE}}
+        </p>
+      </div>
+      <div>
+        <p class="enclair">{{PART_PHRASE}}</p>
+        <p class="enclair">{{PART_PHRASE_2}}</p>
+      </div>
+    </div>
+
+    <div class="bande" data-bande="participation"
+         data-valeur="{{PART_TOUS}}" data-etiquette="{{NOM_COURT}}"
+         data-format="pct"></div>
+    <div class="legende-bande">
+      <span><i>Une barre = un député en exercice</i></span>
+      <span><i>Trait pointillé = médiane de l'Assemblée</i></span>
+    </div>
+
+    <details class="piege">
+      <summary>Pourquoi le chiffre brut de « participation » est trompeur</summary>
+      <div class="dedans">
+        <p>Sur <b>l'ensemble</b> des {{SCRUTINS}} scrutins publics de la législature,
+          {{NOM_COURT}} affiche <b>{{PART_TOUS_PCT}} %</b>. Ce nombre existe, il est exact,
+          et il ne veut presque rien dire.</p>
+        <p>La raison : <b>{{PART_DETAIL_PCT}} % de ces scrutins portent sur un amendement</b>.
+          Ces votes se tiennent à toute heure, souvent devant quelques dizaines de députés,
+          et personne n'est censé y assister en permanence. Un député qui siège en commission
+          au même moment fait son travail — il apparaît pourtant comme absent.</p>
+        <p>Le chiffre affiché en haut ne retient donc que les <b>{{PORTEE_TEXTE}} votes qui engagent</b> :
+          vote sur l'ensemble d'un texte, motion de censure. Ceux-là sont annoncés à l'avance,
+          et y manquer est un choix.</p>
+        <p>Le dénominateur ne compte par ailleurs que les scrutins où le mandat courait, et retire les
+          <b>non-votants structurels</b> — un ministre ou le président de séance ne peuvent pas voter :
+          ce ne sont pas des absences.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ══ MESURE 2 — DISSIDENCE ═════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Mesure 2 — écarts à la ligne du groupe</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{DISS_PCT}}<span class="unite">%</span></div>
+        <p class="provenance valeur-note">
+          <b>{{DISS_N}}</b> votes contre la ligne<br>sur <b>{{DISS_DENOM}}</b> où son groupe en avait une
+        </p>
+      </div>
+      <div>
+        <p class="enclair">{{DISS_PHRASE}}</p>
+        <p class="enclair">{{DISS_PHRASE_2}}</p>
+      </div>
+    </div>
+
+    <div class="bande" data-bande="dissidence"
+         data-valeur="{{DISS_VAL}}" data-etiquette="{{NOM_COURT}}"
+         data-format="pct"></div>
+    <div class="legende-bande">
+      <span><i>Une barre = un député en exercice</i></span>
+      <span><i>Trait pointillé = médiane de l'Assemblée</i></span>
+    </div>
+
+    <details class="piege">
+      <summary>Ce que « dissidence » ne veut pas dire</summary>
+      <div class="dedans">
+        <p>Un taux élevé n'est ni une qualité ni un défaut. Ce nombre ne mesure ni le courage
+          ni la déloyauté&nbsp;: il compte des écarts à la position majoritaire du groupe —
+          {{DISS_N}} ici. <b>L'interprétation vous appartient.</b></p>
+        <p>Encore faut-il qu'il y ait une ligne à enfreindre. Un groupe qui vote 7 pour, 5 contre
+          et 5 abstentions n'a pas donné de consigne — sa position dominante ne réunit que 41 %.
+          Compter les dix autres votes comme dissidents reviendrait à traiter
+          <b>un groupe qui n'a pas su se mettre d'accord</b> comme un groupe dont dix membres
+          auraient désobéi.</p>
+        <p>Ces scrutins-là sont donc <b>exclus du dénominateur</b> et marqués « groupe partagé ».
+          Le taux affiché porte sur {{DISS_DENOM}} scrutins seulement, pas sur {{SCRUTINS}}.</p>
+        <p>La ligne du groupe n'est jamais lue dans une consigne annoncée :
+          elle est <b>recalculée depuis le dépouillement nominatif</b>, vote par vote.</p>
+      </div>
+    </details>
+  </section>
+
+{{BLOC_POSITION}}  <!-- ══ L'ÉCART ═══════════════════════════════════════════════════ -->
+  <section class="cadre ecart">
+    <p class="jalon">La mesure qui n'existe nulle part ailleurs</p>
+    <div class="lecture" style="margin-top:22px">
+      <h2 style="font-family:var(--serif);font-weight:500;font-size:1.85rem;letter-spacing:-0.018em;margin:0 0 14px">
+        Qui vote comme {{NOM_COURT}}&nbsp;?
+      </h2>
+      <p style="margin:0;color:var(--encre-2)">
+        La même question, posée sur deux ensembles de scrutins différents, ne donne pas la même réponse.
+        Les deux colonnes ci-dessous sont calculées sur les mêmes députés, le même jour, avec la même formule.
+      </p>
+    </div>
+
+    <div class="duo">
+      <div class="colonne">
+        <h3>Sur tous les scrutins</h3>
+        <p class="assiette">{{SCRUTINS}} scrutins · dont {{PORTEE_DETAIL}} amendements</p>
+        {{PROCHES_TOUS}}
+      </div>
+      <div class="colonne">
+        <h3>Sur les seuls votes qui engagent</h3>
+        <p class="assiette">{{PORTEE_TEXTE}} scrutins · textes entiers et motions</p>
+        {{PROCHES_TEXTE}}
+      </div>
+    </div>
+
+    <div class="verdict-ecart">
+      <p>{{ECART_VERDICT}}</p>
+      <p>{{ECART_EXPLIC}}</p>
+    </div>
+  </section>
+
+  <!-- ══ VÉRIFIER ══════════════════════════════════════════════════ -->
+  <section class="cadre" style="padding-block: 48px 8px">
+    <p class="jalon">Remonter à la source</p>
+    <div class="duo" style="margin-top:26px">
+      <div class="colonne">
+        <h3>Les données de cette page</h3>
+        <p class="assiette">Tout est recalculé, rien n'est repris tel quel</p>
+        <p style="margin:0;font-size:15.5px;color:var(--encre-2);line-height:1.6">
+          Chaque taux de cette fiche est affiché avec son dénominateur, en
+          caractères à chasse fixe, pour que le calcul puisse être refait.
+          Les votes nominatifs viennent de
+          <a href="https://data.assemblee-nationale.fr">l'open data de l'Assemblée</a>.</p>
+      </div>
+      <div class="colonne">
+        <h3>Ses déclarations d'intérêts</h3>
+        <p class="assiette">Haute Autorité pour la transparence de la vie publique</p>
+        <p style="margin:0;font-size:15.5px;color:var(--encre-2);line-height:1.6">
+          Patrimoine, activités et intérêts déclarés — publiés par une autorité
+          indépendante, hors du champ de ce site.<br>
+          <a href="{{HATVP}}">Consulter la déclaration de {{NOM_COURT}}</a></p>
+      </div>
+    </div>
+    <p class="fraicheur">Chiffres calculés le {{GENERE_LE}} · {{LEGISLATURE}}<sup>e</sup> législature</p>
+  </section>
+
+
+  <script>const DONNEES = {{DONNEES_JSON}};</script>

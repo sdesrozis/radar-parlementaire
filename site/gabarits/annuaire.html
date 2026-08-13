@@ -1,0 +1,52 @@
+  <section class="cadre chercher" data-annuaire>
+    <p class="fil">Les députés · {{LEGISLATURE}}<sup>e</sup> législature</p>
+    <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);max-width:20ch">Trouver un député</h1>
+    <p class="section-intro" style="margin:18px 0 30px">
+      Par nom, par département, par numéro de département, par région ou par groupe.
+      La recherche se fait dans la page&nbsp;: aucune requête n'est envoyée nulle part.
+    </p>
+
+    <div class="champ">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path>
+      </svg>
+      <input type="search" id="q" placeholder="Courson, Gironde, 33, Bretagne, LFI…"
+             autocomplete="off" spellcheck="false" aria-label="Chercher un député">
+      <button class="effacer" id="effacer" hidden>effacer</button>
+    </div>
+
+    <div class="exemples">
+      <span>Essayez&nbsp;:</span>
+      <button data-exemple="Marne">Marne</button>
+      <button data-exemple="LIOT">LIOT</button>
+      <button data-exemple="Bretagne">Bretagne</button>
+      <button data-exemple="75">Paris (75)</button>
+      <button data-exemple="Français établis hors de France">Hors de France</button>
+    </div>
+
+    <p class="compteur" id="compteur"></p>
+    <ul class="annuaire" id="resultats"></ul>
+
+    <div class="rien" id="rien" hidden>
+      <p>Aucun député ne correspond à «&nbsp;<b id="rien-q"></b>&nbsp;».</p>
+      <p style="font-size:15px">La recherche porte sur le nom, le département, son numéro,
+        la région et le groupe. <b>Les communes ne sont pas encore reconnues</b>&nbsp;:
+        l'open data de l'Assemblée publie le département et le numéro de circonscription,
+        pas la liste des villes qui la composent.</p>
+    </div>
+
+    <p class="fraicheur">{{EN_EXERCICE}} députés en exercice · chiffres calculés le {{GENERE_LE}}</p>
+  </section>
+
+  <section class="cadre" style="padding-block: 40px 8px">
+    <div class="lecture">
+      <p class="jalon">Ce que vous verrez</p>
+      <h2 class="section-titre">Chaque fiche explique ses chiffres</h2>
+      <p class="section-intro">Le nombre affiché à droite de chaque nom est la
+        <b>présence aux {{PORTEE_TEXTE}} votes qui engagent</b> — pas la présence à tous
+        les scrutins, qui vaudrait beaucoup moins et voudrait dire beaucoup moins.
+        La fiche dit pourquoi, et situe ce chiffre parmi les {{EN_EXERCICE}} députés.</p>
+    </div>
+  </section>
+
+  <script>const ANNUAIRE = {{ANNUAIRE_JSON}};</script>

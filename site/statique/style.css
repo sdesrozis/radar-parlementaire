@@ -1,0 +1,565 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   RADAR PARLEMENTAIRE — système visuel
+   Encre & papier. Un accent indigo, un signal ocre, rien d'autre.
+   Aucune couleur ne désigne un groupe politique : la couleur porte une
+   grandeur ou une emphase, l'identité passe par le texte.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --papier:       #F5F4EF;
+  --papier-creux: #EBE9E1;
+  --papier-haut:  #FBFAF7;
+  --encre:        #191A1C;
+  --encre-2:      #5E5F5C;
+  --encre-3:      #8C8D88;
+  --trait:        #DBD9D0;
+  --trait-fort:   #C4C2B7;
+  --accent:       #33327A;
+  --accent-vif:   #5250C0;
+  --accent-voile: #33327A1F;
+  --signal:       #8A6B12;
+  --signal-voile: #8A6B121F;
+
+  --serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Roboto Mono", monospace;
+
+  --cadre: 1140px;
+  --lecture: 63ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papier:       #131416;
+    --papier-creux: #1B1D20;
+    --papier-haut:  #1F2126;
+    --encre:        #EDEBE4;
+    --encre-2:      #9E9F99;
+    --encre-3:      #74756F;
+    --trait:        #2C2E32;
+    --trait-fort:   #3E4045;
+    --accent:       #9C99F0;
+    --accent-vif:   #B4B1FF;
+    --accent-voile: #9C99F026;
+    --signal:       #D9B348;
+    --signal-voile: #D9B34826;
+  }
+}
+:root[data-theme="dark"] {
+  --papier:       #131416;
+  --papier-creux: #1B1D20;
+  --papier-haut:  #1F2126;
+  --encre:        #EDEBE4;
+  --encre-2:      #9E9F99;
+  --encre-3:      #74756F;
+  --trait:        #2C2E32;
+  --trait-fort:   #3E4045;
+  --accent:       #9C99F0;
+  --accent-vif:   #B4B1FF;
+  --accent-voile: #9C99F026;
+  --signal:       #D9B348;
+  --signal-voile: #D9B34826;
+}
+:root[data-theme="light"] {
+  --papier:       #F5F4EF;
+  --papier-creux: #EBE9E1;
+  --papier-haut:  #FBFAF7;
+  --encre:        #191A1C;
+  --encre-2:      #5E5F5C;
+  --encre-3:      #8C8D88;
+  --trait:        #DBD9D0;
+  --trait-fort:   #C4C2B7;
+  --accent:       #33327A;
+  --accent-vif:   #5250C0;
+  --accent-voile: #33327A1F;
+  --signal:       #8A6B12;
+  --signal-voile: #8A6B121F;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--encre);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── ossature ──────────────────────────────────────────────────────── */
+
+.cadre { max-width: var(--cadre); margin: 0 auto; padding: 0 32px; }
+.lecture { max-width: var(--lecture); }
+
+/* Marqueur de section : mono, capitales, très espacé.
+   Il porte toujours une information — jamais un numéro décoratif. */
+.jalon {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--encre-3);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.jalon::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--trait);
+}
+
+/* La provenance d'un chiffre est toujours en mono : c'est la signature
+   du site. Mono = vérifiable, dénombrable, opposable. */
+.provenance {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--encre-2);
+  letter-spacing: -0.01em;
+}
+.provenance b { color: var(--encre); font-weight: 600; }
+
+a { color: inherit; text-decoration-color: var(--trait-fort); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent-vif); outline-offset: 3px; border-radius: 2px; }
+
+/* ── en-tête ───────────────────────────────────────────────────────── */
+
+.entete {
+  border-bottom: 1px solid var(--trait);
+  background: color-mix(in srgb, var(--papier) 82%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  position: sticky; top: 0; z-index: 40;
+}
+.entete .cadre {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; height: 62px;
+}
+.marque { display: flex; align-items: baseline; gap: 9px; text-decoration: none; }
+.marque .m1 {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.22em; text-transform: uppercase;
+}
+.marque .m2 { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--encre-2); }
+.menu { display: flex; gap: 26px; font-size: 14.5px; }
+.menu a { text-decoration: none; color: var(--encre-2); padding: 4px 0; border-bottom: 1.5px solid transparent; }
+.menu a:hover { color: var(--encre); }
+.menu a[aria-current] { color: var(--encre); border-bottom-color: var(--accent); }
+@media (max-width: 720px) { .menu { display: none; } }
+
+/* ── titre de fiche ────────────────────────────────────────────────── */
+
+.chapeau { padding-block: 72px 0; }
+.fil {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--encre-3); margin-bottom: 22px;
+}
+h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.9rem, 7vw, 4.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  font-weight: 500;
+  margin: 0;
+  text-wrap: balance;
+}
+.sous-titre-fiche {
+  margin: 20px 0 0;
+  font-size: 17px;
+  color: var(--encre-2);
+  max-width: 60ch;
+}
+.sous-titre-fiche b { color: var(--encre); font-weight: 600; }
+
+.etat {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--encre-2);
+  border: 1px solid var(--trait-fort); border-radius: 999px;
+  padding: 4px 11px; margin-left: 4px;
+  vertical-align: 3px;
+}
+.etat::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ── la thèse ──────────────────────────────────────────────────────── */
+
+.these {
+  margin: 56px 0 0;
+  padding: 40px 0 44px;
+  border-top: 2px solid var(--encre);
+  border-bottom: 1px solid var(--trait);
+}
+.these p {
+  font-family: var(--serif);
+  font-size: clamp(1.45rem, 2.9vw, 2.05rem);
+  line-height: 1.32;
+  letter-spacing: -0.015em;
+  margin: 0;
+  max-width: 26ch;
+  text-wrap: pretty;
+}
+.these p + p { margin-top: 22px; max-width: 34ch; color: var(--encre-2); font-size: clamp(1.15rem, 2vw, 1.4rem); }
+.these em { font-style: normal; box-shadow: inset 0 -0.42em 0 var(--accent-voile); }
+@media (min-width: 900px) {
+  .these { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+  .these p + p { margin-top: 8px; }
+}
+
+/* ── encart pédagogique ────────────────────────────────────────────── */
+
+.socle {
+  padding-block: 40px 48px;
+  border-bottom: 1px solid var(--trait);
+}
+.socle h2 {
+  font-family: var(--serif); font-weight: 500;
+  font-size: 1.6rem; letter-spacing: -0.015em;
+  margin: 18px 0 8px;
+}
+.socle > .lecture > p { margin: 0 0 26px; color: var(--encre-2); }
+.missions {
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  background: var(--trait);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mission { background: var(--papier); padding: 22px 24px 26px; }
+.mission h3 {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 12px; font-weight: 600;
+}
+.mission p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--encre-2); }
+.mission p b { color: var(--encre); font-weight: 600; }
+
+/* ── bloc chiffre ──────────────────────────────────────────────────── */
+
+.mesure { padding-block: 56px; border-bottom: 1px solid var(--trait); }
+.mesure-tete { display: grid; gap: 28px; align-items: end; margin: 26px 0 34px; }
+@media (min-width: 860px) {
+  .mesure-tete { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 56px; }
+}
+.valeur {
+  font-family: var(--serif);
+  font-size: clamp(3.6rem, 9vw, 5.4rem);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.valeur .unite { font-size: 0.34em; letter-spacing: 0; color: var(--encre-2); font-family: var(--sans); font-weight: 400; }
+.valeur-note { margin-top: 12px; }
+.enclair { font-size: 18px; line-height: 1.55; margin: 0; max-width: 46ch; }
+.enclair b { font-weight: 600; }
+.enclair + .enclair { margin-top: 14px; color: var(--encre-2); font-size: 16.5px; }
+
+/* ── la bande des 577 ──────────────────────────────────────────────── */
+
+.bande { position: relative; margin: 0 0 26px; padding: 30px 0 20px; }
+.bande-svg { display: block; width: 100%; height: 56px; shape-rendering: crispEdges; }
+/* Chaque barre est peu opaque : là où les députés se serrent, les barres se
+   recouvrent et le gris s'accumule. La densité se lit sans légende. */
+.bande-ticks > rect { fill: var(--encre-2); opacity: 0.5; }
+.bande-ticks { opacity: 0; transition: opacity 900ms ease; }
+.vu .bande-ticks { opacity: 1; }
+.bande-ic { fill: var(--accent-voile); stroke: none; }
+.bande-sujet { fill: var(--accent); }
+.bande-mediane { stroke: var(--encre); stroke-width: 1; stroke-dasharray: 2 3; }
+.bande-axe { stroke: var(--trait-fort); stroke-width: 1; }
+
+/* Les étiquettes sont en HTML, pas en SVG : le tracé s'étire en largeur
+   (preserveAspectRatio="none"), le texte ne doit surtout pas suivre. */
+.etiq {
+  position: absolute;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  text-transform: uppercase; white-space: nowrap;
+  transform: translateX(-50%);
+  opacity: 0; transition: opacity 500ms ease 650ms;
+}
+.vu .etiq { opacity: 1; }
+.etiq-sujet { top: 0; color: var(--accent); font-weight: 600; }
+.etiq-mediane { bottom: 0; color: var(--encre-3); }
+.etiq[data-ancre="debut"] { transform: none; }
+.etiq[data-ancre="fin"] { transform: translateX(-100%); }
+@media (prefers-reduced-motion: reduce) {
+  .bande-ticks, .etiq { transition: none; opacity: 1; }
+}
+
+.legende-bande {
+  display: flex; flex-wrap: wrap; gap: 6px 20px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+  color: var(--encre-3); text-transform: uppercase;
+  padding-top: 10px; border-top: 1px solid var(--trait);
+}
+.legende-bande i { font-style: normal; color: var(--encre-2); }
+
+/* ── le piège (repliable) ──────────────────────────────────────────── */
+
+.piege {
+  margin-top: 26px;
+  border-left: 2px solid var(--signal);
+  background: var(--signal-voile);
+  border-radius: 0 3px 3px 0;
+}
+.piege > summary {
+  cursor: pointer; list-style: none;
+  padding: 13px 18px;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--signal); font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+}
+.piege > summary::-webkit-details-marker { display: none; }
+.piege > summary::before {
+  content: "+"; font-size: 15px; line-height: 1; width: 12px;
+}
+.piege[open] > summary::before { content: "–"; }
+.piege .dedans { padding: 0 18px 18px 40px; max-width: 66ch; }
+.piege p { margin: 0 0 12px; font-size: 15.5px; line-height: 1.62; color: var(--encre-2); }
+.piege p:last-child { margin-bottom: 0; }
+.piege b { color: var(--encre); font-weight: 600; }
+
+/* ── l'écart : deux colonnes ───────────────────────────────────────── */
+
+.ecart { padding-block: 56px; border-bottom: 1px solid var(--trait); }
+.duo {
+  display: grid; gap: 1px; margin-top: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(288px, 1fr));
+  background: var(--trait); border: 1px solid var(--trait); border-radius: 3px; overflow: hidden;
+}
+.colonne { background: var(--papier); padding: 26px 26px 24px; }
+.colonne > h3 {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase;
+  margin: 0 0 4px; color: var(--encre-2); font-weight: 600;
+}
+.colonne > .assiette { font-family: var(--mono); font-size: 11px; color: var(--encre-3); margin: 0 0 20px; letter-spacing: 0.04em; }
+.rang { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--trait); }
+.rang:last-of-type { border-bottom: 0; }
+.rang .nom { flex: 1; min-width: 0; font-size: 15.5px; }
+.rang .grp { font-family: var(--mono); font-size: 10.5px; color: var(--encre-3); letter-spacing: 0.06em; }
+.rang .tx { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.rang .n { font-family: var(--mono); font-size: 10.5px; color: var(--encre-3); min-width: 62px; text-align: right; }
+.rang.souligne { background: var(--accent-voile); margin: 0 -26px; padding-left: 26px; padding-right: 26px; }
+
+.verdict-ecart {
+  margin-top: 30px; padding: 26px 28px;
+  border: 1px solid var(--encre); border-radius: 3px;
+}
+.verdict-ecart p { margin: 0; font-family: var(--serif); font-size: 1.32rem; line-height: 1.42; letter-spacing: -0.01em; max-width: 52ch; }
+.verdict-ecart p + p { margin-top: 14px; font-family: var(--sans); font-size: 16px; color: var(--encre-2); line-height: 1.6; }
+
+/* ── étiquette contre mesure ───────────────────────────────────────── */
+
+.confrontation {
+  display: grid; gap: 22px; margin-top: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+}
+.face { padding: 22px 24px 24px; border: 1px solid var(--trait); border-radius: 3px; background: var(--papier-haut); }
+.face.mesuree { border-color: var(--accent); }
+.face h3 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; margin: 0 0 14px; color: var(--encre-3); font-weight: 600; }
+.face.mesuree h3 { color: var(--accent); }
+.face .dit { font-family: var(--serif); font-size: 1.5rem; line-height: 1.25; letter-spacing: -0.015em; margin: 0 0 12px; }
+.face .parce { margin: 0; font-size: 15px; color: var(--encre-2); line-height: 1.6; }
+
+/* ── pied ──────────────────────────────────────────────────────────── */
+
+.pied { padding-block: 48px 72px; }
+.pied .grille { display: grid; gap: 30px; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
+.pied h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--encre-3); margin: 0 0 10px; font-weight: 600; }
+.pied p, .pied li { font-size: 14.5px; color: var(--encre-2); margin: 0 0 7px; line-height: 1.6; }
+.pied ul { list-style: none; padding: 0; margin: 0; }
+
+.filet-fin { height: 1px; background: var(--trait); }
+
+.saut { height: 0; }
+@media (max-width: 640px) {
+  .cadre { padding: 0 20px; }
+  .chapeau { padding-block-start: 44px; }
+  .rang .n { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ACCUEIL
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.manifeste { padding-block: 88px 0; }
+.manifeste h1 {
+  font-size: clamp(2.6rem, 6.4vw, 4.4rem);
+  max-width: 17ch;
+}
+.manifeste .appui {
+  font-family: var(--serif);
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+  line-height: 1.38;
+  letter-spacing: -0.012em;
+  color: var(--encre-2);
+  max-width: 44ch;
+  margin: 26px 0 0;
+  text-wrap: pretty;
+}
+.manifeste .appui em { font-style: normal; color: var(--encre); box-shadow: inset 0 -0.42em 0 var(--accent-voile); }
+
+/* Le périmètre, en mono : c'est une provenance, pas un argument de vente. */
+.perimetre {
+  display: flex; flex-wrap: wrap; gap: 0;
+  margin: 44px 0 0;
+  border-top: 1px solid var(--trait);
+  border-bottom: 1px solid var(--trait);
+}
+.perimetre > div {
+  flex: 1 1 150px;
+  padding: 18px 20px 20px 0;
+}
+.perimetre dt {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--encre-3); margin-bottom: 6px;
+}
+.perimetre dd {
+  margin: 0; font-family: var(--serif); font-size: 1.75rem;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1;
+}
+.perimetre dd small { font-family: var(--sans); font-size: 12.5px; color: var(--encre-2); letter-spacing: 0; display: block; margin-top: 7px; line-height: 1.45; }
+
+/* Les trois règles : la promesse du site, en clair. */
+.regles { padding-block: 56px; border-bottom: 1px solid var(--trait); }
+.regle {
+  display: grid; gap: 6px 28px; padding: 24px 0;
+  border-top: 1px solid var(--trait);
+}
+.regle:first-of-type { border-top: 0; }
+@media (min-width: 800px) { .regle { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); } }
+.regle h3 {
+  font-family: var(--serif); font-weight: 500; font-size: 1.32rem;
+  letter-spacing: -0.015em; margin: 0; text-wrap: balance;
+}
+.regle p { margin: 0; color: var(--encre-2); font-size: 16px; line-height: 1.62; max-width: 58ch; }
+.regle p b { color: var(--encre); font-weight: 600; }
+
+/* Ce que le site ne mesure pas : bloc d'honnêteté, encadré comme un piège. */
+.limites { padding-block: 56px; border-bottom: 1px solid var(--trait); }
+.limites ul { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 1px; background: var(--trait); border: 1px solid var(--trait); border-radius: 3px; overflow: hidden; }
+.limites li { background: var(--papier); padding: 18px 22px; font-size: 15.5px; color: var(--encre-2); line-height: 1.6; }
+.limites li b { color: var(--encre); font-weight: 600; }
+
+/* Tableau des groupes : dense, tabulaire, sans couleur d'identité. */
+.tableau-groupes { width: 100%; border-collapse: collapse; margin-top: 26px; font-variant-numeric: tabular-nums; }
+.tableau-groupes th {
+  text-align: right; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--encre-3); font-weight: 600;
+  padding: 0 0 10px 16px; border-bottom: 1px solid var(--trait-fort); white-space: nowrap;
+}
+.tableau-groupes th:first-child, .tableau-groupes td:first-child { text-align: left; padding-left: 0; }
+.tableau-groupes td { text-align: right; padding: 11px 0 11px 16px; border-bottom: 1px solid var(--trait); font-size: 14.5px; }
+.tableau-groupes .sigle { font-weight: 600; font-size: 15px; }
+.tableau-groupes .plein { font-size: 12.5px; color: var(--encre-2); display: block; margin-top: 2px; }
+.tableau-groupes .mono { font-family: var(--mono); font-size: 13px; }
+@media (max-width: 720px) { .tableau-groupes .repliable { display: none; } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ANNUAIRE ET RECHERCHE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.chercher { padding-block: 30px 0; }
+.champ {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--trait-fort); border-radius: 3px;
+  background: var(--papier-haut);
+  padding: 0 16px;
+  transition: border-color 140ms ease;
+}
+.champ:focus-within { border-color: var(--accent); }
+.champ svg { flex: none; opacity: 0.45; }
+.champ input {
+  flex: 1; min-width: 0;
+  font-family: var(--serif); font-size: 1.32rem; letter-spacing: -0.01em;
+  background: none; border: 0; color: var(--encre);
+  padding: 15px 0; outline: none;
+}
+.champ input::placeholder { color: var(--encre-3); }
+.champ .effacer {
+  flex: none; background: none; border: 0; cursor: pointer; color: var(--encre-3);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 6px 4px;
+}
+.champ .effacer:hover { color: var(--encre); }
+.champ .effacer[hidden] { display: none; }
+
+.exemples {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+}
+.exemples span { color: var(--encre-3); text-transform: uppercase; padding: 5px 0; }
+.exemples button {
+  background: none; border: 1px solid var(--trait); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer; color: var(--encre-2);
+  font: inherit; letter-spacing: 0.04em;
+}
+.exemples button:hover { border-color: var(--accent); color: var(--encre); }
+
+.compteur {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--encre-3);
+  padding: 22px 0 12px; border-bottom: 1px solid var(--trait);
+}
+.compteur b { color: var(--encre); font-weight: 600; }
+
+.annuaire { list-style: none; padding: 0; margin: 0; }
+.annuaire li { border-bottom: 1px solid var(--trait); }
+.annuaire a {
+  display: grid; gap: 2px 20px; align-items: baseline;
+  padding: 15px 4px 15px 0; text-decoration: none;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+@media (min-width: 780px) {
+  .annuaire a { grid-template-columns: minmax(0, 1fr) 190px 96px 120px; }
+}
+.annuaire a:hover { background: var(--papier-creux); }
+.annuaire a:hover .an-nom { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.an-nom { font-family: var(--serif); font-size: 1.22rem; letter-spacing: -0.012em; }
+.an-lieu { font-size: 14px; color: var(--encre-2); }
+.an-grp { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--encre-2); }
+.an-chiffre { font-family: var(--mono); font-size: 12.5px; color: var(--encre-3); font-variant-numeric: tabular-nums; text-align: right; }
+@media (max-width: 779px) {
+  .an-lieu, .an-grp { grid-column: 1; font-size: 13px; }
+  .an-chiffre { grid-row: 1; grid-column: 2; }
+}
+.annuaire mark { background: var(--accent-voile); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+.rien { padding: 40px 0; color: var(--encre-2); }
+.rien b { color: var(--encre); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ÉLÉMENTS PARTAGÉS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.bouton {
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid var(--encre); border-radius: 3px;
+  padding: 12px 20px; text-decoration: none;
+  font-size: 15px; font-weight: 500;
+  transition: background 140ms ease, color 140ms ease;
+}
+.bouton:hover { background: var(--encre); color: var(--papier); }
+.bouton.discret { border-color: var(--trait-fort); }
+.bouton.discret:hover { background: none; border-color: var(--accent); color: var(--encre); }
+
+.section-titre {
+  font-family: var(--serif); font-weight: 500;
+  font-size: clamp(1.7rem, 3vw, 2.15rem); letter-spacing: -0.02em;
+  margin: 18px 0 10px; text-wrap: balance;
+}
+.section-intro { margin: 0; color: var(--encre-2); max-width: 62ch; }
+
+.fraicheur {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--encre-3);
+  padding-top: 22px; margin-top: 40px; border-top: 1px solid var(--trait);
+}

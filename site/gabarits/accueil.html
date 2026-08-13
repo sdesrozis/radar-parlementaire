@@ -1,0 +1,162 @@
+  <!-- ══ MANIFESTE ═════════════════════════════════════════════════ -->
+  <section class="cadre manifeste">
+    <p class="fil">Assemblée nationale · {{LEGISLATURE}}<sup>e</sup> législature</p>
+    <h1>Ce que fait votre député, avec le dénominateur.</h1>
+    <p class="appui">Un pourcentage sans son effectif est une opinion. Ce site recalcule
+      chaque chiffre depuis les {{VOTES}} votes nominatifs publiés par l'Assemblée, et
+      n'en affiche <em>aucun sans dire sur quoi il porte</em>.</p>
+
+    <dl class="perimetre">
+      <div>
+        <dt>Députés</dt>
+        <dd>{{EN_EXERCICE}}<small>en exercice, sur {{DEPUTES}} ayant siégé depuis 2024</small></dd>
+      </div>
+      <div>
+        <dt>Scrutins publics</dt>
+        <dd>{{SCRUTINS}}<small>dont {{PORTEE_TEXTE}} engagent réellement un texte</small></dd>
+      </div>
+      <div>
+        <dt>Votes nominatifs</dt>
+        <dd>{{VOTES}}<small>chaque « pour », « contre » et abstention, nom par nom</small></dd>
+      </div>
+      <div>
+        <dt>Période</dt>
+        <dd class="provenance" style="font-family:var(--serif);font-size:1.15rem">{{DEBUT}}<small>→ {{FIN}}</small></dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- ══ SOCLE — À QUOI SERT UN DÉPUTÉ ═════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Avant tout le reste</p>
+      <h2 class="section-titre">À quoi sert un député&nbsp;?</h2>
+      <p class="section-intro">Ils sont {{EN_EXERCICE}}. Chacun est élu pour cinq ans dans
+        une circonscription — un territoire d'environ 120&nbsp;000 habitants — au scrutin
+        majoritaire à deux tours. Leur travail tient en trois missions, et une seule
+        laisse des traces chiffrées.</p>
+    </div>
+    <div class="missions">
+      <div class="mission">
+        <h3>1 — Voter la loi</h3>
+        <p>Ils examinent les textes, proposent des <b>amendements</b> pour les modifier,
+          puis votent pour ou contre. Quand le vote est <b>public</b>, le nom de chaque
+          votant est publié&nbsp;: c'est la matière première de ce site.</p>
+      </div>
+      <div class="mission">
+        <h3>2 — Contrôler le gouvernement</h3>
+        <p>Questions au Gouvernement, commissions d'enquête, et l'arme ultime&nbsp;:
+          la <b>motion de censure</b>, qui renverse un gouvernement si 289 députés
+          la votent — la majorité absolue des 577.</p>
+      </div>
+      <div class="mission">
+        <h3>3 — Représenter son territoire</h3>
+        <p>Permanence, rendez-vous, dossiers locaux. C'est une grande partie du métier,
+          et elle ne produit <b>aucune donnée publique</b>. Aucun chiffre de ce site
+          ne la mesure — ni ne peut la juger.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ COMMENCER ═════════════════════════════════════════════════ -->
+  <section class="cadre" style="padding-block: 52px; border-bottom: 1px solid var(--trait)">
+    <div class="lecture">
+      <p class="jalon">Commencer par le vôtre</p>
+      <h2 class="section-titre">Qui est votre député&nbsp;?</h2>
+      <p class="section-intro">Cherchez par nom, par département ou par région. Chaque fiche
+        explique ses chiffres au lieu de les afficher seuls.</p>
+      <p style="margin-top:26px"><a class="bouton" href="deputes.html">Chercher parmi les {{EN_EXERCICE}} députés →</a></p>
+    </div>
+  </section>
+
+  <!-- ══ LES TROIS RÈGLES ══════════════════════════════════════════ -->
+  <section class="cadre regles">
+    <div class="lecture" style="margin-bottom:34px">
+      <p class="jalon">Comment lire nos chiffres</p>
+      <h2 class="section-titre">Trois règles, tenues sur chaque page</h2>
+      <p class="section-intro">Elles ne sont pas décoratives&nbsp;: elles changent les
+        nombres affichés, et expliquent pourquoi les nôtres diffèrent parfois de ceux
+        qu'on lit ailleurs.</p>
+    </div>
+
+    <div class="regle">
+      <h3>Jamais un taux sans son dénominateur</h3>
+      <p>«&nbsp;91&nbsp;% de participation&nbsp;» ne veut rien dire tant qu'on ignore
+        <b>sur combien de votes</b>. Sur ce site, l'effectif est écrit à côté du taux,
+        en caractères à chasse fixe, pour que <b>le calcul puisse être refait</b>.</p>
+    </div>
+    <div class="regle">
+      <h3>On situe, on ne juge pas</h3>
+      <p>Un chiffre isolé se lit comme un verdict. Le même chiffre posé sur la
+        distribution des {{EN_EXERCICE}} députés se lit comme une position. Chaque mesure
+        est donc accompagnée de <b>la barre des {{EN_EXERCICE}}</b>&nbsp;: une barre par
+        député, la médiane marquée. «&nbsp;Faible&nbsp;» devient
+        «&nbsp;faible <b>par rapport à quoi</b>&nbsp;».</p>
+    </div>
+    <div class="regle">
+      <h3>L'incertitude est affichée</h3>
+      <p>Une position estimée n'est pas un point, c'est une zone. Quand deux députés ont
+        des intervalles qui se recouvrent, <b>ils ne sont pas classables</b> l'un par
+        rapport à l'autre, et le site le dit au lieu de publier un classement qui
+        n'existe pas.</p>
+    </div>
+  </section>
+
+  <!-- ══ CE QUE LE SITE NE MESURE PAS ══════════════════════════════ -->
+  <section class="cadre limites">
+    <div class="lecture">
+      <p class="jalon">Les limites, avant les résultats</p>
+      <h2 class="section-titre">Ce que ce site ne mesure pas</h2>
+      <p class="section-intro">Un site de données qui ne dit pas ce qu'il ignore laisse
+        croire qu'il sait tout. Voici ce qui échappe entièrement à nos chiffres.</p>
+    </div>
+    <ul>
+      <li><b>Le travail en circonscription.</b> Permanences, dossiers locaux, présence
+        auprès des habitants&nbsp;: rien n'en est publié, donc rien n'en est mesuré.</li>
+      <li><b>Le travail en commission.</b> L'essentiel de l'examen des textes s'y déroule,
+        souvent sans vote nominatif public. Un député très actif en commission peut
+        paraître peu présent ici.</li>
+      <li><b>La qualité d'un vote.</b> Voter souvent ne veut pas dire voter bien. Ce site
+        compte des actes, il n'évalue aucune conviction.</li>
+      <li><b>L'influence réelle.</b> Négocier un compromis, faire retirer un amendement,
+        convaincre en réunion de groupe&nbsp;: ces actes décisifs ne laissent aucune trace
+        chiffrée.</li>
+      <li><b>Les {{PORTEE_DETAIL}} votes d'amendement</b> pèsent {{PART_DETAIL_PCT}}&nbsp;%
+        des scrutins et se tiennent souvent devant quelques dizaines de députés. Les
+        agréger tous revient à mesurer surtout de la tactique parlementaire&nbsp;: c'est
+        pourquoi nos mesures principales portent sur les {{PORTEE_TEXTE}} votes qui engagent.</li>
+    </ul>
+  </section>
+
+  <!-- ══ LES GROUPES ═══════════════════════════════════════════════ -->
+  <section class="cadre" style="padding-block: 56px">
+    <div class="lecture">
+      <p class="jalon">Vue d'ensemble</p>
+      <h2 class="section-titre">Les groupes de l'Assemblée</h2>
+      <p class="section-intro">Un groupe réunit au moins quinze députés. Il structure le
+        temps de parole, les postes et les consignes de vote. <b>La cohésion</b> mesure
+        l'accord moyen entre deux de ses membres&nbsp;: c'est la discipline réelle,
+        recalculée depuis les votes, pas depuis les consignes annoncées.</p>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tableau-groupes">
+        <thead>
+          <tr>
+            <th>Groupe</th>
+            <th>Députés</th>
+            <th>Cohésion</th>
+            <th class="repliable">Dissidence moyenne</th>
+            <th class="repliable">Position médiane</th>
+            <th class="repliable">Étendue interne</th>
+          </tr>
+        </thead>
+        <tbody>{{LIGNES_GROUPES}}</tbody>
+      </table>
+    </div>
+    <p class="note" style="font-size:14px;color:var(--encre-2);max-width:70ch;margin-top:20px;line-height:1.6">
+      L'<b>étendue interne</b> va du membre le plus à un bout de l'axe au plus à l'autre.
+      Ce n'est pas une marge d'erreur&nbsp;: c'est la dispersion réelle des positions
+      à l'intérieur du groupe. Plus elle est large, moins «&nbsp;un député de ce
+      groupe&nbsp;» veut dire quelque chose de précis.
+    </p>
+  </section>

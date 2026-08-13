@@ -1,0 +1,62 @@
+  <!-- ══ MESURE 3 — POSITION ═══════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Mesure 3 — position estimée</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{POS_VAL}}</div>
+        <p class="provenance valeur-note">
+          intervalle à 90&nbsp;% : <b>{{POS_BAS}}</b> à <b>{{POS_HAUT}}</b><br>
+          rang <b>{{POS_RANG}}</b> sur {{POS_CLASSES}} députés classés
+        </p>
+      </div>
+      <div>
+        <p class="enclair">{{POS_PHRASE}}</p>
+        <p class="enclair">{{POS_PHRASE_2}}</p>
+      </div>
+    </div>
+
+    <div class="bande" data-bande="positions"
+         data-valeur="{{POS_VAL_BRUT}}" data-bas="{{POS_BAS_BRUT}}" data-haut="{{POS_HAUT_BRUT}}"
+         data-etiquette="{{NOM_COURT}}" data-format="dec"></div>
+    <div class="legende-bande">
+      <span><i>Une barre = un député en exercice</i></span>
+      <span><i>Zone teintée = son intervalle de confiance</i></span>
+      <span><i>Trait pointillé = médiane de l'Assemblée</i></span>
+    </div>
+
+    <!-- On ne cite aucune étiquette qu'on ne pourrait pas sourcer : on oppose le
+         raccourci le plus répandu — « il pense comme son groupe » — à la mesure. -->
+    <div class="confrontation">
+      <div class="face">
+        <h3>Le raccourci habituel</h3>
+        <p class="dit">«&nbsp;Un député de {{GROUPE}}&nbsp;»</p>
+        <p class="parce">C'est ainsi qu'on le résume presque toujours&nbsp;: par son groupe,
+          donc par une position unique partagée avec ses {{GROUPE_AUTRES}} collègues.
+          Commode, et faux dans le détail — la médiane de {{GROUPE}} est à {{GROUPE_MEDIANE}},
+          mais ses membres s'étalent de {{GROUPE_MIN}} à {{GROUPE_MAX}}.</p>
+      </div>
+      <div class="face mesuree">
+        <h3>Ce que ses votes disent</h3>
+        <p class="dit">{{POS_VAL}}, entre {{POS_BAS}} et {{POS_HAUT}}</p>
+        <p class="parce">{{POS_ECART_GROUPE}} Position estimée à partir de ses
+          {{PART_ENG_N}} votes sur les textes qui engagent, par un modèle de vote à deux
+          paramètres, avec {{BOOTSTRAP}} rééchantillonnages pour en mesurer l'incertitude.</p>
+      </div>
+    </div>
+
+    <details class="piege">
+      <summary>Ce que cet axe n'est pas</summary>
+      <div class="dedans">
+        <p><b>Ce n'est pas un axe gauche-droite.</b> Personne ne l'a défini comme tel.
+          C'est l'axe qui explique le mieux les votes observés&nbsp;: le modèle cherche la
+          seule dimension qui permet de prédire au mieux qui vote quoi. Il se trouve qu'elle
+          ressemble au clivage gauche-droite — mais c'est un résultat, pas une hypothèse.</p>
+        <p><b>Une position n'est pas un point, c'est une zone.</b> Deux députés dont les
+          intervalles se recouvrent ne sont <b>pas classables</b> l'un par rapport à l'autre.
+          {{POS_INCERTITUDE}}</p>
+        <p><b>Le modèle est binaire.</b> Il prédit «&nbsp;pour&nbsp;» ou «&nbsp;contre&nbsp;»
+          et ne sait pas représenter l'abstention, qui porte pourtant de l'information&nbsp;:
+          consigne de groupe, position intermédiaire, arbitrage assumé.</p>
+      </div>
+    </details>
+  </section>

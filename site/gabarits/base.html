@@ -1,0 +1,56 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITRE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="statique/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.2' fill='none' stroke='%2333327A' stroke-width='1.4'/><circle cx='8' cy='8' r='1.9' fill='%2333327A'/></svg>">
+
+<header class="entete">
+  <div class="cadre">
+    <a class="marque" href="index.html">
+      <span class="m1">Radar</span><span class="m2">parlementaire</span>
+    </a>
+    <nav class="menu">
+      <a href="index.html"{{NAV_ACCUEIL}}>Comprendre</a>
+      <a href="deputes.html"{{NAV_DEPUTES}}>Les députés</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+{{CORPS}}
+</main>
+
+<div class="filet-fin"></div>
+<footer class="cadre pied">
+  <div class="grille">
+    <div>
+      <h4>Source</h4>
+      <p><a href="https://data.assemblee-nationale.fr">Open data de l'Assemblée nationale</a>,
+        Licence Ouverte 2.0.</p>
+      <p>Aucun chiffre n'est repris tel quel&nbsp;: tous sont recalculés depuis le
+        dépouillement nominatif.</p>
+    </div>
+    <div>
+      <h4>Périmètre</h4>
+      <p class="provenance">{{LEGISLATURE}}<sup>e</sup> législature<br>
+        {{DEBUT}} → {{FIN}}<br>
+        {{SCRUTINS}} scrutins · {{VOTES}} votes nominatifs</p>
+    </div>
+    <div>
+      <h4>Notre règle</h4>
+      <p>Aucune couleur ne désigne un groupe sur ce site. La couleur porte une grandeur
+        ou une emphase&nbsp;; l'identité passe par le texte.</p>
+      <p>Le radar signale des écarts à la normale. Il ne produit aucune interprétation
+        politique&nbsp;: la lecture reste au lecteur.</p>
+    </div>
+    <div>
+      <h4>Une erreur&nbsp;?</h4>
+      <p>Chaque chiffre est accompagné de son dénominateur pour pouvoir être recalculé.
+        Si l'un d'eux est faux, il doit être corrigé publiquement.</p>
+      <p class="provenance">Calculé le {{GENERE_LE}}</p>
+    </div>
+  </div>
+</footer>
+
+<script src="statique/radar.js"></script>
