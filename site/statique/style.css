@@ -153,41 +153,50 @@ a:hover { text-decoration-color: var(--accent); }
 }
 .entete .cadre {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 24px; height: 88px;
+  gap: 24px; height: 96px;
 }
-.marque { display: flex; align-items: center; gap: 13px; text-decoration: none; }
+.marque { display: flex; align-items: center; gap: 15px; text-decoration: none; }
 /* L'emblème du logo, découpé du fichier d'origine. Il occupait 28 px : à cette
    taille, le fronton, les colonnes et l'aiguille du cadran se confondaient en
    une tache, et la marque n'était plus lisible que par son texte. À 34 px les
    trois motifs se séparaient, mais l'ensemble — emblème et mot — pesait encore
    moins que le menu posé en face : sur une page de fiche, le premier élément
    que l'œil rencontrait était le nom du député, et le site n'était nulle part.
-   À 46 px avec le mot à l'avenant, la marque tient le coin sans écraser le
-   contenu. La source fait 256 px : l'agrandissement ne coûte aucune netteté,
-   y compris sur écran à haute densité.
+   À 46 px avec le mot à l'avenant, la marque tenait le coin — mais sur un écran
+   large, à 1140 px de cadre, elle restait plus discrète que les quatre entrées
+   de menu réunies, et le site continuait de s'annoncer moins fort que sa propre
+   navigation. À 58 px, avec « RADAR » à 19 px et « parlementaire » à 25 px, la
+   marque pèse enfin ce que pèse le menu d'en face, sans déborder sur lui.
+   La source fait 256 px : l'agrandissement ne coûte aucune netteté, y compris
+   sur écran à haute densité.
    `align-self: baseline` le poserait sur la ligne d'écriture, où il flotterait
    au-dessus du texte : il est centré, et un demi-pixel de descente l'aligne
    optiquement sur les capitales de « RADAR ». */
 .marque .embleme {
-  flex: none; width: 46px; height: 46px;
+  flex: none; width: 58px; height: 58px;
   transform: translateY(0.5px);
 }
 /* « RADAR » passe en pleine encre : à `--encre-2`, le mot reculait derrière les
    entrées de menu qui, elles, s'allument au survol. La marque doit être le seul
    élément de l'en-tête qui n'a pas besoin d'être survolé pour se voir. */
 .marque .m1 {
-  font-family: var(--mono); font-size: 16px; font-weight: 700;
+  font-family: var(--mono); font-size: 19px; font-weight: 700;
   letter-spacing: 0.2em; text-transform: uppercase; color: var(--encre);
 }
 .marque .m2 {
-  font-family: var(--serif); font-style: italic; font-size: 21px;
+  font-family: var(--serif); font-style: italic; font-size: 25px;
   color: var(--encre-2);
 }
+/* Sous 720 px le menu disparaît de l'en-tête : la marque n'a plus de voisin à
+   égaler, et la barre du bas prend le relais. Elle grandit donc moins que sur
+   écran large — assez pour rester la première chose lue, pas au point de manger
+   la hauteur d'écran d'un téléphone. */
 @media (max-width: 720px) {
-  .entete .cadre { height: 74px; }
-  .marque .embleme { width: 40px; height: 40px; }
-  .marque .m1 { font-size: 14px; }
-  .marque .m2 { font-size: 18px; }
+  .entete .cadre { height: 80px; }
+  .marque { gap: 13px; }
+  .marque .embleme { width: 48px; height: 48px; }
+  .marque .m1 { font-size: 16px; }
+  .marque .m2 { font-size: 20px; }
 }
 /* Le mot « parlementaire » ne disparaît plus qu'au tout dernier ressort : c'est
    lui qui dit de quel radar il s'agit, et l'emblème seul ne le dit à personne. */
@@ -195,6 +204,13 @@ a:hover { text-decoration-color: var(--accent); }
 .menu { display: flex; gap: 26px; font-size: 14.5px; }
 .menu a { text-decoration: none; color: var(--encre-2); padding: 4px 0; border-bottom: 1.5px solid transparent; }
 .menu a:hover { color: var(--encre); }
+/* La marque agrandie prend 50 px de plus qu'avant : sur une tablette en portrait
+   (768 px), « Les députés » et « Qui vote avec qui » passaient à la ligne et le
+   menu se cassait en deux étages. C'est le menu qui se resserre, pas la marque
+   qui rapetisse : quatre libellés à 13,5 px restent lisibles, une marque qu'on
+   ne remarque pas ne sert à rien. En dessous de 720 px, le menu disparaît de
+   toute façon au profit de la barre du bas. */
+@media (max-width: 1000px) { .menu { gap: 18px; font-size: 13.5px; } }
 .menu a[aria-current] { color: var(--encre); border-bottom-color: var(--accent); }
 @media (max-width: 720px) { .menu { display: none; } }
 
