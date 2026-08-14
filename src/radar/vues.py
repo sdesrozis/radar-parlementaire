@@ -55,6 +55,24 @@ MIN_COMMUNS = 30
 #: qui engagent écarterait des paires parfaitement mesurables.
 MIN_COMMUNS_TEXTE = 20
 
+#: Dénominateur minimal pour qu'un taux de présence entre dans la
+#: **distribution de comparaison** — la médiane, le maximum, les rangs et la
+#: bande des 577.
+#:
+#: Le taux d'un député dont le dénominateur est plus petit reste exact, reste
+#: publié, et garde son effectif à côté de lui. Ce qu'il ne peut pas faire, c'est
+#: servir de repère aux autres : la présidente de l'Assemblée, qui ne vote pas
+#: tant qu'elle préside, a exprimé 19 suffrages sur les 19 scrutins où elle
+#: n'était pas empêchée. Son taux de 100 % est juste, et il devenait « le député
+#: le plus assidu de la législature » — au-dessus de qui a voté 190 fois sur 245.
+#: Le maximum de la distribution était ainsi fixé par le plus petit dénominateur
+#: de l'Assemblée.
+#:
+#: La valeur est celle de `MIN_COMMUNS_TEXTE`, et ce n'est pas une coïncidence :
+#: c'est le nombre de scrutins qui engagent en deçà duquel ce projet considère
+#: déjà qu'un taux n'est pas mesuré. Une seule idée, un seul seuil.
+MIN_VOTABLES = MIN_COMMUNS_TEXTE
+
 #: Nombre de rééchantillonnages pour l'intervalle de confiance des positions.
 #:
 #: Il valait 40, avec pour justification que « au-delà, les bornes ne bougent
@@ -304,13 +322,14 @@ class Donnees:
         colonnes = [
             "acteur_uid", "nom_complet", "groupe", "groupe_libelle", "departement",
             "num_departement", "num_circo", "en_exercice", "participation",
-            "taux_dissidence", "part_abstention", "votes_exprimes", "axe1",
+            "taux_dissidence", "dissidence_basse", "dissidence_haute",
+            "votes_avec_ligne", "part_abstention", "votes_exprimes", "axe1",
             "borne_basse", "borne_haute", "age", "cat_socio_pro",
             # Servies ici pour que le site n'ait jamais à refaire la division :
             # le taux, son numérateur et son dénominateur voyagent ensemble.
             "participation_engageants", "votes_engageants",
             "engageants_eligibles", "engageants_votables",
-            "part_delegation_engageants",
+            "part_delegation_engageants", "participation_comparable",
         ]
         if self.avec_amendements:
             colonnes += ["amendements", "taux_adoption"]
@@ -345,13 +364,14 @@ class Donnees:
                         "scrutins_votables", "participation",
                         "part_pour", "part_contre", "part_abstention",
                         "votes_avec_ligne", "votes_dissidents", "taux_dissidence",
+                        "dissidence_basse", "dissidence_haute",
                         # Les quatre colonnes de la présence aux votes qui
                         # engagent : le numérateur, les deux retraits et le
                         # dénominateur réellement divisé. Le site n'en recalcule
                         # aucune — c'est ce qui garantit un seul chiffre.
                         "votes_engageants", "engageants_eligibles",
                         "engageants_structurels", "engageants_votables",
-                        "participation_engageants",
+                        "participation_engageants", "participation_comparable",
                         # Ce que « présence » recouvre : les suffrages émis au
                         # nom du député par un collègue mandaté. Comptés dans
                         # les numérateurs ci-dessus, servis à part pour être dits.
@@ -532,8 +552,8 @@ class Donnees:
         seconde permutation (`ordre_groupe`) est fournie pour comparer, mais elle
         est la vue de contrôle, pas la vue par défaut.
 
-        Le transport est compact parce que la matrice ne l'est pas : 577 députés
-        font 166 176 paires. On envoie le triangle supérieur strict, l'accord
+        Le transport est compact parce que la matrice ne l'est pas : les 574
+        députés retenus font 164 451 paires. On envoie le triangle supérieur strict, l'accord
         quantifié sur un octet et les scrutins communs sur deux, en base64 ; la
         page reconstruit. Pour la paire `(i, j)` avec `i < j`, l'indice est
         `i * n - i * (i + 1) // 2 + (j - i - 1)`.
@@ -544,6 +564,10 @@ class Donnees:
         """
         import base64
 
+        # L'ordre étant celui de l'axe estimé, un député sans position estimée
+        # n'a pas de place dans la matrice : trois députés en exercice sont dans
+        # ce cas, faute d'assez de votes qui engagent. `absents_de_la_carte` les
+        # compte pour que la page puisse le dire au lieu de les faire disparaître.
         candidats = self.deputes.filter(
             pl.col("en_exercice") & pl.col("axe1").is_not_null()
         ).select("acteur_uid", "nom_complet", "groupe", "axe1").sort("axe1")
@@ -615,6 +639,11 @@ class Donnees:
             {
                 "n": n,
                 "min_communs": min_communs,
+                "absents_de_la_carte": int(
+                    self.deputes.filter(
+                        pl.col("en_exercice") & pl.col("axe1").is_null()
+                    ).height
+                ),
                 "absent": 255,
                 "paires": int(a.size),
                 "mesurables": int(mesurable.sum()),
@@ -645,7 +674,7 @@ class Donnees:
     def matrice_groupes(self) -> dict:
         """La même mesure que `matrice_accords`, agrégée par groupe.
 
-        574 cases sont une forme ; 12 sur 12 sont un tableau qu'on lit. Les deux
+        164 451 cases sont une forme ; 12 sur 12 sont un tableau qu'on lit. Les deux
         disent la même chose, et la seconde est là pour que la première ne soit
         pas seulement jolie.
 
@@ -813,6 +842,50 @@ def _age(colonne: pl.Expr) -> pl.Expr:
     ).cast(pl.Int32, strict=False)
 
 
+#: Niveau des intervalles publiés — celui du bootstrap des positions. Un seul
+#: niveau sur tout le site : deux mesures accompagnées d'intervalles à des
+#: niveaux différents ne se comparent pas, et rien ne le signalerait au lecteur.
+NIVEAU = 0.90
+
+
+def _intervalle_proportion(k: np.ndarray, n: np.ndarray,
+                           niveau: float = NIVEAU) -> tuple[np.ndarray, np.ndarray]:
+    """Intervalle de Jeffreys sur une proportion `k / n`.
+
+    **Pourquoi il en faut un.** Le site refuse d'ordonner deux positions
+    estimées dont les intervalles se recouvrent, et publiait dans le même temps
+    un rang de dissidence sans réserve. C'était une asymétrie de rigueur sans
+    justification : un taux de dissidence est une proportion binomiale, son
+    incertitude se calcule, et elle est loin d'être négligeable — l'intervalle
+    fait environ un point pour un député médian, jusqu'à quatre pour les taux
+    élevés, de sorte qu'un rang recouvre en réalité des dizaines de positions
+    indiscernables.
+
+    **Pourquoi Jeffreys** plutôt que l'intervalle de Wald appris à l'école.
+    Wald — `p ± z√(p(1−p)/n)` — se dégrade exactement là où on en a besoin :
+    proche de 0, il descend sous zéro et affiche des bornes négatives, et son
+    taux de couverture réel s'effondre. Or la dissidence *est* proche de zéro
+    presque partout : la moitié des députés sont sous 3 %. Jeffreys est
+    l'intervalle bayésien de loi a priori Beta(½, ½) ; il reste dans [0, 1] par
+    construction, se comporte bien aux extrêmes, et vaut zéro exactement quand
+    aucun écart n'a été observé.
+    """
+    from scipy.stats import beta
+
+    k = np.asarray(k, dtype=float)
+    n = np.asarray(n, dtype=float)
+    q = (1 - niveau) / 2
+    with np.errstate(invalid="ignore"):
+        bas = beta.ppf(q, k + 0.5, n - k + 0.5)
+        haut = beta.ppf(1 - q, k + 0.5, n - k + 0.5)
+    # Un député sans aucun vote comparable n'a pas d'intervalle : il n'a pas
+    # non plus de taux, et une borne à 0 laisserait croire à une mesure.
+    vide = n <= 0
+    bas = np.where(vide, np.nan, np.clip(np.nan_to_num(bas, nan=0.0), 0.0, 1.0))
+    haut = np.where(vide, np.nan, np.clip(np.nan_to_num(haut, nan=1.0), 0.0, 1.0))
+    return bas, haut
+
+
 def _delegation(scrutins: pl.DataFrame, prefixe: str) -> pl.DataFrame:
     """Suffrages émis **par délégation**, sur l'assiette de scrutins donnée.
 
@@ -856,6 +929,15 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
         pl.col("votes_exprimes").alias("votes_avec_ligne"),
         "votes_dissidents",
         "taux_dissidence",
+    )
+    # Le taux de dissidence est une proportion : il est servi avec son
+    # intervalle, comme la position l'est avec le sien. Sans lui, la fiche
+    # publie un rang là où des dizaines de députés sont indiscernables.
+    bas, haut = _intervalle_proportion(
+        diss["votes_dissidents"].to_numpy(), diss["votes_avec_ligne"].to_numpy()
+    )
+    diss = diss.with_columns(
+        dissidence_basse=pl.Series(bas), dissidence_haute=pl.Series(haut)
     )
 
     exprime = (cube.exprime & cube.eligible).sum(axis=1).astype(np.float64)
@@ -905,6 +987,12 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
         .with_columns(
             pl.col("votes_delegues").fill_null(0),
             pl.col("engageants_delegues").fill_null(0),
+            # Le taux est-il assez assis pour servir de repère aux autres ?
+            # Cf. `MIN_VOTABLES` : en deçà, il reste publié mais sort de la
+            # médiane, du maximum, des rangs et de la bande.
+            (pl.col("engageants_votables") >= MIN_VOTABLES)
+            .fill_null(False)
+            .alias("participation_comparable"),
         )
         .with_columns(
             # La part est servie calculée : le site ne refait aucune division,

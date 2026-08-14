@@ -349,8 +349,8 @@ def comparer_portees(
     si le classement des proximités bouge.
 
     **Résultat** (17ᵉ législature, août 2026) : il bouge beaucoup, et de façon
-    monotone avec l'enjeu. LFI↔SOC tombe de 79 % à 60 %, RN↔DR monte de 67 % à
-    86 %. La part de variance captée par le premier axe passe de 24 % à 39 %,
+    monotone avec l'enjeu. LFI↔SOC tombe de 79 % à 63 %, RN↔DR monte de 67 % à
+    86 %. La part de variance captée par le premier axe passe de 24 % à 38 %,
     c'est-à-dire que le clivage politique devient bien plus lisible dès qu'on
     retire les amendements. Publier une proximité « tous scrutins confondus »
     revient donc à sous-estimer les divisions à gauche et la convergence à

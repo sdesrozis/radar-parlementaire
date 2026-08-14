@@ -136,6 +136,22 @@ def phrase_participation(a: dict, i: dict, dist: dict, rang_sup: int,
                 f"d'un texte, une motion de censure —")
     if restrictions:
         assiette += " " + " et ".join(restrictions)
+    # Un dénominateur trop petit ne se compare pas. Le taux reste affiché — il
+    # est exact — mais on ne le range pas parmi les autres : dire « au-dessus de
+    # la médiane » d'un taux mesuré sur quinze votes serait un classement fondé
+    # sur rien. Cf. `vues.MIN_VOTABLES`.
+    if not a.get("participation_comparable", True):
+        p1 = (f"{assiette}, {g['il']} en a exprimé "
+              f"<b>{num(a['votes_engageants'])}</b>.")
+        p2 = (f"<b>Ce taux ne se compare pas aux autres.</b> Il porte sur "
+              f"{num(votables)} scrutins seulement, quand la plupart des députés "
+              f"en ont {num(n_texte)} : une fonction — présider, entrer au "
+              f"Gouvernement — a réduit l'assiette au point qu'un rang n'aurait "
+              f"plus de sens. Le chiffre est exact, il n'est simplement pas un "
+              f"repère. C'est pourquoi cette page ne le situe pas dans "
+              f"l'Assemblée.")
+        return p1, p2
+
     p1 = (f"{assiette}, {g['il']} en a exprimé <b>{num(a['votes_engageants'])}</b>. {situation}")
 
     # L'argument « l'étalon n'est pas 100 % » repose sur le maximum observé. Il
@@ -161,7 +177,14 @@ def phrase_participation(a: dict, i: dict, dist: dict, rang_sup: int,
 
 
 def phrase_dissidence(a: dict, i: dict, dist: dict, au_dessus: int,
-                      groupe: dict | None) -> tuple[str, str]:
+                      groupe: dict | None, indiscernables: int = 0) -> tuple[str, str]:
+    """La mesure 2, avec la réserve que son rang appelle.
+
+    `indiscernables` est le nombre de députés dont l'intervalle recouvre le
+    sien. Le rang reste affiché — il situe —, mais il est immédiatement borné :
+    sur un taux mesuré à quelques centaines de votes, des dizaines de positions
+    voisines ne sont pas départageables, et un rang nu le laisserait ignorer.
+    """
     g = accords(i)
     if not a["votes_avec_ligne"] or a["taux_dissidence"] is None:
         return (f"Son groupe n'a eu de ligne identifiable sur aucun scrutin où {g['il']} a voté&nbsp;: "
@@ -172,6 +195,15 @@ def phrase_dissidence(a: dict, i: dict, dist: dict, au_dessus: int,
           f"{pct(dist['mediane'])}{NBSP}%{NBSP}: {g['il']} s'en écarte donc environ "
           f"<b>{dec(facteur, 1)} fois plus souvent</b> que le député médian, et "
           f"{combien(au_dessus, dist['n'], 'le fait davantage', 'le font davantage')}.")
+
+    if indiscernables and a.get("dissidence_basse") is not None:
+        p1 += (
+            f" Ce taux est mesuré, donc incertain&nbsp;: son intervalle à 90{NBSP}% va de "
+            f"<b>{pct(a['dissidence_basse'])}{NBSP}%</b> à <b>{pct(a['dissidence_haute'])}"
+            f"{NBSP}%</b>, et {num(indiscernables)} députés y ont un intervalle qui recouvre "
+            f"le sien. Le rang situe&nbsp;; il ne départage pas ces "
+            f"{num(indiscernables)}-là."
+        )
 
     # Le contexte du groupe renverse souvent la lecture : on le donne toujours.
     if groupe and groupe["dissidence_moyenne"] > a["taux_dissidence"]:
@@ -271,8 +303,13 @@ def phrase_these(f: dict, d_diss: dict, d_part: dict, rang_diss: int, rang_part:
     diss_mesurable = a["taux_dissidence"] is not None and bool(a["votes_avec_ligne"])
     ecart_diss = (a["taux_dissidence"] / d_diss["mediane"]
                   if diss_mesurable and d_diss["mediane"] else 1.0)
+    # Un taux de présence hors distribution ne peut pas fournir l'angle : il
+    # n'est comparable à rien, et l'écart à la médiane qu'on en tirerait serait
+    # un artefact de dénominateur. Il vaut 1 — neutre — pour que la dissidence
+    # l'emporte, et la dernière branche décrit alors l'assiette sans la classer.
     ecart_part = (a["participation_engageants"] / d_part["mediane"]
-                  if d_part["mediane"] else 1.0)
+                  if d_part["mediane"] and a.get("participation_comparable", True)
+                  else 1.0)
 
     def force(r: float) -> float:
         return max(r, 1 / r) if r > 0 else 99.0

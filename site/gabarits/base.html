@@ -28,13 +28,13 @@
 <meta property="og:title" content="{{TITRE}}">
 <meta property="og:description" content="{{DESCRIPTION}}">
 <meta property="og:url" content="{{CANONIQUE}}">
-<!-- Absolue, et pas `statique/logo.png` : le chemin relatif était résolu par le
-     navigateur mais pas par les robots qui fabriquent les aperçus de lien. Ils
-     lisent la balise hors de tout document et n'ont aucune base pour la
-     résoudre — l'aperçu partait donc sans image, sur les 581 pages. -->
-<!-- Une carte 1200×630 à fond plein, et non le PNG transparent de la marque :
-     une plateforme qui compose sa carte sur fond sombre ferait disparaître un
-     logo à encre foncée. Le fond est figé côté image. -->
+<!-- Deux exigences pour cette balise, apprises l'une après l'autre.
+     Absolue, et jamais relative : les robots qui fabriquent les aperçus lisent
+     la balise hors de tout document et n'ont aucune base pour résoudre un
+     chemin — l'aperçu partait sans image sur toutes les pages.
+     À fond plein, et non le PNG transparent de la marque : une plateforme qui
+     compose sa carte sur fond sombre ferait disparaître un logo à encre
+     foncée. Le fond est donc figé dans l'image. -->
 <meta property="og:image" content="{{BASE_URL}}/statique/partage-v2.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">

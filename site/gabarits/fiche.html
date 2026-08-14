@@ -53,13 +53,7 @@
       </div>
     </div>
 
-    <div class="bande" data-bande="participation"
-         data-valeur="{{PART_TOUS}}" data-etiquette="{{NOM_COURT}}"
-         data-format="pct"></div>
-    <div class="legende-bande">
-      <span><i>Une barre = un député en exercice</i></span>
-      <span><i>Trait pointillé = médiane de l'Assemblée</i></span>
-    </div>
+    {{PART_BANDE}}
 
     <details class="piege">
       <summary>Pourquoi le chiffre brut de « participation » est trompeur</summary>
@@ -89,7 +83,7 @@
       <div>
         <div class="valeur">{{DISS_PCT}}<span class="unite">%</span></div>
         <p class="provenance valeur-note">
-          <b>{{DISS_N}}</b> votes contre la ligne<br>sur <b>{{DISS_DENOM}}</b> où son groupe en avait une
+          <b>{{DISS_N}}</b> votes contre la ligne<br>sur <b>{{DISS_DENOM}}</b> où son groupe en avait une{{DISS_IC}}
         </p>
       </div>
       <div>

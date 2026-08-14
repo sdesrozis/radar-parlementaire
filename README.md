@@ -431,9 +431,12 @@ n'autorisent simplement pas les mêmes affirmations. Détail dans
 s'abstenir est un luxe d'opposition et de groupe charnière, pas une hésitation
 répartie au hasard.
 
-- **80 % des abstentions suivent une consigne de groupe** — c'est un instrument
-  collectif, pas un flottement individuel. Et une consigne d'abstention est
-  moins suivie qu'une consigne de vote : 88 % contre 96 %.
+- **72 % des abstentions suivent une consigne de groupe** — c'est un instrument
+  collectif, pas un flottement individuel. 18 % sont des retraits individuels, et
+  les 10 % restants sont indéterminés : le groupe n'avait ce jour-là aucune ligne,
+  et il n'y a donc ni consigne à suivre ni consigne à quitter. Les trois parts
+  somment à 1. Et une consigne d'abstention est moins suivie qu'une consigne de
+  vote : 88 % contre 96 %.
 - **Elle est intermédiaire dans 71 % des scrutins.** Replacés sur l'axe des
   points idéaux estimé *sans eux*, les abstentionnistes tombent entre les deux
   camps, à mi-chemin en médiane.
@@ -512,7 +515,7 @@ ses archives plusieurs fois par jour, on ne retélécharge que ce qui a changé.
 | [`02_portee_des_scrutins`](notebooks/02_portee_des_scrutins.ipynb) | Tous les votes ne se valent pas. L'accord LFI↔SOC passe de 79 % à 63 % selon l'enjeu du scrutin, RN↔DR de 67 % à 86 %. Avec contre-épreuve sur la taille d'échantillon. |
 | [`03_reseau_de_cosignatures`](notebooks/03_reseau_de_cosignatures.ipynb) | Voter ensemble n'est pas travailler ensemble. LFI et ECOS votent à 88 % et échangent 0,3 % de leurs cosignatures ; DR et UDDPLR votent à 74 % avec zéro amendement commun. |
 | [`04_points_ideaux`](notebooks/04_points_ideaux.ipynb) | Décrire ou modéliser. Ce qu'un modèle permet d'affirmer que l'ACP ne permet pas : incertitude, lecture des scrutins, test de dimensionnalité. Deux dimensions se justifient, trois non. |
-| [`05_abstention`](notebooks/05_abstention.ipynb) | Ce qu'on avait écarté. L'abstention est une consigne de groupe dans 80 % des cas, une position intermédiaire dans 71 % des scrutins — et elle a tenu l'issue de dix votes sur l'ensemble d'un texte. |
+| [`05_abstention`](notebooks/05_abstention.ipynb) | Ce qu'on avait écarté. L'abstention est une consigne de groupe dans 72 % des cas, une position intermédiaire dans 71 % des scrutins — et elle a tenu l'issue de dix votes sur l'ensemble d'un texte. |
 
 Les notebooks 02 à 05 forment une suite : chacun montre qu'une réponse
 apparemment solide reposait sur un **choix invisible** — la population de

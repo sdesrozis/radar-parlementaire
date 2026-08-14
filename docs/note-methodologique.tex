@@ -693,6 +693,28 @@ lequel des deux répond à sa question.}
 ou de moins déplace le taux de cinq points. Le dénominateur sert à lire le taux,
 pas seulement à le justifier.}
 
+\subsubsection*{Publier un taux et le comparer sont deux choses}
+
+De cette instabilité découle une règle qui n'est pas une exclusion. Un taux dont
+le dénominateur est inférieur à un seuil $D_{\min}$ — fixé à 20, le même nombre
+qu'exige déjà un taux d'accord sur les votes qui engagent — reste calculé,
+reste publié, et reste accompagné de son effectif. Ce qu'il ne fait plus, c'est
+entrer dans la \emph{distribution de comparaison} : la médiane, le maximum, les
+rangs et la représentation graphique de la population.
+
+La raison est arithmétique. Ces quantités servent de repère à tous les autres
+députés, et un taux mesuré sur quelques scrutins les fixe sans les mériter. Le
+cas s'est produit : la présidente de l'Assemblée, qui ne vote pas tant qu'elle
+préside, a exprimé un suffrage à chacun des dix-neuf scrutins où elle n'était
+pas empêchée. Son taux de 100~\% est exact, et il devenait « le député le plus
+assidu de la législature », au-dessus de qui a voté 190 fois sur 245. Le maximum
+de l'Assemblée était fixé par son plus petit dénominateur.
+
+\important{Écarter un taux d'une comparaison n'est pas le juger faible. C'est
+reconnaître qu'il ne répond pas à la même question que les autres, faute de
+porter sur la même assiette. La fiche concernée l'écrit explicitement plutôt que
+d'afficher un rang que rien ne fonde.}
+
 Le taux mesure la participation aux scrutins publics, et rien d'autre : ni la
 présence en commission, ni le travail en circonscription, ni les interventions
 en séance sans vote.
@@ -769,6 +791,7 @@ votes ne sont pas dix infractions à une ligne : ils révèlent qu'aucune positi
 ne domine. Le scrutin est classé \emph{groupe partagé}, pas \emph{fracture}.
 
 \subsection{Taux de dissidence}
+\label{sec:dissidence}
 
 Sur les seuls votes $\mathcal L_i$ où une ligne nette existe pour le groupe de
 $i$, la dissidence est
@@ -781,6 +804,27 @@ Une personne avec trop peu de votes comparables est écartée du classement
 (minimum de 50 par défaut). Cette mesure décrit un écart à la majorité
 \emph{observée} du groupe : elle ne prouve ni une opposition idéologique ni une
 désobéissance à une consigne privée.
+
+\subsubsection*{L'incertitude du taux}
+
+Ce taux est une proportion estimée sur un nombre fini de votes : il a une marge,
+et elle se calcule. Le projet publie l'intervalle de Jeffreys au niveau
+$1-\gamma$, c'est-à-dire les quantiles de la loi
+$\mathrm{Beta}(k+\tfrac12,\;|\mathcal L_i|-k+\tfrac12)$ où $k$ est le nombre de
+votes dissidents.
+
+Le choix de Jeffreys plutôt que de l'intervalle de Wald usuel
+$\hat p\pm z\sqrt{\hat p(1-\hat p)/n}$ n'est pas indifférent ici. Wald se
+dégrade précisément là où se trouve la majorité des députés : proche de zéro, il
+produit des bornes négatives et son taux de couverture réel s'effondre. Or la
+moitié de l'Assemblée est sous 3~\% de dissidence. L'intervalle de Jeffreys
+reste dans $[0,1]$ par construction et se comporte correctement aux extrêmes.
+
+\important{L'ordre de grandeur importe plus que la formule : l'intervalle fait
+environ un point pour un député médian et jusqu'à quatre points pour les taux
+élevés. Un rang de dissidence recouvre donc, en pratique, plusieurs dizaines de
+positions que les données ne départagent pas. Le site publie le rang \emph{et}
+le nombre de députés dont l'intervalle recouvre celui du député consulté.}
 
 \subsection{Scrutins serrés et scrutins clivants}
 
@@ -1388,19 +1432,14 @@ le classement déplace le député médian de quelques rangs, et bien davantage 
 qui délèguent souvent. Publier les deux versions, ou au moins cette sensibilité,
 reste à faire.
 
-\textbf{Deux mesures sur trois sont publiées sans intervalle.} La position
-latente est accompagnée de son intervalle de bootstrap
-(section~\ref{sec:bootstrap}), et le site refuse d'ordonner deux députés dont
-les intervalles se recouvrent. La participation et la dissidence, elles, sont
-des proportions binomiales : elles ont un intervalle calculable, et il n'est
-aujourd'hui ni calculé ni affiché. Un intervalle de Jeffreys à 90~\% sur le taux
-de dissidence fait environ un point de large pour un député médian, et jusqu'à
-quatre points pour ceux dont le taux est élevé — de sorte qu'un rang publié
-sans réserve recouvre en réalité plusieurs dizaines de positions
-indiscernables. C'est une asymétrie de rigueur entre indicateurs, et elle n'a
-pas de justification méthodologique : le site refuse d'ordonner deux positions
-latentes qui se recouvrent, et ordonne sans réserve deux taux de dissidence qui
-se recouvrent tout autant.
+\textbf{La participation reste publiée sans intervalle.} La position latente est
+accompagnée de son intervalle de bootstrap (section~\ref{sec:bootstrap}) et la
+dissidence du sien (section~\ref{sec:dissidence}) ; le taux de présence, lui,
+est encore un point nu. C'est aussi une proportion, son intervalle se calcule de
+la même façon, et rien ne justifie l'asymétrie sinon qu'elle n'a pas encore été
+levée. La lacune est plus étroite qu'elle n'y paraît — le dénominateur vaut 245
+pour les trois quarts des députés, ce qui donne des intervalles serrés — mais
+elle est réelle pour les élus arrivés en cours de législature.
 
 \textbf{La cosignature n'est pas la collaboration.} Signer un amendement est un
 acte peu coûteux, parfois collectif par défaut au sein d'un groupe. Le réseau

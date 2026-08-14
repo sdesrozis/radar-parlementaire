@@ -439,8 +439,16 @@ class Site:
 
         pe = participation_engageants(self.tous)
         self.pe = pe
-        uids = {d["acteur_uid"] for d in self.deputes}
-        self.d_part = distribution([p["taux"] for u, p in pe.items() if u in uids])
+        # La distribution de comparaison — médiane, maximum, rangs, bande des
+        # 577 — ne retient que les taux assis sur assez de scrutins. Sans ce
+        # filtre, le maximum de l'Assemblée était fixé par le plus petit
+        # dénominateur : 19 votes sur 19 pour la présidente, qui ne vote pas
+        # tant qu'elle préside. Cf. `vues.MIN_VOTABLES`.
+        comparables = {
+            d["acteur_uid"] for d in self.deputes
+            if d.get("participation_comparable")
+        }
+        self.d_part = distribution([p["taux"] for u, p in pe.items() if u in comparables])
         self.d_diss = distribution(
             [d["taux_dissidence"] for d in self.deputes if d["taux_dissidence"] is not None])
         self.d_pos = distribution(
@@ -711,7 +719,18 @@ class Site:
             f, self.d_diss, self.d_part, rang_diss, rang_part, groupe,
             self.apercu["groupes"], self.n_texte)
         part1, part2 = phrase_participation(a, i, self.d_part, rang_part, self.n_texte)
-        diss1, diss2 = phrase_dissidence(a, i, self.d_diss, rang_diss, groupe)
+        # Le pendant, pour la dissidence, du recouvrement calculé plus haut sur
+        # les positions : combien de députés ce rang ne départage pas.
+        indiscernables = 0
+        if a.get("dissidence_basse") is not None:
+            indiscernables = sum(
+                1 for d in self.deputes
+                if d.get("dissidence_basse") is not None
+                and d["dissidence_haute"] >= a["dissidence_basse"]
+                and d["dissidence_basse"] <= a["dissidence_haute"]
+                and d["acteur_uid"] != uid)
+        diss1, diss2 = phrase_dissidence(
+            a, i, self.d_diss, rang_diss, groupe, indiscernables)
         ec1, ec2 = phrase_ecart(f, communs)
 
         # On surligne dans les deux colonnes le binôme de tête des votes qui engagent :
@@ -763,6 +782,22 @@ class Site:
             "PART_DELEGATION_PHRASE": phrase_delegation(
                 a.get("engageants_delegues") or 0, exprimes,
                 self.mediane_delegation),
+            # La bande situe un député dans la population. Elle n'a donc rien à
+            # dessiner quand le taux ne s'y compare pas : le losange irait se
+            # poser hors de l'étendue des barres et étirerait l'échelle des 577
+            # pour loger un chiffre calculé sur quinze votes.
+            "PART_BANDE": (
+                f'<div class="bande" data-bande="participation"\n'
+                f'         data-valeur="{taux:.4f}" data-etiquette="{echapper(i["nom"])}"\n'
+                f'         data-format="pct"></div>\n'
+                f'    <div class="legende-bande">\n'
+                f'      <span><i>Une barre = un député en exercice</i></span>\n'
+                f'      <span><i>Trait pointillé = médiane de l\'Assemblée</i></span>\n'
+                f'    </div>'
+                if a.get("participation_comparable") else
+                '<p class="provenance">Pas de comparaison à la population&nbsp;: '
+                'le dénominateur est trop petit pour situer ce taux parmi les autres.</p>'
+            ),
             "PART_TOUS": f"{taux:.4f}",
             "PART_TOUS_PCT": pct(a["participation"] or 0),
             "PART_PHRASE": part1,
@@ -772,6 +807,14 @@ class Site:
             "DISS_N": num(a["votes_dissidents"] or 0),
             "DISS_DENOM": num(a["votes_avec_ligne"] or 0),
             "DISS_VAL": f"{a['taux_dissidence'] or 0:.4f}",
+            # L'intervalle est affiché sous le taux, dans la même colonne de
+            # provenance que le dénominateur : c'est là qu'on lit ce que le
+            # chiffre vaut, pas dans une note de bas de page.
+            "DISS_IC": (
+                "" if a.get("dissidence_basse") is None else
+                f"<br>intervalle à 90{NBSP}%&nbsp;: {pct(a['dissidence_basse'])}"
+                f"{NBSP}% à {pct(a['dissidence_haute'])}{NBSP}%"
+            ),
             "DISS_PHRASE": diss1,
             "DISS_PHRASE_2": diss2,
 
