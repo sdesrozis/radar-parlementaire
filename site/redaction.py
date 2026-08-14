@@ -132,8 +132,10 @@ def phrase_participation(a: dict, i: dict, dist: dict, rang_sup: int,
         restrictions.append("tenus depuis son entrée en fonction")
     if a["engageants_eligibles"] > votables:
         restrictions.append(f"auxquels {g['il']} pouvait prendre part")
-    assiette = (f"Sur les {num(votables)} votes qui engagent réellement — l'ensemble "
-                f"d'un texte, une motion de censure —")
+    # Parenthèses et non tirets : l'incise est suivie de la virgule de la phrase
+    # principale, et un tiret fermant collé à une virgule (« —, ») accroche l'œil.
+    assiette = (f"Sur les {num(votables)} votes qui engagent réellement (l'ensemble "
+                f"d'un texte, une motion de censure)")
     if restrictions:
         assiette += " " + " et ".join(restrictions)
     # Un dénominateur trop petit ne se compare pas. Le taux reste affiché — il
