@@ -1208,11 +1208,25 @@ l'issue sous ce scénario arithmétique.
 \subsection{Volumes et adoption}
 
 Pour un député ou un groupe, le projet compte les amendements dont l'auteur est
-identifié, puis calcule :
+identifié. La source publie pour chacun un \emph{sort} — adopté, rejeté, tombé,
+retiré, non soutenu — ou rien du tout lorsque le texte n'a pas encore été
+discuté. En notant $A$ l'ensemble des amendements déposés par l'auteur et
+$A_{\mathrm{ex}}\subseteq A$ ceux dont la source publie un sort :
 \[
- \mathrm{taux\ d'adoption}=\frac{\#\{\text{amendements adoptés}\}}
- {\#\{\text{amendements déposés}\}}.
+ \mathrm{taux\ d'adoption}=\frac{\#\{a\in A_{\mathrm{ex}} : \text{sort}(a)=\text{adopté}\}}
+ {\#A_{\mathrm{ex}}},
+ \qquad \text{indéfini si } A_{\mathrm{ex}}=\varnothing .
 \]
+
+\textbf{Le dénominateur est l'examen, pas le dépôt}, et l'écart n'est pas
+marginal : sur la 17\textsuperscript{e} législature, 54~485 des 123~224
+amendements enregistrés n'ont pas de sort publié, soit 44~\%. Diviser par les
+dépôts revient à compter comme des échecs des amendements dont l'Assemblée n'a
+rien dit ; le taux d'un député baisserait alors à chaque nouveau dépôt sur un
+texte en cours de navette, sans qu'aucun vote ait eu lieu. Le nombre
+d'amendements en attente est publié à côté du taux, pour que la différence
+entre $\#A$ et $\#A_{\mathrm{ex}}$ reste lisible.
+
 Ce taux est descriptif : l'adoption dépend notamment de la recevabilité, de la
 procédure, de la majorité, du sujet et du statut de l'auteur. Comparer seulement
 des taux sans le volume de dépôts serait trompeur.

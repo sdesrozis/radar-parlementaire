@@ -39,25 +39,32 @@ import polars as pl
 from radar.vues import BOOTSTRAP, MIN_COMMUNS, Donnees
 from redaction import (
     NBSP,
+    STATUTS,
     accords,
     combien,
     dec,
     echapper,
+    grand_chiffre,
     jour,
     mention_delegation,
     num,
     ordinal,
     pct,
+    phrase_amendements,
     phrase_carte,
     phrase_delegation,
+    phrase_delegation_assemblee,
     phrase_dissidence,
     phrase_ecart,
     phrase_ecart_groupe,
     phrase_incertitude,
+    phrase_journal,
     phrase_participation,
     phrase_portee,
     phrase_position,
     phrase_these,
+    provenance_amendements,
+    provenance_delegation,
     reserve_denominateur,
     situer,
 )
@@ -77,6 +84,11 @@ def slug(*morceaux: str | int | None) -> str:
     texte = "".join(c for c in texte if not unicodedata.combining(c))
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", texte)).strip("-")
 
+
+# L'indicateur ordinal masculin. « n° » avec le signe degré est un abus courant
+# et rendu de travers en chasse fixe ; un `<sup>` se détache de son « n » dans
+# une ligne à fort interlettrage. Le caractère dédié règle les deux.
+ORDINAL_MASC = "º"
 
 ICI = Path(__file__).parent
 GABARITS = ICI / "gabarits"
@@ -180,6 +192,163 @@ def rangs_html(voisins: list[dict], adresse: dict[str, str],
             f"</div>"
         )
     return "\n        ".join(lignes)
+
+
+def journal_html(votes: list[dict]) -> str:
+    """Le relevé des votes qui engagent, une ligne par scrutin.
+
+    Écrit dans la page et non chargé par un script : c'est la pièce qui rend
+    les taux opposables, et elle doit rester lisible sans JavaScript, indexable
+    par un moteur et copiable dans un tableur. Le filtre, lui, est un confort —
+    il masque des lignes déjà présentes, il n'en fabrique aucune.
+
+    Les classes portent le statut : le filtre est un simple sélecteur CSS, et
+    aucun compte n'est refait côté navigateur.
+
+    Le balisage est réduit au strict nécessaire — `<time>`, `<p>`, `<small>`,
+    `<b>` stylés par sélecteur d'élément plutôt que quatre `class` par ligne.
+    Ce n'est pas de la coquetterie : la liste pèse 245 lignes sur chacune des
+    577 fiches, et chaque attribut économisé vaut une centaine de kilo-octets
+    à l'échelle du site.
+    """
+    libelles = dict(STATUTS)
+    lignes = []
+    for v in votes:
+        classes = [v["statut"]]
+        marques = []
+        if v.get("par_delegation"):
+            classes.append("delegue")
+            marques.append("<i>par délégation</i>")
+        if v.get("dissident"):
+            classes.append("ecart")
+            marques.append('<i class="hors">écart à la ligne</i>')
+        resultat = (v.get("sort_code") or "").capitalize()
+        lignes.append(
+            f'<li class="{" ".join(classes)}">'
+            f'<time datetime="{v["date"]}">{jour(v["date"])}</time>'
+            f'<p>{echapper(v["titre"])}'
+            f'<small>Scrutin n{ORDINAL_MASC}&nbsp;{num(v["numero"])}'
+            f' · {echapper(resultat)} par {num(v["n_pour"])} voix contre '
+            f'{num(v["n_contre"])}{"".join(marques)}</small></p>'
+            f'<b>{libelles[v["statut"]]}</b>'
+            f"</li>"
+        )
+    return "\n      ".join(lignes)
+
+
+def bilan_html(bilan: list[dict]) -> str:
+    """L'activité en un coup d'œil : trois assiettes, une ligne chacune.
+
+    Le site publie deux présences, à deux endroits, avec deux dénominateurs.
+    Les rapprocher demandait de tenir deux pages en mémoire ; elles sont ici
+    dans le même tableau, avec ce qui les sépare — combien de scrutins, combien
+    de suffrages, quelle part déléguée.
+
+    La ligne « tous les scrutins » est mise en avant comme une somme, pas comme
+    une mesure : c'est la moins intéressante des trois, puisque les amendements
+    y décident du résultat par leur nombre. Elle est là parce qu'elle est celle
+    que le lecteur va chercher ailleurs, et qu'il vaut mieux la lui donner avec
+    sa réserve que le laisser la trouver sans.
+    """
+    libelles = {
+        "engageants": ("Votes qui engagent",
+                       "ensemble d'un texte, motion de censure"),
+        "autres": ("Autres scrutins",
+                   "amendements, articles, motions de procédure"),
+        "tous": ("Tous les scrutins", "la somme des deux lignes ci-dessus"),
+    }
+    lignes = []
+    for r in bilan:
+        titre, glose = libelles[r["assiette"]]
+        taux = f"{pct(r['taux'])}{NBSP}%" if r["taux"] is not None else "—"
+        classe = ' class="somme"' if r["assiette"] == "tous" else ""
+        lignes.append(
+            f"<tr{classe}>"
+            f'<td><b>{titre}</b><span class="plein">{glose}</span></td>'
+            f'<td class="mono">{num(r["votables"])}</td>'
+            f'<td class="mono">{num(r["exprimes"])}</td>'
+            f'<td class="mono">{num(r["delegues"])}</td>'
+            f'<td class="mono">{taux}</td>'
+            f"</tr>"
+        )
+    return "\n          ".join(lignes)
+
+
+def filtres_html(resume: dict) -> str:
+    """Les boutons du relevé, chacun avec son effectif.
+
+    Ils portent les comptes, et c'est leur seconde raison d'être : la ligne
+    « 118 pour · 44 contre · 12 abstentions » est le résumé du relevé, et elle
+    est ici garantie d'être celle des lignes affichées en dessous, puisque les
+    deux viennent du même dictionnaire.
+
+    Un statut à zéro n'a pas de bouton : proposer un filtre qui ne donnerait
+    rien est une impasse offerte au lecteur.
+    """
+    boutons = [
+        '<button type="button" data-filtre="tous" aria-pressed="true">'
+        f'Tous<span class="compte mono">{num(resume["total"])}</span></button>'
+    ]
+    for cle, libelle in STATUTS:
+        if resume.get(cle):
+            boutons.append(
+                f'<button type="button" data-filtre="{cle}" aria-pressed="false">'
+                f'{libelle}<span class="compte mono">{num(resume[cle])}</span></button>'
+            )
+    for cle, libelle in (("delegue", "Par délégation"), ("ecart", "Écart à la ligne")):
+        n = resume["delegues"] if cle == "delegue" else resume["dissidents"]
+        if n:
+            boutons.append(
+                f'<button type="button" data-filtre="{cle}" aria-pressed="false">'
+                f'{libelle}<span class="compte mono">{num(n)}</span></button>'
+            )
+    return "\n      ".join(boutons)
+
+
+def sorts_html(am: dict) -> str:
+    """La ventilation des sorts d'un dépôt d'amendements.
+
+    Le compte de dépôts seul ne dit rien : mille amendements tombés à
+    l'irrecevabilité et mille amendements adoptés sont le même nombre. Les six
+    états sont donc affichés ensemble, avec leur somme, qui doit retomber sur le
+    nombre de dépôts — c'est le contrôle que le lecteur peut faire de tête.
+    """
+    etats = (
+        ("adoptes", "Adoptés"),
+        ("rejetes", "Rejetés"),
+        ("tombes", "Tombés"),
+        ("retires", "Retirés"),
+        ("non_soutenus", "Non soutenus"),
+    )
+    cases = [
+        f'<div class="sort"><span class="sort-n mono">{num(am.get(cle) or 0)}</span>'
+        f'<span class="sort-nom">{libelle}</span></div>'
+        for cle, libelle in etats
+    ]
+    restant = (am.get("deposes") or 0) - (am.get("examines") or 0)
+    cases.append(
+        f'<div class="sort sort-attente"><span class="sort-n mono">{num(restant)}</span>'
+        f'<span class="sort-nom">Pas encore examinés</span></div>'
+    )
+    return '<div class="sorts">\n      ' + "\n      ".join(cases) + "\n    </div>"
+
+
+def lignes_delegation_html(groupes: list[dict]) -> str:
+    """Le tableau de la délégation par groupe, du plus au moins délégataire."""
+    mesures = [g for g in groupes if g.get("part_delegation") is not None]
+    lignes = []
+    for g in sorted(mesures, key=lambda x: -x["part_delegation"]):
+        lignes.append(
+            f"<tr>"
+            f'<td><span class="sigle">{echapper(g["groupe"])}</span>'
+            f'<span class="plein">{echapper(g["groupe_libelle"] or "")}</span></td>'
+            f'<td class="mono">{num(g["effectif_actuel"])}</td>'
+            f'<td class="mono">{pct(g["part_delegation"])}{NBSP}%</td>'
+            f'<td class="mono">{num(g["delegues_groupe"])} / '
+            f'{num(g["engageants_groupe"])}</td>'
+            f"</tr>"
+        )
+    return "\n          ".join(lignes)
 
 
 def redirection(vers: str) -> str:
@@ -453,17 +622,38 @@ class Site:
             [d["taux_dissidence"] for d in self.deputes if d["taux_dissidence"] is not None])
         self.d_pos = distribution(
             [d["axe1"] for d in self.deputes if d["axe1"] is not None])
-        # Médiane de la part déléguée sur les votes qui engagent. Elle sert de
-        # repère : sans elle, « 30 % de ses votes sont délégués » se lit comme
-        # une anomalie alors que c'est la pratique courante de l'Assemblée.
-        parts_deleg = [
+        # La part déléguée sur les votes qui engagent, distribuée comme les
+        # autres mesures. Sans ce repère, « 30 % de ses votes sont délégués » se
+        # lit comme une anomalie alors que c'est la pratique courante de
+        # l'Assemblée. Le filtre est celui de la présence : un taux assis sur
+        # quinze suffrages ne fixe pas le maximum des 577.
+        self.d_deleg = distribution([
             d["part_delegation_engageants"] for d in self.deputes
             if d.get("part_delegation_engageants") is not None
-        ]
-        self.mediane_delegation = (
-            distribution(parts_deleg)["mediane"] if parts_deleg else 0.0)
+            and d.get("participation_comparable")
+        ])
+        # Les dépôts d'amendements. La distribution est très dissymétrique — la
+        # médiane est à quelques dizaines, le maximum à plusieurs milliers — et
+        # c'est précisément ce que la bande doit montrer : le compte de dépôts
+        # n'est pas une mesure d'effort, il est une mesure de pratique de séance.
+        #
+        # Ici, et ici seulement, une case vide vaut zéro. La règle du site est
+        # l'inverse — une absence n'est pas un zéro — mais elle vise les trous
+        # de la source. Le fichier des amendements, lui, est complet : n'y
+        # figurer comme auteur d'aucun amendement, c'est n'en avoir déposé
+        # aucun. Écarter ces seize députés de la distribution reviendrait à
+        # calculer la médiane de l'Assemblée sur les seuls déposants.
+        self.d_amd = distribution([
+            d.get("amendements") or 0 for d in self.deputes
+        ]) if self.apercu["avec_amendements"] else None
         self.donnees_json = json.dumps(
-            {"participation": self.d_part, "dissidence": self.d_diss, "positions": self.d_pos},
+            {
+                "participation": self.d_part,
+                "dissidence": self.d_diss,
+                "positions": self.d_pos,
+                "delegation": self.d_deleg,
+                **({"amendements": self.d_amd} if self.d_amd else {}),
+            },
             ensure_ascii=False, separators=(",", ":"))
 
         self.groupes_tries = sorted(
@@ -590,6 +780,12 @@ class Site:
         entetes, lignes_groupes, ecart_conventions = self.matrice_groupes_html()
         textes = phrase_carte(m, m["groupes"])
 
+        # La délégation appartient à cette page autant qu'aux fiches : un taux
+        # d'accord compte des suffrages imputés, et près d'un quart d'entre eux
+        # ont été déposés par quelqu'un d'autre.
+        deleg = self.apercu["delegation"]
+        deleg1, deleg2 = phrase_delegation_assemblee(deleg, self.apercu["groupes"])
+
         # La paire la plus élevée sert d'exemple chiffré dans le bloc « piège » :
         # elle est déjà calculée, on ne la réinvente pas.
         exemple_haut = pct(m["paire_haute"]["accord"], 0)
@@ -610,6 +806,12 @@ class Site:
                 "ENTETES_GROUPES": entetes,
                 "LIGNES_MATRICE_GROUPES": lignes_groupes,
                 "ECART_CONVENTIONS": ecart_conventions,
+                "DELEG_ASSEMBLEE_PCT": pct(deleg["engageants"]["part"]),
+                "DELEG_ASSEMBLEE_N": num(deleg["engageants"]["delegues"]),
+                "DELEG_ASSEMBLEE_DENOM": num(deleg["engageants"]["exprimes"]),
+                "DELEG_ASSEMBLEE_PHRASE": deleg1,
+                "DELEG_ASSEMBLEE_PHRASE_2": deleg2,
+                "LIGNES_DELEGATION": lignes_delegation_html(self.apercu["groupes"]),
                 "CARTE_JSON": json.dumps(m, ensure_ascii=False, separators=(",", ":")),
             },
             titre="Qui vote avec qui ? — Radar parlementaire",
@@ -733,6 +935,23 @@ class Site:
             a, i, self.d_diss, rang_diss, groupe, indiscernables)
         ec1, ec2 = phrase_ecart(f, communs)
 
+        # La délégation : le taux vient de `vues.py`, jamais d'une division
+        # refaite ici. Un député sans suffrage exprimé n'en a pas, et la bande
+        # ne le situe pas — comme pour la présence, une case vide vaut mieux
+        # qu'un zéro qui affirmerait une mesure.
+        part_deleg = a.get("part_delegation_engageants")
+        rang_deleg = rang_parmi(self.d_deleg["valeurs"], part_deleg or 0)
+        deleg1, deleg2 = phrase_delegation(a, i, self.d_deleg, rang_deleg, groupe)
+
+        journal = self.donnees.votes_engageants(uid)
+        jour1, jour2 = phrase_journal(journal["resume"], i)
+
+        am = f["amendements"] or {}
+        rang_amd = rang_parmi(self.d_amd["valeurs"], am.get("deposes") or 0) if self.d_amd else 0
+        amd1, amd2 = (
+            phrase_amendements(am, i, self.d_amd, rang_amd, groupe)
+            if self.d_amd else ("", ""))
+
         # On surligne dans les deux colonnes le binôme de tête des votes qui engagent :
         # c'est lui qui rend l'écart entre les deux assiettes visible d'un coup d'œil.
         pt = f["proches"]["texte"]
@@ -746,7 +965,16 @@ class Site:
         identite = (identite + ", " if identite else "") + \
             f"député depuis le {jour(i['mandat_debut'])}."
 
-        corps = (GABARITS / "fiche.html").read_text().replace("{{BLOC_POSITION}}", bloc)
+        # Le bloc des amendements disparaît si la table n'a pas été construite —
+        # elle pèse 300 Mo au téléchargement, et un site généré sans elle reste
+        # un site. Ce qui ne se ferait pas : afficher la section avec des tirets,
+        # qui ferait lire « zéro amendement » à une absence de données.
+        bloc_amd = (GABARITS / "bloc-amendements.html").read_text() if self.d_amd else ""
+        corps = (
+            (GABARITS / "fiche.html").read_text()
+            .replace("{{BLOC_POSITION}}", bloc)
+            .replace("{{BLOC_AMENDEMENTS}}", bloc_amd)
+        )
 
         jetons = {
             "FIL": echapper(f"Députés · {i['departement']} · "
@@ -763,10 +991,16 @@ class Site:
             "IDENTITE_PHRASE": echapper(identite),
             "THESE": these,
             "THESE_SUITE": these_suite,
+            "BILAN": bilan_html(f["bilan"]),
             "HATVP": i.get("uri_hatvp") or "https://www.hatvp.fr",
             "BOOTSTRAP": num(self.apercu.get("bootstrap") or BOOTSTRAP),
 
-            "PART_ENG_PCT": pct(taux),
+            # Une mesure qui n'existe pas ne s'affiche pas à zéro. Un député
+            # dont la source ne publie aucun vote nominatif portait « 0,0 % »
+            # en corps 88 juste au-dessus du paragraphe qui explique qu'on
+            # préfère une case vide à un zéro trompeur.
+            "PART_ENG_VALEUR": grand_chiffre(
+                pct(taux) if a["votes_exprimes"] else None, "%"),
             "PART_ENG_N": num(exprimes),
             "PART_ENG_DENOM": num(votables),
             # Le dénominateur affiché est celui qui a été divisé, et les deux
@@ -775,13 +1009,10 @@ class Site:
             "PART_ENG_RESERVE": reserve_denominateur(
                 eligibles, votables, self.n_texte),
             # La délégation qualifie le numérateur, pas le dénominateur : elle
-            # s'affiche donc accolée aux votes exprimés, et s'explique dans le
-            # repli déjà consacré aux pièges de la participation.
+            # s'affiche donc accolée aux votes exprimés, et se déplie dans la
+            # mesure qui lui est consacrée juste en dessous.
             "PART_ENG_DELEGATION": mention_delegation(
                 a.get("engageants_delegues") or 0, exprimes),
-            "PART_DELEGATION_PHRASE": phrase_delegation(
-                a.get("engageants_delegues") or 0, exprimes,
-                self.mediane_delegation),
             # La bande situe un député dans la population. Elle n'a donc rien à
             # dessiner quand le taux ne s'y compare pas : le losange irait se
             # poser hors de l'étendue des barres et étirerait l'échelle des 577
@@ -803,7 +1034,61 @@ class Site:
             "PART_PHRASE": part1,
             "PART_PHRASE_2": part2,
 
-            "DISS_PCT": pct(a["taux_dissidence"] or 0),
+            # Sans suffrage exprimé, il n'y a pas de part à calculer : le
+            # dénominateur est nul, et `vues.py` sert `null` plutôt qu'un zéro.
+            "DELEG_VALEUR": grand_chiffre(
+                pct(part_deleg) if part_deleg is not None else None, "%"),
+            "DELEG_PROVENANCE": provenance_delegation(
+                a.get("engageants_delegues") or 0, exprimes),
+            "DELEG_PHRASE": deleg1,
+            "DELEG_PHRASE_2": deleg2,
+            # Même réserve que pour la présence : une part mesurée sur quinze
+            # suffrages ne se range pas parmi les 577, et un député sans suffrage
+            # exprimé n'a pas de part du tout.
+            "DELEG_BANDE": (
+                f'<div class="bande" data-bande="delegation"\n'
+                f'         data-valeur="{part_deleg:.4f}" data-etiquette="{echapper(i["nom"])}"\n'
+                f'         data-format="pct"></div>\n'
+                f'    <div class="legende-bande">\n'
+                f'      <span><i>Une barre = un député en exercice</i></span>\n'
+                f'      <span><i>Trait pointillé = médiane de l\'Assemblée</i></span>\n'
+                f'    </div>'
+                if part_deleg is not None and a.get("participation_comparable") else
+                '<p class="provenance">Pas de comparaison à la population&nbsp;: '
+                'trop peu de suffrages exprimés pour situer cette part parmi les autres.</p>'
+            ),
+
+            "JOURNAL": journal_html(journal["votes"]),
+            "JOURNAL_FILTRES": filtres_html(journal["resume"]),
+            "JOURNAL_PHRASE": jour1,
+            "JOURNAL_PHRASE_2": jour2,
+
+            "AMD_N": num(am.get("deposes") or 0),
+            "AMD_PROVENANCE": provenance_amendements(
+                am.get("deposes") or 0, am.get("examines") or 0,
+                am.get("adoptes") or 0),
+            "AMD_COSIGNES": num(am.get("cosignes") or 0),
+            "AMD_SORTS": sorts_html(am) if am.get("deposes") else "",
+            "AMD_PHRASE": amd1,
+            "AMD_PHRASE_2": amd2,
+            "AMD_BANDE": (
+                f'<div class="bande" data-bande="amendements"\n'
+                f'         data-valeur="{am["deposes"]:.4f}" data-etiquette="{echapper(i["nom"])}"\n'
+                f'         data-format="num"></div>\n'
+                f'    <div class="legende-bande">\n'
+                f'      <span><i>Une barre = un député en exercice</i></span>\n'
+                f'      <span><i>Trait pointillé = médiane de l\'Assemblée</i></span>\n'
+                f'    </div>'
+                if am.get("deposes") else
+                '<p class="provenance">Aucun dépôt&nbsp;: rien à situer dans la population.</p>'
+            ),
+
+            # Même règle : un groupe qui n'a eu de ligne sur aucun scrutin où ce
+            # député a voté ne donne pas une dissidence de 0 %, il n'en donne
+            # aucune. Le tiret le dit, le zéro l'aurait démenti.
+            "DISS_VALEUR": grand_chiffre(
+                pct(a["taux_dissidence"]) if a["taux_dissidence"] is not None else None,
+                "%"),
             "DISS_N": num(a["votes_dissidents"] or 0),
             "DISS_DENOM": num(a["votes_avec_ligne"] or 0),
             "DISS_VAL": f"{a['taux_dissidence'] or 0:.4f}",

@@ -161,3 +161,98 @@ class TestLigneDeGroupe:
         d = self.cas()["dissident"]
         assert d.null_count() == 2  # groupe partagé + ligne absente
         assert not math.isnan(d.drop_nulls().mean())
+
+
+class TestStatutDeVote:
+    """Les cinq façons de ne pas voter « pour », et pourquoi elles diffèrent.
+
+    Le relevé de la fiche part des scrutins et non des votes : un député absent
+    n'a pas de ligne dans la table des votes, et une liste construite depuis
+    les votes tuerait silencieusement ce qu'elle prétend montrer. Le statut est
+    donc calculé sur une jointure à gauche, où presque tout peut être `null`.
+
+    L'ordre des cas est ce qui se vérifie ici. Il n'est pas commutatif : un
+    ministre est empêché avant d'être absent, et un scrutin tenu avant son
+    élection n'est ni l'un ni l'autre.
+    """
+
+    def cas(self) -> pl.DataFrame:
+        return pl.DataFrame(
+            {
+                "eligible": [True, True, True, True, True, False, False],
+                "position": ["pour", "contre", "abstention", None, "nonVotant",
+                             None, "pour"],
+                "cause": [None, None, None, None, "MG", None, None],
+            }
+        ).with_columns(vues._statut_vote())
+
+    def test_les_six_statuts(self):
+        assert self.cas()["statut"].to_list() == [
+            "pour", "contre", "abstention",
+            "absent",       # mandat courant, aucune ligne de vote
+            "empeche",      # membre du Gouvernement : la source le dit
+            "hors_mandat",  # scrutin antérieur à son élection
+            "hors_mandat",  # et l'inéligibilité prime sur tout le reste
+        ]
+
+    def test_aucun_statut_hors_du_vocabulaire_publie(self):
+        """Le gabarit traduit chaque statut : un statut non prévu casserait la page."""
+        assert set(self.cas()["statut"]) <= set(vues.STATUTS_VOTE)
+
+
+class TestBilan:
+    """L'activité en un coup d'œil : trois assiettes qui doivent s'additionner."""
+
+    def depute(self, **surcharges) -> dict:
+        base = {
+            "votes_exprimes": 483, "scrutins_votables": 8434,
+            "scrutins_eligibles": 8434, "votes_delegues": 29,
+            "votes_engageants": 77, "engageants_votables": 245,
+            "engageants_eligibles": 245, "engageants_delegues": 19,
+        }
+        return {**base, **surcharges}
+
+    def test_les_autres_scrutins_sont_la_soustraction_exacte(self):
+        """Un troisième calcul serait une troisième occasion de diverger."""
+        eng, autres, tous = vues._bilan(self.depute())
+        for champ in ("exprimes", "votables", "eligibles", "delegues"):
+            assert eng[champ] + autres[champ] == tous[champ]
+
+    def test_chaque_taux_est_le_sien(self):
+        eng, autres, tous = vues._bilan(self.depute())
+        assert eng["taux"] == pytest.approx(77 / 245)
+        assert autres["taux"] == pytest.approx((483 - 77) / (8434 - 245))
+        assert tous["taux"] == pytest.approx(483 / 8434)
+
+    def test_un_depute_sans_aucun_suffrage_n_a_pas_un_taux_de_zero(self):
+        """C'est l'accusation la plus grave du site, portée sur un trou de source."""
+        muet = self.depute(votes_exprimes=0, votes_engageants=0,
+                           votes_delegues=0, engageants_delegues=0)
+        assert [r["taux"] for r in vues._bilan(muet)] == [None, None, None]
+
+    def test_un_denominateur_nul_ne_divise_pas(self):
+        entrant = self.depute(engageants_votables=0, engageants_eligibles=0,
+                              votes_engageants=0, engageants_delegues=0)
+        assert vues._bilan(entrant)[0]["taux"] is None
+
+    def test_les_colonnes_absentes_valent_zero_et_non_none(self):
+        """`fiche()` sert des `null` : la soustraction ne doit pas exploser."""
+        vide = {k: None for k in self.depute()}
+        assert [r["exprimes"] for r in vues._bilan(vide)] == [0, 0, 0]
+
+
+class TestTauxAdoption:
+    """Le taux d'adoption se divise par les amendements examinés."""
+
+    def table(self) -> pl.DataFrame:
+        return pl.DataFrame(
+            {"amendements": [100, 10, 5], "examines": [50, 10, 0], "adoptes": [25, 1, 0]}
+        ).with_columns(vues.analyze.taux_adoption())
+
+    def test_le_denominateur_est_l_examen_pas_le_depot(self):
+        """Diviser par les dépôts ferait baisser le taux à chaque dépôt."""
+        assert self.table()["taux_adoption"].to_list()[:2] == [0.5, 0.1]
+
+    def test_rien_d_examine_ne_donne_pas_zero(self):
+        """Un texte encore en navette n'est pas un échec : c'est une attente."""
+        assert self.table()["taux_adoption"].to_list()[2] is None

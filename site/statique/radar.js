@@ -15,8 +15,12 @@ const el = (nom, attrs = {}) => {
   return n;
 };
 
+/* Trois formats, parce que trois natures de mesure : une part, un compte, une
+   coordonnée sur l'axe. Un compte affiché « 121,00 » ferait douter du chiffre. */
 const fmt = (v, mode) =>
-  mode === "pct" ? (100 * v).toFixed(1).replace(".", ",") + " %" : v.toFixed(2).replace(".", ",");
+  mode === "pct" ? (100 * v).toFixed(1).replace(".", ",") + " %"
+  : mode === "num" ? Math.round(v).toLocaleString("fr-FR")
+  : v.toFixed(2).replace(".", ",");
 
 function bande(hote) {
   const serie = DONNEES[hote.dataset.bande];
@@ -232,3 +236,42 @@ function recherche() {
 }
 
 recherche();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Le filtre du relevé des votes.
+
+   Il ne fabrique rien : les 245 lignes sont écrites dans la page par le
+   générateur, avec leur statut en classe. Le bouton pose un attribut sur la
+   liste, et la feuille de style masque le reste. Sans JavaScript, le relevé
+   reste entier — c'est la seule façon acceptable de filtrer une pièce
+   justificative, qui doit rester lisible et indexable telle quelle.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function filtreJournal() {
+  const barre = document.querySelector(".filtres[data-cible='journal']");
+  const journal = document.querySelector("#journal");
+  if (!barre || !journal) return;
+  const vide = document.querySelector(".journal-vide");
+
+  barre.addEventListener("click", (e) => {
+    const bouton = e.target.closest("button");
+    if (!bouton) return;
+    const filtre = bouton.dataset.filtre;
+    for (const b of barre.querySelectorAll("button")) {
+      b.setAttribute("aria-pressed", String(b === bouton));
+    }
+    if (filtre === "tous") delete journal.dataset.filtre;
+    else journal.dataset.filtre = filtre;
+    /* Le message d'impasse ne devrait jamais paraître — un bouton n'existe
+       qu'au-dessus de zéro — mais il coûte une ligne et évite qu'une liste
+       vide passe pour une page cassée. On compte les classes, pas les pixels. */
+    if (vide) {
+      const restants = filtre === "tous"
+        ? journal.children.length
+        : journal.querySelectorAll("li." + filtre).length;
+      vide.hidden = restants > 0;
+    }
+  });
+}
+
+filtreJournal();

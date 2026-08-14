@@ -70,6 +70,12 @@ tournure sans pronom personnel — le gabarit est le même pour tous.
 « 0 % de présence » serait l'accusation la plus grave du site, portée sur ce qui n'est
 peut-être qu'un trou dans les données.
 
+Ce piège s'était refermé sur le site lui-même : le chiffre de tête affichait
+« 0,0 % » en corps 88 **au-dessus** du paragraphe qui explique qu'on préfère une case
+vide à un zéro trompeur. Un grand chiffre passe donc par `grand_chiffre(valeur, unite)`,
+qui rend un tiret cadratin quand la valeur est `None` — et c'est au générateur de
+passer `None`, jamais `0`, quand la mesure n'existe pas.
+
 **Ne jamais citer une étiquette qu'on ne peut pas sourcer.** Le bloc « position »
 opposait « un groupe classé au centre » : vrai pour LIOT, faux pour les autres,
 et invérifiable. Il oppose maintenant le raccourci « un député de {{GROUPE}} » à la
@@ -110,13 +116,23 @@ moitié, le site produit 577 fiches qui se ressemblent.
 
 ## État actuel
 
-Fait : fiche de député (577), accueil pédagogique **ouvert par la recherche**, annuaire
+Fait : fiche de député (577) — **bilan d'activité en tête** (trois assiettes de
+scrutins, leurs dénominateurs et leur présence), **quatre mesures** (présence,
+**délégation**, écart à la ligne, position estimée), **le relevé des 245 votes qui
+engagent** écrit dans la page et filtrable, et **les amendements déposés** avec la
+ventilation de leurs sorts —, accueil pédagogique **ouvert par la recherche**, annuaire
 avec recherche par nom, département, numéro, région et groupe **plus l'index HTML des
 577 par département**, **carte « Qui vote avec qui ? »** (matrice des 164 451 paires en
-canvas, paire épinglable au clic, au tactile, au clavier ou par le nom), **page
-Méthode** avec le bloc « comment citer », **page Mentions** (éditeur, hébergeur,
-financement, licences), **registre des corrections**, **barre de navigation mobile**,
-marque tirée de `site/assets/logo.png`.
+canvas, paire épinglable au clic, au tactile, au clavier ou par le nom, **et la
+délégation à l'échelle de l'Assemblée et des groupes**), **page Méthode** avec le bloc
+« comment citer », **page Mentions** (éditeur, hébergeur, financement, licences,
+**maxime**), **registre des corrections**, **barre de navigation mobile**, **verrou
+complet en tête et en pied** en deux versions dessinées.
+
+**Le relevé coûte 95 Ko par fiche** — 245 lignes de titres de scrutins, 79 Mo pour le
+site contre 22 Mo avant lui. C'est le prix de la pièce justificative, et il se paie en
+balisage nu : les lignes du relevé n'ont qu'une classe, tout le reste se style par
+sélecteur d'élément. Y ajouter un attribut coûte une centaine de kilo-octets.
 
 À faire, dans cet ordre : la recherche par **commune** (l'open data ne publie pas la
 composition des circonscriptions — il faut une table externe), la page « cette semaine »

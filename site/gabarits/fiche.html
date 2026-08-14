@@ -18,6 +18,38 @@
     </div>
   </section>
 
+  <!-- ══ L'ACTIVITÉ EN UN COUP D'ŒIL ═══════════════════════════════
+       Le site publie deux présences — sur les votes qui engagent, et sur tous
+       les scrutins — à deux endroits et avec deux dénominateurs. Un lecteur ne
+       peut pas les rapprocher de tête, et c'est pourtant le rapprochement qui
+       répond à la question qu'il se pose : combien de fois a-t-il voté, sur
+       combien de fois où il pouvait le faire.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre bilan">
+    <p class="jalon">Son activité, en un coup d'œil</p>
+    <div class="tableau-defile">
+      <table class="tableau-groupes">
+        <thead>
+          <tr>
+            <th scope="col">Assiette de scrutins</th>
+            <th scope="col">Où le vote était possible</th>
+            <th scope="col">Suffrages exprimés</th>
+            <th scope="col">Dont délégués</th>
+            <th scope="col">Présence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{BILAN}}
+        </tbody>
+      </table>
+    </div>
+    <p class="provenance">Sur les {{SCRUTINS}} scrutins publics de la
+      {{LEGISLATURE}}<sup>e</sup> législature, dont {{PORTEE_TEXTE}} qui engagent.
+      «&nbsp;Où le vote était possible&nbsp;» retire les scrutins tenus hors du mandat
+      et ceux où une fonction interdisait de voter&nbsp;: c'est le dénominateur
+      réellement divisé, jamais un total de façade.</p>
+  </section>
+
   <!-- ══ RENVOI PÉDAGOGIQUE ════════════════════════════════════════
        Le cours d'instruction civique vivait ici, recopié sur 577 fiches et
        sur l'accueil. Trois copies d'un même texte divergent tôt ou tard, et
@@ -42,7 +74,7 @@
     <p class="jalon">Mesure 1 — présence aux votes</p>
     <div class="mesure-tete">
       <div>
-        <div class="valeur">{{PART_ENG_PCT}}<span class="unite">%</span></div>
+        {{PART_ENG_VALEUR}}
         <p class="provenance valeur-note">
           <b>{{PART_ENG_N}}</b> votes exprimés{{PART_ENG_DELEGATION}}<br>sur <b>{{PART_ENG_DENOM}}</b> votes qui engagent{{PART_ENG_RESERVE}}
         </p>
@@ -71,17 +103,63 @@
         <p>Le dénominateur ne compte par ailleurs que les scrutins où le mandat courait, et retire les
           <b>non-votants structurels</b> — un ministre, le président de séance ou le président de
           l'Assemblée ne peuvent pas voter : ce ne sont pas des absences.</p>
-        {{PART_DELEGATION_PHRASE}}
+        <p>Enfin, « exprimé » ne veut pas dire « exprimé en personne » : un vote délégué à un
+          collègue compte au numérateur, parce que le règlement l'impute au député. C'est assez
+          fréquent pour mériter sa propre mesure, juste en dessous.</p>
       </div>
     </details>
   </section>
 
-  <!-- ══ MESURE 2 — DISSIDENCE ═════════════════════════════════════ -->
+  <!-- ══ MESURE 2 — DÉLÉGATION ═════════════════════════════════════
+       Elle tenait en une phrase, au fond du repli de la mesure 1. C'était
+       trop peu : près d'un quart des suffrages qui engagent sont émis par un
+       mandataire, et un taux de présence élevé peut ne décrire aucune
+       présence. Une mesure qui corrige la lecture d'une autre mesure doit
+       être aussi visible qu'elle.
+       ══════════════════════════════════════════════════════════════ -->
   <section class="cadre mesure">
-    <p class="jalon">Mesure 2 — écarts à la ligne du groupe</p>
+    <p class="jalon">Mesure 2 — suffrages émis par délégation</p>
     <div class="mesure-tete">
       <div>
-        <div class="valeur">{{DISS_PCT}}<span class="unite">%</span></div>
+        {{DELEG_VALEUR}}
+        <p class="provenance valeur-note">{{DELEG_PROVENANCE}}</p>
+      </div>
+      <div>
+        <p class="enclair">{{DELEG_PHRASE}}</p>
+        <p class="enclair">{{DELEG_PHRASE_2}}</p>
+      </div>
+    </div>
+
+    {{DELEG_BANDE}}
+
+    <details class="piege">
+      <summary>Ce que ce taux ne dit pas — et ne peut pas dire</summary>
+      <div class="dedans">
+        <p>Un député empêché peut confier son vote à un collègue, qui l'exprime en son nom.
+          <b>C'est un droit</b>, encadré par l'ordonnance de 1958 : maladie, mission, service
+          militaire, cas de force majeure. Le vote lui est imputé, et il entre au numérateur de
+          sa présence exactement comme un vote émis au banc.</p>
+        <p>Un taux élevé n'est donc pas un manquement. Ce qu'il change, c'est le sens du chiffre
+          d'à côté : au-dessus de la moitié, <b>« présence aux votes » ne décrit plus une
+          présence</b> mais des suffrages portés par quelqu'un d'autre. Les deux mesures se
+          lisent ensemble ou pas du tout.</p>
+        <p><b>La source dit qu'un vote a été délégué, jamais par qui il a été porté.</b>
+          Ce site ne peut donc rien dire des récipiendaires — qui reçoit le plus de délégations,
+          si les délégations restent dans le groupe, si quelques députés en concentrent
+          beaucoup. Ces questions sont bonnes, et les données publiées n'y répondent pas.</p>
+        <p>Rien n'indique non plus la <b>cause</b> de l'empêchement : le motif n'est pas publié.
+          Un vote délégué depuis une mission parlementaire et un vote délégué depuis chez soi
+          sont ici le même vote.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ══ MESURE 3 — DISSIDENCE ═════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Mesure 3 — écarts à la ligne du groupe</p>
+    <div class="mesure-tete">
+      <div>
+        {{DISS_VALEUR}}
         <p class="provenance valeur-note">
           <b>{{DISS_N}}</b> votes contre la ligne<br>sur <b>{{DISS_DENOM}}</b> où son groupe en avait une{{DISS_IC}}
         </p>
@@ -151,6 +229,48 @@
     </div>
   </section>
 
+  <!-- ══ LE RELEVÉ DES VOTES ═══════════════════════════════════════
+       Les quatre mesures ci-dessus sont des taux. Celle-ci est la pièce
+       jointe : tant qu'un lecteur ne voit pas les scrutins, il ne peut que
+       croire ou ne pas croire un pourcentage. Le relevé est écrit dans la
+       page, pas chargé par un script — il doit rester lisible sans
+       JavaScript, indexable, et copiable dans un tableur.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre mesure" id="votes">
+    <p class="jalon">Le relevé — ce que {{NOM_COURT}} a voté, texte par texte</p>
+    <div class="lecture" style="margin-top:22px">
+      <p class="enclair">{{JOURNAL_PHRASE}}</p>
+      <p class="enclair">{{JOURNAL_PHRASE_2}}</p>
+    </div>
+
+    <div class="filtres" role="group" aria-label="Filtrer le relevé" data-cible="journal">
+      {{JOURNAL_FILTRES}}
+    </div>
+
+    <ol class="journal" id="journal">
+      {{JOURNAL}}
+    </ol>
+    <p class="provenance journal-vide" hidden>Aucun vote ne correspond à ce filtre.</p>
+
+    <details class="piege">
+      <summary>Pourquoi cette liste s'arrête aux votes qui engagent</summary>
+      <div class="dedans">
+        <p>Elle ne montre pas les {{PORTEE_DETAIL}} votes d'amendement de la législature.
+          Ce n'est pas un oubli : ces scrutins se tiennent à toute heure devant quelques
+          dizaines de députés, et une liste de {{SCRUTINS}} lignes dont 86 % sont des
+          amendements noierait les {{PORTEE_TEXTE}} votes qui décident du sort d'un texte.</p>
+        <p><b>« Absent » ne veut pas dire absent de l'Assemblée.</b> Un député en commission,
+          en mission ou en circonscription au moment du scrutin apparaît ici sans suffrage.
+          La source ne publie aucun motif d'absence, et ce site n'en invente pas.</p>
+        <p>Le titre affiché est celui du scrutin, tel que l'Assemblée le publie — pas un
+          résumé du texte. « L'ensemble de la proposition de loi visant à… » désigne le texte
+          <b>tel qu'il ressort des débats</b>, amendements compris : voter contre un texte
+          n'est pas voter contre son intitulé.</p>
+      </div>
+    </details>
+  </section>
+
+{{BLOC_AMENDEMENTS}}
   <!-- ══ VÉRIFIER ══════════════════════════════════════════════════ -->
   <section class="cadre" style="padding-block: 48px 8px">
     <p class="jalon">Remonter à la source</p>

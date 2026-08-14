@@ -741,6 +741,31 @@ def scrutins_clivants(cube: VoteCube, k: int = 20) -> pl.DataFrame:
 # --------------------------------------------------------------------------
 
 
+#: Un amendement dont la source publie un sort a été examiné ; les autres
+#: attendent leur passage. C'est **le** dénominateur du taux d'adoption, et
+#: l'écart n'est pas marginal : 54 485 des 123 224 amendements de la
+#: 17ᵉ législature n'ont pas encore de sort. Diviser par les dépôts ferait
+#: baisser le taux d'un député à chaque nouveau dépôt, sans qu'aucun vote ait
+#: eu lieu, et compterait comme des échecs des amendements dont l'Assemblée
+#: n'a rien dit.
+EXAMINE = pl.col("sort").is_not_null()
+
+
+def taux_adoption() -> pl.Expr:
+    """`adoptes / examines`, et `null` quand rien n'a encore été examiné.
+
+    Une seule définition pour tout le projet — la ligne de commande, le rapport
+    et le site en publient le même nombre. Deux divisions écrites séparément
+    finissent par diverger : c'est déjà arrivé sur la présence aux votes.
+    """
+    return (
+        pl.when(pl.col("examines") > 0)
+        .then(pl.col("adoptes") / pl.col("examines"))
+        .otherwise(None)
+        .alias("taux_adoption")
+    )
+
+
 def amendements_par_depute(k: int | None = None, *, depuis: str | None = None) -> pl.DataFrame:
     """Classement des députés par nombre d'amendements déposés et taux d'adoption."""
     amd = load("amendements")
@@ -754,13 +779,12 @@ def amendements_par_depute(k: int | None = None, *, depuis: str | None = None) -
         .group_by("auteur_uid", "nom_complet", "groupe")
         .agg(
             pl.len().alias("amendements"),
+            EXAMINE.sum().alias("examines"),
             (pl.col("sort") == "Adopté").sum().alias("adoptes"),
             (pl.col("sort") == "Rejeté").sum().alias("rejetes"),
             pl.col("nb_cosignataires").mean().alias("cosignataires_moyen"),
         )
-        .with_columns(
-            (pl.col("adoptes") / pl.col("amendements")).alias("taux_adoption")
-        )
+        .with_columns(taux_adoption())
         .sort("amendements", descending=True)
     )
     return out.head(k) if k else out
@@ -779,9 +803,10 @@ def amendements_par_groupe(*, depuis: str | None = None) -> pl.DataFrame:
         .group_by("groupe")
         .agg(
             pl.len().alias("amendements"),
+            EXAMINE.sum().alias("examines"),
             (pl.col("sort") == "Adopté").sum().alias("adoptes"),
             pl.col("auteur_uid").n_unique().alias("deputes_deposants"),
         )
-        .with_columns((pl.col("adoptes") / pl.col("amendements")).alias("taux_adoption"))
+        .with_columns(taux_adoption())
         .sort("amendements", descending=True)
     )

@@ -390,6 +390,9 @@ h1 {
   display: flex; align-items: baseline; gap: 6px;
 }
 .valeur .unite { font-size: 0.34em; letter-spacing: 0; color: var(--encre-2); font-family: var(--sans); font-weight: 400; }
+/* Le tiret d'une mesure absente n'a ni le poids ni l'encre d'un chiffre : il
+   ne dit pas « zéro », il dit « rien à calculer ici ». */
+.valeur-absente { color: var(--encre-3); }
 .valeur-note { margin-top: 12px; }
 .enclair { font-size: 18px; line-height: 1.55; margin: 0; max-width: 46ch; }
 .enclair b { font-weight: 600; }
@@ -434,6 +437,111 @@ h1 {
   padding-top: 10px; border-top: 1px solid var(--trait);
 }
 .legende-bande i { font-style: normal; color: var(--encre-2); }
+
+/* ── l'activité en un coup d'œil ───────────────────────────────────── */
+
+.bilan { padding-block: 8px 44px; border-bottom: 1px solid var(--trait); }
+.bilan .tableau-defile { margin-top: 20px; }
+.bilan .provenance { margin-top: 14px; max-width: 78ch; line-height: 1.55; }
+/* La somme n'est pas une mesure de plus : elle se lit comme un total de
+   colonne, filet au-dessus et encre secondaire, pas comme une quatrième
+   ligne de même rang. */
+.tableau-groupes tr.somme td { border-top: 1px solid var(--trait-fort); color: var(--encre-2); }
+.tableau-groupes tr.somme td b { color: var(--encre-2); }
+
+/* ── le relevé des votes ───────────────────────────────────────────────
+   La pièce justificative de la fiche : une ligne par vote qui engage. Elle
+   est écrite dans la page par le générateur — le filtre masque, il ne
+   fabrique pas —, et elle doit donc rester lisible feuille de style éteinte.
+
+   Aucune couleur ne distingue « pour » de « contre ». La tentation du vert et
+   du rouge est exactement celle que ce site refuse ailleurs : une couleur qui
+   porte un jugement sur un vote. La position se lit au mot, l'absence de
+   suffrage à l'encre secondaire — une intensité, pas un camp.
+   ────────────────────────────────────────────────────────────────────── */
+
+.filtres { display: flex; flex-wrap: wrap; gap: 6px; margin: 28px 0 4px; }
+.filtres button {
+  display: inline-flex; align-items: baseline; gap: 7px;
+  border: 1px solid var(--trait-fort); border-radius: 3px; background: none;
+  padding: 7px 11px; cursor: pointer; color: var(--encre-2);
+  font-family: var(--sans); font-size: 13px;
+}
+.filtres button:hover { color: var(--encre); border-color: var(--encre-3); }
+.filtres button[aria-pressed="true"] {
+  background: var(--accent); border-color: var(--accent); color: var(--papier-haut);
+}
+.filtres .compte { font-size: 11.5px; font-variant-numeric: tabular-nums; opacity: 0.75; }
+
+/* Le balisage d'une ligne est nu — `<time>`, `<p>`, `<small>`, `<b>` — et tout
+   se style par sélecteur d'élément : 245 lignes × 577 fiches font payer très
+   cher chaque attribut de classe. */
+.journal { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--trait); }
+.journal > li {
+  display: grid; gap: 4px 18px; padding: 13px 0;
+  border-bottom: 1px solid var(--trait);
+}
+@media (min-width: 820px) {
+  .journal > li { grid-template-columns: 122px minmax(0, 1fr) 158px; align-items: baseline; }
+  .journal > li > b { text-align: right; }
+}
+.journal time {
+  font-family: var(--mono); font-size: 11.5px; color: var(--encre-3);
+  letter-spacing: 0.03em; white-space: nowrap;
+}
+.journal > li > p { margin: 0; font-size: 15.5px; line-height: 1.5; }
+.journal small {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 5px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--encre-3);
+}
+.journal > li > b {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.09em;
+  text-transform: uppercase; font-weight: 600; color: var(--encre);
+}
+/* Ne pas avoir voté n'est pas une position : ces trois états s'effacent d'un
+   cran plutôt que de s'afficher avec la même autorité qu'un suffrage. */
+.journal > li.absent > b,
+.journal > li.empeche > b,
+.journal > li.hors_mandat > b { color: var(--encre-3); font-weight: 400; }
+
+.journal small i {
+  font-style: normal; font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 2px 6px; border-radius: 2px;
+  background: var(--accent-voile); color: var(--accent);
+}
+.journal small i.hors { background: none; border: 1px solid var(--trait-fort); color: var(--encre-2); }
+
+/* Le filtre : huit sélecteurs plutôt qu'une ligne de JavaScript qui masquerait
+   élément par élément. La liste complète reste dans le document. */
+.journal[data-filtre] > li { display: none; }
+.journal[data-filtre="pour"] > li.pour,
+.journal[data-filtre="contre"] > li.contre,
+.journal[data-filtre="abstention"] > li.abstention,
+.journal[data-filtre="absent"] > li.absent,
+.journal[data-filtre="empeche"] > li.empeche,
+.journal[data-filtre="hors_mandat"] > li.hors_mandat,
+.journal[data-filtre="delegue"] > li.delegue,
+.journal[data-filtre="ecart"] > li.ecart { display: grid; }
+
+/* ── ce qui a été proposé : la ventilation des sorts ────────────────── */
+
+.sorts {
+  display: grid; gap: 1px; margin: 30px 0 10px;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  background: var(--trait); border: 1px solid var(--trait);
+  border-radius: 3px; overflow: hidden;
+}
+.sort { background: var(--papier); padding: 15px 17px; }
+.sort-n { display: block; font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sort-nom {
+  display: block; margin-top: 3px;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--encre-3);
+}
+/* Un amendement non examiné n'est pas un échec : il ne s'affiche pas avec le
+   même poids que les cinq sorts que l'Assemblée a réellement prononcés. */
+.sort-attente .sort-n { color: var(--encre-3); font-weight: 400; }
 
 /* ── le piège (repliable) ──────────────────────────────────────────── */
 

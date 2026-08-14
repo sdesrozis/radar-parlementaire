@@ -39,6 +39,16 @@ def num(n: float) -> str:
     return f"{int(n):,}".replace(",", NBSP)
 
 
+def pluriel(n: float) -> str:
+    """La marque du pluriel français : rien en deçà de deux.
+
+    « 1 amendements adoptés » sur une page qui promet l'exactitude des chiffres
+    coûte plus cher qu'il n'y paraît : un lecteur qui voit la langue mal
+    accordée doute du reste.
+    """
+    return "s" if abs(n) >= 2 else ""
+
+
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
         "août", "septembre", "octobre", "novembre", "décembre"]
 
@@ -528,44 +538,256 @@ def mention_delegation(delegues: int, exprimes: int) -> str:
     return f", dont <b>{num(delegues)}</b> par délégation"
 
 
-def phrase_delegation(delegues: int, exprimes: int, mediane: float) -> str:
-    """Le paragraphe du repli « pourquoi ce chiffre est trompeur ».
+def grand_chiffre(valeur: str | None, unite: str = "") -> str:
+    """Le chiffre de tête d'une mesure — ou le tiret qui dit qu'il n'y en a pas.
 
-    Trois cas, parce qu'un même dispositif ne se commente pas pareil selon son
-    ampleur : la pratique est générale, donc la signaler sans la situer ferait
-    passer pour singulier ce qui est ordinaire.
+    Une mesure qui n'existe pas ne s'affiche pas à zéro. La fiche d'un député
+    dont la source ne publie aucun vote nominatif portait « 0,0 % » en corps
+    88, au-dessus d'un paragraphe qui expliquait qu'on préfère « une case vide
+    à un zéro trompeur ». Le paragraphe avait raison et le chiffre le
+    démentait ; c'est le chiffre qu'on lit.
+
+    Le tiret cadratin n'est pas un ornement : c'est la convention typographique
+    de la donnée manquante, et le site l'emploie déjà dans ses tableaux.
     """
+    if valeur is None:
+        return '<div class="valeur valeur-absente" aria-label="mesure absente">—</div>'
+    marque = f'<span class="unite">{unite}</span>' if unite else ""
+    return f'<div class="valeur">{valeur}{marque}</div>'
+
+
+def provenance_delegation(delegues: int, exprimes: int) -> str:
+    """Le numérateur et le dénominateur de la part déléguée, sous le grand chiffre.
+
+    La ligne est ici et non dans le gabarit parce que sa langue dépend de ses
+    nombres : « 0 suffrages » et « 1 suffrages » sont deux fautes qu'un gabarit
+    ne peut pas éviter, et que ce site ne peut pas se permettre.
+    """
+    return (f"<b>{num(delegues)}</b> suffrage{pluriel(delegues)} émis par un "
+            f"collègue<br>sur <b>{num(exprimes)}</b> exprimé{pluriel(exprimes)} "
+            f"en son nom")
+
+
+def provenance_amendements(deposes: int, examines: int, adoptes: int) -> str:
+    """Ce que le compte de dépôts recouvre, sous le grand chiffre."""
+    tete = (f"amendement{pluriel(deposes)} déposé{pluriel(deposes)} comme "
+            f"auteur principal")
+    if not examines:
+        return f"{tete}<br>aucun n'a encore été examiné"
+    return (f"{tete}<br>dont <b>{num(adoptes)}</b> adopté{pluriel(adoptes)}, "
+            f"sur <b>{num(examines)}</b> examiné{pluriel(examines)}")
+
+
+def phrase_delegation(a: dict, i: dict, dist: dict, au_dessus: int,
+                      groupe: dict | None) -> tuple[str, str]:
+    """La mesure des suffrages émis par un mandataire.
+
+    Elle vivait au fond d'un repli, en une phrase, sous la présence aux votes.
+    C'était trop peu pour ce qu'elle dit : près d'un quart des suffrages qui
+    engagent sont émis par un collègue, et un taux de présence élevé peut ne
+    décrire aucune présence.
+
+    Le premier paragraphe situe, le second donne l'objection — ici, que la
+    délégation est un droit, et qu'un taux élevé n'est pas en soi un
+    manquement.
+    """
+    g = accords(i)
+    exprimes = a.get("votes_engageants") or 0
+    delegues = a.get("engageants_delegues") or 0
     if not exprimes:
-        return ""
+        return ("Aucun suffrage de ce député ne figure dans les données publiées "
+                "sur ces scrutins&nbsp;: il n'y a pas de part à calculer.", "")
+
     if not delegues:
-        return (f"<p><b>Aucun de ces votes n'a été émis par délégation</b>&nbsp;: "
-                f"ils ont tous été exprimés en personne. C'est assez rare pour "
-                f"être noté — à l'Assemblée, la moitié des députés délèguent au "
-                f"moins {pct(mediane)}{NBSP}% de leurs suffrages sur ces "
-                f"scrutins.</p>")
+        p1 = (f"<b>Aucun</b> des {num(exprimes)} suffrages exprimés par "
+              f"{echapper(i['nom'])} sur les votes qui engagent n'a été émis par "
+              f"un collègue&nbsp;: {g['il']} a voté en personne à chaque fois. "
+              f"La médiane de l'Assemblée est à {pct(dist['mediane'])}{NBSP}%.")
+        p2 = ("La délégation est un droit, pas un manquement&nbsp;: un député "
+              "empêché confie son vote à un collègue, qui l'exprime en son nom. "
+              "Ce chiffre ne dit donc pas que ce député travaille davantage — "
+              "il dit que sa présence aux votes est une présence en séance.")
+        return p1, p2
+
     part = delegues / exprimes
-    situation = (
-        "c'est au-dessus de la pratique ordinaire"
-        if part > mediane * 1.5 else
-        "c'est en dessous de la pratique ordinaire"
-        if part < mediane * 0.5 else
-        "c'est l'ordre de grandeur habituel"
+    situation = situer(
+        part, dist["mediane"],
+        f"C'est <b>au-dessus</b> de la médiane de l'Assemblée, qui est de "
+        f"{pct(dist['mediane'])}{NBSP}%{NBSP}: "
+        f"{combien(au_dessus, dist['n'], 'le fait davantage', 'le font davantage')}.",
+        f"C'est <b>en dessous</b> de la médiane de l'Assemblée, qui est de "
+        f"{pct(dist['mediane'])}{NBSP}%.",
+        f"C'est <b>l'ordre de grandeur habituel</b>&nbsp;: la médiane de "
+        f"l'Assemblée est à {pct(dist['mediane'])}{NBSP}%.",
     )
-    alerte = (
-        " <b>À ce niveau, le taux de présence ne décrit plus une présence "
-        "physique</b> : il décrit des suffrages émis en son nom."
-        if part >= 0.5 else ""
+    p1 = (f"<b>{num(delegues)} des {num(exprimes)} suffrages</b> exprimés au nom "
+          f"de {echapper(i['nom'])} sur les votes qui engagent ont été émis par "
+          f"un collègue mandaté. {situation}")
+
+    if part >= 0.5:
+        p1 += (f" <b>Au-delà de la moitié, «&nbsp;présence aux votes&nbsp;» cesse "
+               f"de décrire une présence</b>&nbsp;: sur ces scrutins, la voix de "
+               f"{echapper(i['nom'])} a été portée par quelqu'un d'autre plus "
+               f"souvent que par {g['lui']}-même.")
+
+    # Le contexte du groupe, comme pour la dissidence : la délégation est très
+    # largement une pratique collective, et un taux personnel lu sans celui de
+    # son groupe fait passer une habitude de banc pour un trait de caractère.
+    if groupe and groupe.get("part_delegation") is not None:
+        p2 = (f"La délégation est d'abord une pratique de groupe. Dans "
+              f"{echapper(i['groupe'])}, {pct(groupe['part_delegation'])}{NBSP}% "
+              f"des suffrages qui engagent sont émis par un mandataire&nbsp;— "
+              f"{num(groupe['delegues_groupe'])} sur "
+              f"{num(groupe['engageants_groupe'])}. ")
+        p2 += situer(
+            part, groupe["part_delegation"],
+            f"<b>Chez {g['lui']}, {echapper(i['nom'])} délègue plus que la "
+            f"moyenne de son groupe.</b>",
+            f"<b>Chez {g['lui']}, {echapper(i['nom'])} délègue moins que la "
+            f"moyenne de son groupe.</b>",
+            f"<b>{echapper(i['nom'])} y est dans la moyenne de son groupe.</b>",
+        )
+    else:
+        p2 = ("La délégation est un droit&nbsp;: un député empêché confie son "
+              "vote à un collègue, qui l'exprime en son nom, et le suffrage lui "
+              "est bien imputé. Ce taux ne mesure donc pas un manquement — il "
+              "mesure la part de sa voix qu'un autre a portée.")
+    return p1, p2
+
+
+def phrase_delegation_assemblee(delegation: dict, groupes: list[dict]) -> tuple[str, str]:
+    """La délégation à l'échelle de l'Assemblée, pour la page des accords.
+
+    Elle a sa place ici et pas seulement sur les fiches&nbsp;: «&nbsp;qui vote
+    avec qui&nbsp;» compte des suffrages, et près d'un quart d'entre eux n'ont
+    pas été émis par la personne à qui ils sont imputés. Un accord entre deux
+    députés est donc en partie un accord entre deux mandataires.
+    """
+    eng, tous = delegation["engageants"], delegation["tous"]
+    mesures = [g for g in groupes if g.get("part_delegation") is not None]
+    p1 = (f"<b>{num(eng['delegues'])} des {num(eng['exprimes'])} suffrages</b> "
+          f"exprimés sur les votes qui engagent l'ont été par un collègue "
+          f"mandaté, soit {pct(eng['part'])}{NBSP}%. Sur l'ensemble des "
+          f"scrutins, la part tombe à {pct(tous['part'])}{NBSP}% "
+          f"({num(tous['delegues'])} sur {num(tous['exprimes'])})&nbsp;: on "
+          f"délègue d'autant plus que le vote compte.")
+    if not mesures:
+        return p1, ""
+    bas = min(mesures, key=lambda g: g["part_delegation"])
+    haut = max(mesures, key=lambda g: g["part_delegation"])
+    p2 = (f"Aucun groupe n'y échappe. Du moins délégataire au plus délégataire, "
+          f"l'écart va de <b>{pct(bas['part_delegation'])}{NBSP}%</b> "
+          f"({echapper(bas['groupe'])}) à <b>{pct(haut['part_delegation'])}"
+          f"{NBSP}%</b> ({echapper(haut['groupe'])})&nbsp;— soit "
+          f"{dec(100 * (haut['part_delegation'] - bas['part_delegation']), 1)} "
+          f"points d'écart entre les deux extrêmes, quand la pratique elle-même "
+          f"concerne tout le monde.")
+    return p1, p2
+
+
+#: Ce que chaque statut de vote s'appelle sur la page, et l'ordre d'affichage
+#: des filtres. Le libellé n'est jamais le code : « empeche » ne se lit pas.
+STATUTS = (
+    ("pour", "Pour"),
+    ("contre", "Contre"),
+    ("abstention", "Abstention"),
+    ("absent", "Absent"),
+    ("empeche", "Ne pouvait pas voter"),
+    ("hors_mandat", "Hors mandat"),
+)
+
+
+def phrase_journal(resume: dict, i: dict) -> tuple[str, str]:
+    """L'introduction du relevé texte par texte.
+
+    Le relevé est la pièce qui rend les taux opposables&nbsp;: tant qu'un
+    lecteur ne voit pas les scrutins, il ne peut que croire ou ne pas croire un
+    pourcentage. La phrase dit donc ce qu'il va compter, et ce qu'il ne pourra
+    pas y lire.
+    """
+    g = accords(i)
+    presents = resume["total"] - resume["hors_mandat"]
+    assiette = (
+        f"les {num(resume['total'])} votes qui engagent de la législature"
+        if presents == resume["total"] else
+        f"les {num(presents)} votes qui engagent tenus pendant son mandat, "
+        f"sur {num(resume['total'])}"
     )
-    return (
-        f"<p><b>{num(delegues)} de ces votes ont été émis par délégation</b>, "
-        f"soit {pct(part)}{NBSP}%. Un député empêché peut confier son vote à un "
-        f"collègue, qui l'exprime pour lui&nbsp;; le règlement l'autorise et le "
-        f"vote lui est bien imputé. Rapporté à la médiane de l'Assemblée "
-        f"({pct(mediane)}{NBSP}% sur ces scrutins), {situation}.{alerte}</p>"
-        f"<p class=\"provenance\">La source indique qu'un vote a été délégué, "
-        f"jamais par qui il a été porté&nbsp;: ce site ne peut donc pas dire qui "
-        f"reçoit les délégations, et ne l'invente pas.</p>"
+    p1 = (f"Voici {assiette}, du plus récent au plus ancien, avec la position de "
+          f"{echapper(i['nom'])} sur chacun. <b>{num(resume['pour'])} pour, "
+          f"{num(resume['contre'])} contre, {num(resume['abstention'])} "
+          f"abstentions</b>, et {num(resume['absent'])} scrutins sans suffrage "
+          f"exprimé. C'est le détail de tous les chiffres de cette page&nbsp;: "
+          f"chaque taux plus haut se recompte ici, ligne à ligne.")
+    ecart = (
+        f" {num(resume['dissidents'])} de ces votes s'écartent de la ligne de son "
+        f"groupe et sont signalés comme tels."
+        if resume["dissidents"] else ""
     )
+    p2 = (f"Un vote «&nbsp;pour&nbsp;» n'est pas une adhésion, et un vote "
+          f"«&nbsp;contre&nbsp;» n'est pas un rejet du sujet&nbsp;: on vote sur "
+          f"un texte tel qu'il ressort des débats, avec ses amendements et ses "
+          f"compromis. La mention en capitales dit ce qu'{g['il']} a voté, "
+          f"jamais pourquoi.{ecart}")
+    return p1, p2
+
+
+def phrase_amendements(am: dict, i: dict, dist: dict, au_dessus: int,
+                       groupe: dict | None) -> tuple[str, str]:
+    """Ce que le député a proposé, et pourquoi le nombre ne se lit pas seul.
+
+    C'est la mesure la plus facile à mal lire du site&nbsp;: un compte
+    d'amendements ressemble à un compte de travail, alors qu'il additionne le
+    travail de rédaction et la tactique de séance. Le contre-argument n'est pas
+    une précaution ici, c'est la moitié de l'information.
+    """
+    g = accords(i)
+    deposes = am.get("deposes") or 0
+    if not deposes:
+        return ("Aucun amendement déposé par ce député ne figure dans les "
+                "données publiées par l'Assemblée sur cette législature.",
+                "L'absence de dépôt n'est pas l'absence de travail&nbsp;: un "
+                "député écrit aussi en commission, en rapport et en "
+                "cosignature — ce que ce compte-là ne voit pas.")
+    examines, adoptes = am.get("examines") or 0, am.get("adoptes") or 0
+    situation = situer(
+        deposes, dist["mediane"],
+        f"C'est <b>au-dessus</b> de la médiane de l'Assemblée, qui est de "
+        f"{num(dist['mediane'])} amendements&nbsp;: "
+        f"{combien(au_dessus, dist['n'], 'en dépose davantage', 'en déposent davantage')}.",
+        f"C'est <b>en dessous</b> de la médiane de l'Assemblée, qui est de "
+        f"{num(dist['mediane'])} amendements.",
+        f"C'est <b>dans la moyenne</b> de l'Assemblée, dont la médiane est de "
+        f"{num(dist['mediane'])} amendements.",
+        seuil=0.2,
+    )
+    p1 = (f"{echapper(i['nom'])} a déposé <b>{num(deposes)} amendement"
+          f"{pluriel(deposes)}</b> comme auteur principal. {situation}")
+    if examines and adoptes:
+        p1 += (f" {num(adoptes)} {'ont' if adoptes >= 2 else 'a'} été "
+               f"adopté{pluriel(adoptes)}, sur {num(examines)} dont l'Assemblée "
+               f"a tranché le sort — soit {pct(adoptes / examines)}{NBSP}%.")
+    elif examines:
+        p1 += (f" Aucun n'a été adopté, sur {num(examines)} dont l'Assemblée a "
+               f"tranché le sort.")
+
+    # L'objection, toujours dans le même paragraphe que le chiffre : déposer
+    # beaucoup peut être un travail de rédaction comme une tactique de séance,
+    # et rien dans les données ne permet de trancher entre les deux.
+    p2 = ("<b>Ce nombre ne mesure pas un effort.</b> Déposer trois cents "
+          "amendements sur un texte est tantôt un travail de rédaction ligne à "
+          "ligne, tantôt une manœuvre pour occuper la séance&nbsp;: les données "
+          "ne distinguent pas les deux, et ce site ne prétend pas le faire. ")
+    if groupe:
+        p2 += (f"Le taux d'adoption, lui, dépend surtout d'un fait extérieur au "
+               f"député&nbsp;: un amendement de la majorité passe, un amendement "
+               f"de l'opposition tombe. Il se lit donc contre celui de "
+               f"{echapper(i['groupe'])}, pas contre celui de l'Assemblée.")
+    else:
+        p2 += ("Le taux d'adoption, lui, dépend surtout d'un fait extérieur au "
+               "député : un amendement de la majorité passe, un amendement de "
+               "l'opposition tombe.")
+    return p1, p2
 
 
 def phrase_portee(apercu: dict) -> tuple[str, str]:

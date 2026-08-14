@@ -42,7 +42,7 @@ import polars as pl
 
 from . import analyze, cosign, ideal
 from .analyze import VoteCube
-from .config import EXPRESSED
+from .config import EXPRESSED, STRUCTURAL_NONVOTE_CAUSES
 from .parse import load
 
 #: Scrutins en commun exigés pour qu'un taux d'accord soit publié. En deçà, le
@@ -108,6 +108,24 @@ FONCTIONS_NOTABLES = frozenset(
     {"Président", "Co-Président", "Vice-Président", "Secrétaire", "Rapporteur",
      "Co-rapporteur", "Questeur", "Rapporteur général"}
 )
+
+#: Les sorts possibles d'un amendement, tels que la source les nomme, et le
+#: nom de la colonne qui les compte. Un amendement sans sort n'a pas encore été
+#: examiné — c'est un sixième état, et le confondre avec un rejet ferait
+#: publier un taux d'adoption calculé sur un dénominateur qui n'existe pas.
+SORTS_AMENDEMENT: dict[str, str] = {
+    "Adopté": "adoptes",
+    "Rejeté": "rejetes",
+    "Tombé": "tombes",
+    "Retiré": "retires",
+    "Non soutenu": "non_soutenus",
+}
+
+#: Statuts d'un député sur un vote qui engage, du plus au moins engageant.
+#: Cinq et non trois : « absent » recouvrait jusqu'ici trois situations qui ne
+#: se reprochent pas de la même façon — n'avoir pas pris part, ne pas *pouvoir*
+#: voter (ministre, perchoir), et n'être pas encore élu.
+STATUTS_VOTE = ("pour", "contre", "abstention", "absent", "empeche", "hors_mandat")
 
 #: Types d'organes retenus pour la fiche, du plus au moins parlant.
 TYPES_ORGANES = {
@@ -295,8 +313,37 @@ class Donnees:
                 # les intervalles. La page Méthode le publie.
                 "blocs_bootstrap": len(ideal.blocs_de_scrutins(self.cube_texte)),
                 "entres_en_cours": self._entres_en_cours(),
+                # La délégation à l'échelle de l'Assemblée. Publiée en double,
+                # comme tout le reste du site : sur tous les scrutins, et sur
+                # les seuls votes qui engagent — c'est sur ces derniers qu'elle
+                # pèse le plus, et c'est là que « présence » cesse de vouloir
+                # dire présence physique.
+                "delegation": {
+                    "tous": self._part_delegation(s),
+                    "engageants": self._part_delegation(self.cube_texte.scrutins),
+                },
             }
         )
+
+    def _part_delegation(self, scrutins: pl.DataFrame) -> dict:
+        """Part des suffrages émis par délégation, sur une assiette de scrutins.
+
+        Agrégée, et non moyennée sur les députés : la question est « quelle part
+        des suffrages de cette assemblée a été émise par un mandataire ? ». La
+        moyenne des taux individuels répondrait à une autre question et donnerait
+        un autre nombre.
+        """
+        v = (
+            self.votes.join(
+                scrutins.select("scrutin_uid"), on="scrutin_uid", how="inner")
+            .filter(pl.col("position").is_in(list(EXPRESSED)))
+        )
+        delegues, exprimes = int(v["par_delegation"].sum()), v.height
+        return {
+            "delegues": delegues,
+            "exprimes": exprimes,
+            "part": (delegues / exprimes) if exprimes else None,
+        }
 
     def _entres_en_cours(self) -> int:
         """Députés en exercice dont le mandat n'a pas couru toute la législature.
@@ -329,10 +376,11 @@ class Donnees:
             # le taux, son numérateur et son dénominateur voyagent ensemble.
             "participation_engageants", "votes_engageants",
             "engageants_eligibles", "engageants_votables",
-            "part_delegation_engageants", "participation_comparable",
+            "engageants_delegues", "part_delegation_engageants",
+            "participation_comparable",
         ]
         if self.avec_amendements:
-            colonnes += ["amendements", "taux_adoption"]
+            colonnes += ["amendements", "examines", "adoptes", "taux_adoption"]
         return lignes(self.deputes.select(colonnes).sort("nom_complet"))
 
     def fiche(self, uid: str) -> dict:
@@ -379,6 +427,7 @@ class Donnees:
                         "engageants_delegues", "part_delegation_engageants",
                     )
                 },
+                "bilan": _bilan(r),
                 "position": {
                     "axe1": r["axe1"],
                     "borne_basse": r["borne_basse"],
@@ -389,7 +438,11 @@ class Donnees:
                 "amendements": (
                     {
                         "deposes": r.get("amendements"),
-                        "adoptes": r.get("adoptes"),
+                        # Le dénominateur du taux d'adoption, et la ventilation
+                        # complète des sorts : un compte de dépôts seul ne dit
+                        # pas si le député écrit du droit ou de la protestation.
+                        "examines": r.get("examines"),
+                        **{c: r.get(c) for c in SORTS_AMENDEMENT.values()},
                         "taux_adoption": r.get("taux_adoption"),
                         "cosignes": r.get("cosignes"),
                         "cosignataires_moyen": r.get("cosignataires_moyen"),
@@ -455,6 +508,83 @@ class Donnees:
         if seulement_dissidents:
             v = v.filter(pl.col("dissident"))
         return _propre({"total": total, "retenus": v.height, "votes": lignes(v.head(limite))})
+
+    def votes_engageants(self, uid: str) -> dict:
+        """Le relevé, texte par texte, des votes qui engagent — absences comprises.
+
+        Les mesures de la fiche sont des taux ; celle-ci est la pièce jointe qui
+        les rend opposables. Un lecteur qui conteste « 62 % de présence » n'a
+        rien à contester tant qu'il ne voit pas les scrutins qui composent le
+        numérateur et ceux qui composent le reste.
+
+        **On part des scrutins, pas des votes.** `votes_du_depute` ne peut
+        renvoyer que les lignes qui existent : un député absent n'a pas de ligne,
+        et la liste tue silencieusement ce qu'elle est censée montrer. On part
+        donc des 245 votes qui engagent, et le vote vient s'y accrocher — ou pas.
+
+        Le statut vaut donc cinq valeurs et non trois, parce que les quatre
+        façons de ne pas voter pour ne se valent pas :
+
+        - `absent` — le mandat courait, aucun suffrage n'a été émis ;
+        - `empeche` — la source dit que le député ne pouvait pas voter
+          (ministre, président de séance, président de l'Assemblée) ;
+        - `hors_mandat` — le scrutin est antérieur à son entrée en fonction, ou
+          postérieur à sa sortie. Ce n'est pas une absence, c'est une absence de
+          question.
+
+        `par_delegation` qualifie un suffrage exprimé, jamais une absence :
+        c'est un vote imputé au député et émis par un collègue mandaté.
+        """
+        cube = self.cube_texte
+        scrutins = cube.scrutins
+        i = self.index_texte.get(uid)
+        eligible = (
+            cube.eligible[i] if i is not None
+            else np.zeros(scrutins.height, dtype=bool)
+        )
+
+        v = self.votes.filter(pl.col("acteur_uid") == uid).select(
+            "scrutin_uid", "groupe_uid", "position", "par_delegation", "cause")
+
+        t = (
+            scrutins.select(
+                "scrutin_uid", "numero", "date", "titre", "categorie",
+                "sort_code", "sort_libelle", "n_pour", "n_contre",
+                "n_abstention", "date_d",
+            )
+            .with_columns(eligible=pl.Series("eligible", eligible))
+            .join(v, on="scrutin_uid", how="left")
+            .join(
+                self.positions_groupe.select(
+                    "scrutin_uid", "groupe_uid", "majoritaire",
+                    "part_majoritaire", "partage",
+                ),
+                on=["scrutin_uid", "groupe_uid"],
+                how="left",
+            )
+            .with_columns(
+                # Même définition qu'ailleurs sur le site : pas de ligne dans le
+                # groupe, pas de dissidence — `null`, jamais `false`.
+                dissident=pl.when(
+                    pl.col("majoritaire").is_not_null()
+                    & (pl.col("part_majoritaire") > analyze.SEUIL_LIGNE)
+                    & pl.col("position").is_in(list(EXPRESSED))
+                )
+                .then(pl.col("position") != pl.col("majoritaire"))
+                .otherwise(None),
+                statut=_statut_vote(),
+                par_delegation=pl.col("par_delegation").fill_null(False),
+            )
+            .sort("date_d", "numero", descending=True)
+            .drop("date_d", "groupe_uid")
+        )
+
+        resume = {s: int((t["statut"] == s).sum()) for s in STATUTS_VOTE}
+        resume["total"] = t.height
+        resume["exprimes"] = sum(resume[s] for s in EXPRESSED)
+        resume["delegues"] = int(t["par_delegation"].sum())
+        resume["dissidents"] = int(t["dissident"].fill_null(False).sum())
+        return _propre({"resume": resume, "votes": lignes(t)})
 
     def liste_scrutins(
         self, *, portee: str | None = None, q: str | None = None,
@@ -821,6 +951,18 @@ class Donnees:
                 pl.col("axe1").min().alias("position_min"),
                 pl.col("axe1").max().alias("position_max"),
                 pl.len().alias("effectif_actuel"),
+                # La délégation du groupe, agrégée sur ses membres actuels : la
+                # somme des suffrages délégués sur la somme des suffrages émis.
+                # Une moyenne des taux individuels donnerait le même poids à un
+                # député entré en janvier qu'à un député présent depuis 2024.
+                pl.col("engageants_delegues").sum().alias("delegues_groupe"),
+                pl.col("votes_engageants").sum().alias("engageants_groupe"),
+            )
+            .with_columns(
+                pl.when(pl.col("engageants_groupe") > 0)
+                .then(pl.col("delegues_groupe") / pl.col("engageants_groupe"))
+                .otherwise(None)
+                .alias("part_delegation")
             )
         )
         return (
@@ -909,6 +1051,84 @@ def _delegation(scrutins: pl.DataFrame, prefixe: str) -> pl.DataFrame:
         .group_by("acteur_uid")
         .agg(pl.col("par_delegation").sum().alias(f"{prefixe}_delegues"))
     )
+
+
+def _statut_vote() -> pl.Expr:
+    """Le statut d'un député sur un scrutin, en une expression et un seul endroit.
+
+    L'ordre des cas porte tout le sens, et il n'est pas commutatif :
+
+    1. **hors mandat** d'abord. Un scrutin antérieur à l'élection du député n'est
+       pas une absence, c'est une question qui ne lui était pas posée. Testé en
+       dernier, il aurait été noyé dans « absent ».
+    2. **le suffrage exprimé** ensuite, qui se nomme lui-même — pour, contre,
+       abstention.
+    3. **l'empêchement** enfin : la source dit que ce député ne pouvait pas voter
+       (ministre, président de séance, président de l'Assemblée). Le compter
+       comme absent revient à reprocher à quelqu'un d'avoir occupé le perchoir.
+
+    Ce qui reste — mandat courant, aucun suffrage, aucun motif publié — est une
+    absence, et le mot n'en dit pas plus : la source ne publie aucun motif, et
+    ce site n'en invente pas.
+    """
+    return (
+        pl.when(~pl.col("eligible"))
+        .then(pl.lit("hors_mandat"))
+        .when(pl.col("position").is_in(list(EXPRESSED)))
+        .then(pl.col("position"))
+        .when(pl.col("cause").is_in(list(STRUCTURAL_NONVOTE_CAUSES)))
+        .then(pl.lit("empeche"))
+        .otherwise(pl.lit("absent"))
+        .alias("statut")
+    )
+
+
+def _bilan(r: dict) -> list[dict]:
+    """Les trois assiettes de scrutins d'un député, côte à côte.
+
+    Le site publie deux présences — sur les votes qui engagent, et sur tous les
+    scrutins — à deux endroits différents et avec deux dénominateurs différents.
+    Un lecteur ne peut pas les rapprocher de tête, et sans le rapprochement il
+    lui manque le seul chiffre qu'il cherchait vraiment : *combien de fois ce
+    député a-t-il voté, sur combien de fois où il aurait pu ?*
+
+    Les « autres scrutins » se déduisent, ils ne se recomptent pas. Les portées
+    partitionnent les scrutins — un scrutin est de portée « texte » ou il ne
+    l'est pas — et les deux assiettes sortent des mêmes tables : la soustraction
+    est exacte, là où un troisième calcul serait une troisième occasion de
+    diverger.
+
+    Chaque ligne porte les trois nombres qui la fondent : les scrutins où le
+    mandat courait, ceux où le député pouvait effectivement voter (hors
+    non-votants structurels), et les suffrages émis. Aucun taux ne voyage sans
+    son dénominateur, ici comme ailleurs.
+    """
+    champs = ("exprimes", "votables", "eligibles", "delegues")
+    tous = dict(zip(champs, (
+        r["votes_exprimes"] or 0, r["scrutins_votables"] or 0,
+        r["scrutins_eligibles"] or 0, r["votes_delegues"] or 0)))
+    texte = dict(zip(champs, (
+        r["votes_engageants"] or 0, r["engageants_votables"] or 0,
+        r["engageants_eligibles"] or 0, r["engageants_delegues"] or 0)))
+    autres = {c: tous[c] - texte[c] for c in champs}
+
+    # Un député dont la source ne publie aucun suffrage n'a pas une présence de
+    # zéro : il a une présence inconnue. Publier « 0,0 % » sur les trois lignes
+    # serait l'accusation la plus grave du site, portée sur ce qui n'est
+    # peut-être qu'un trou dans les données. Cf. `phrase_participation`.
+    muet = not tous["exprimes"]
+
+    lignes = []
+    for assiette, valeurs in (
+        ("engageants", texte), ("autres", autres), ("tous", tous)
+    ):
+        votables = valeurs["votables"]
+        lignes.append({
+            "assiette": assiette,
+            **valeurs,
+            "taux": None if (muet or not votables) else valeurs["exprimes"] / votables,
+        })
+    return lignes
 
 
 def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
@@ -1048,10 +1268,17 @@ def _amendements() -> pl.DataFrame | None:
         .group_by(pl.col("auteur_uid").alias("acteur_uid"))
         .agg(
             pl.len().alias("amendements"),
-            (pl.col("sort") == "Adopté").sum().alias("adoptes"),
+            *[
+                (pl.col("sort") == libelle).sum().alias(colonne)
+                for libelle, colonne in SORTS_AMENDEMENT.items()
+            ],
+            # Ni adopté ni rejeté : pas encore examiné. Sans cette colonne, le
+            # lecteur soustrait les adoptés du total et attribue au rejet des
+            # amendements dont l'Assemblée n'a rien dit.
+            analyze.EXAMINE.sum().alias("examines"),
             pl.col("nb_cosignataires").mean().alias("cosignataires_moyen"),
         )
-        .with_columns((pl.col("adoptes") / pl.col("amendements")).alias("taux_adoption"))
+        .with_columns(analyze.taux_adoption())
     )
     cosignes = (
         amd.select("cosignataires")

@@ -234,6 +234,67 @@
     </details>
   </section>
 
+  <!-- ══ LA DÉLÉGATION ═════════════════════════════════════════════
+       Elle a sa place sur cette page et pas seulement sur les fiches :
+       « qui vote avec qui » compte des suffrages, et près d'un quart d'entre
+       eux n'ont pas été émis par la personne à qui ils sont imputés. Un
+       accord entre deux députés est donc aussi, pour partie, un accord entre
+       deux mandataires.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Qui a réellement déposé ces bulletins</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{DELEG_ASSEMBLEE_PCT}}<span class="unite">%</span></div>
+        <p class="provenance valeur-note">
+          <b>{{DELEG_ASSEMBLEE_N}}</b> suffrages émis par un mandataire<br>
+          sur <b>{{DELEG_ASSEMBLEE_DENOM}}</b> exprimés sur les votes qui engagent
+        </p>
+      </div>
+      <div>
+        <p class="enclair">{{DELEG_ASSEMBLEE_PHRASE}}</p>
+        <p class="enclair">{{DELEG_ASSEMBLEE_PHRASE_2}}</p>
+      </div>
+    </div>
+
+    <div class="tableau-defile">
+      <table class="tableau-groupes">
+        <caption class="provenance">Part des suffrages émis par délégation sur les
+          {{PORTEE_TEXTE}} votes qui engagent, groupe par groupe. Numérateur et
+          dénominateur agrégés sur les membres actuels du groupe&nbsp;: c'est la part
+          des suffrages du groupe, pas la moyenne des taux de ses députés.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Groupe</th>
+            <th scope="col">Députés</th>
+            <th scope="col">Part déléguée</th>
+            <th scope="col">Suffrages délégués</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{LIGNES_DELEGATION}}
+        </tbody>
+      </table>
+    </div>
+
+    <details class="piege">
+      <summary>Ce que la délégation change à la lecture de cette page</summary>
+      <p>Deux députés dont les votes concordent à 90&nbsp;% ont pu ne jamais se
+        trouver ensemble dans l'hémicycle. Le taux d'accord porte sur des
+        <b>suffrages imputés</b>, et un suffrage sur quatre a été déposé par
+        quelqu'un d'autre. Cela ne fausse rien — le vote délégué est le vote du
+        député, c'est le droit — mais cela interdit de lire cette carte comme une
+        photographie de qui siège à côté de qui.</p>
+      <p>La source dit qu'un vote a été délégué&nbsp;; <b>elle ne dit jamais à qui</b>.
+        Impossible, donc, de savoir si les délégations restent dans le groupe, ni si
+        quelques députés en concentrent beaucoup. Ces questions sont bonnes, et les
+        données publiées n'y répondent pas.</p>
+      <p>La comparaison entre groupes se lit avec leurs effectifs&nbsp;: un groupe de
+        dix députés voit sa part bouger de plusieurs points dès qu'un de ses membres
+        s'absente durablement.</p>
+    </details>
+  </section>
+
   <!-- ══ SUITE ═════════════════════════════════════════════════════ -->
   <section class="cadre socle">
     <div class="lecture">

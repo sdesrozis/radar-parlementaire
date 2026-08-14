@@ -1,0 +1,38 @@
+  <!-- ══ CE QUI A ÉTÉ PROPOSÉ ══════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Ce que {{NOM_COURT}} a proposé — les amendements déposés</p>
+    <div class="mesure-tete">
+      <div>
+        <div class="valeur">{{AMD_N}}</div>
+        <p class="provenance valeur-note">{{AMD_PROVENANCE}}</p>
+      </div>
+      <div>
+        <p class="enclair">{{AMD_PHRASE}}</p>
+        <p class="enclair">{{AMD_PHRASE_2}}</p>
+      </div>
+    </div>
+
+    {{AMD_SORTS}}
+
+    {{AMD_BANDE}}
+
+    <details class="piege">
+      <summary>Ce que « amendement déposé » compte, et ce qu'il ne compte pas</summary>
+      <div class="dedans">
+        <p><b>Un amendement n'est pas une loi.</b> C'est une modification proposée à un texte
+          en discussion — parfois une refonte d'article, parfois le remplacement d'un mot.
+          Les deux comptent pour un ici, et aucune donnée publiée ne permet de les distinguer.</p>
+        <p>Le compte retient les amendements dont ce député est <b>l'auteur principal</b>,
+          celui que la source nomme en premier. Les amendements seulement cosignés n'y
+          sont pas — il y en a {{AMD_COSIGNES}} — parce qu'un dépôt de groupe entier
+          ferait alors compter la même proposition pour cent.</p>
+        <p><b>Le taux d'adoption se divise par les amendements examinés</b>, pas par les dépôts :
+          un texte encore en navette laisse les siens sans sort, et les compter comme des échecs
+          ferait baisser le taux d'un député à chaque dépôt, sans qu'aucun vote ait eu lieu.</p>
+        <p>Ce que ce site ne publie pas, faute de donnée exploitable : les <b>propositions de
+          loi</b> dont un député est l'auteur. Elles vivent dans un autre jeu de données de
+          l'Assemblée, que ce projet ne télécharge pas encore. C'est une lacune, elle est ici
+          nommée, et elle n'est pas comblée par un chiffre approchant.</p>
+      </div>
+    </details>
+  </section>
