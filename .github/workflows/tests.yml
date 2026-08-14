@@ -14,7 +14,16 @@ jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
+      # `fetch-depth: 0` récupère tout l'historique. Le défaut de `checkout` est
+      # un clone superficiel d'un seul commit, et `test_corrections.py` vérifie
+      # que chaque empreinte du registre désigne un commit réel : sur un clone
+      # superficiel, les commits cités n'existent pas localement et le contrôle
+      # échouait sur les douze entrées. Le dépôt est petit, le coût est nul, et
+      # la vérification retrouve son sens — c'est elle qui attraperait une
+      # empreinte fausse dans un registre que le site publie sous forme de liens.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Installer uv
         uses: astral-sh/setup-uv@v5

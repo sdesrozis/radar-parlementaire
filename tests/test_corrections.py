@@ -65,17 +65,46 @@ def test_l_effet_donne_un_avant_et_un_apres(entree):
         "un effet non chiffré doit être explicité")
 
 
+def _historique_incomplet() -> str | None:
+    """Dit pourquoi l'historique ne permet pas de vérifier une empreinte.
+
+    Deux situations, et aucune n'est une erreur du registre :
+
+    - **hors dépôt git** — une archive du code reste parfaitement utilisable, et
+      le test ne doit pas transformer son absence en échec ;
+    - **clone superficiel** — `git clone --depth 1`, et surtout le défaut de
+      `actions/checkout`, ne rapatrient qu'un commit. Les empreintes citées par
+      le registre sont alors absentes *localement* tout en étant parfaitement
+      valides sur le dépôt. Le contrôle échouait sur les douze entrées à chaque
+      exécution de la CI, en annonçant « commit introuvable » là où il fallait
+      lire « historique non récupéré ».
+
+    La CI demande désormais l'historique complet (`fetch-depth: 0`), de sorte
+    que la vérification y a bien lieu. Ce garde-fou couvre les autres cas.
+    """
+    r = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                       cwd=RACINE, capture_output=True, text=True)
+    if r.returncode != 0:
+        return "hors dépôt git"
+    r = subprocess.run(["git", "rev-parse", "--is-shallow-repository"],
+                       cwd=RACINE, capture_output=True, text=True)
+    if r.stdout.strip() == "true":
+        return "clone superficiel : historique non récupéré (fetch-depth: 0)"
+    return None
+
+
 @pytest.mark.parametrize("entree", ENTREES, ids=lambda e: e["titre"])
 def test_le_commit_existe(entree):
     """L'empreinte doit désigner un commit réel : le registre publie le lien.
 
-    Ignoré hors dépôt git — une archive du code reste utilisable, et le test ne
-    doit pas transformer son absence en échec.
+    C'est le contrôle qui donne sa valeur au registre : chaque entrée renvoie
+    vers un commit du dépôt, et une empreinte fausse produirait un lien mort sur
+    la page qui promet qu'on peut aller lire la correction.
     """
+    if raison := _historique_incomplet():
+        pytest.skip(raison)
     r = subprocess.run(
         ["git", "cat-file", "-t", entree["commit"]],
         cwd=RACINE, capture_output=True, text=True)
-    if r.returncode != 0 and "not a git repository" in r.stderr.lower():
-        pytest.skip("hors dépôt git")
     assert r.returncode == 0, f"commit {entree['commit']} introuvable"
     assert r.stdout.strip() == "commit"
