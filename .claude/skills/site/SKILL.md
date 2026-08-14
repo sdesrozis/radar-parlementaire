@@ -162,9 +162,35 @@ passe par `{{BASE_URL}}`.
 
 ## La marque
 
-`site/assets/` porte les images de marque ; `generer.py` les copie dans `sortie/statique/`.
-`logo.png` est le verrou complet, `marque.png` l'emblème seul recadré au carré — c'est lui
-qui sert de favicon et d'en-tête, le verrou complet étant illisible à 32 pixels.
+`site/assets/` porte les images de marque ; `generer.py` copie ses fichiers de premier
+niveau dans `sortie/statique/` (`assets/sources/` reste sur place : les originaux portent
+le bloc-marque de l'État). Chaque image existe en deux versions **dessinées** — `-clair`
+pour le papier clair, `-sombre` pour le papier sombre —, jamais un filtre : la version
+précédente éclaircissait le bleu d'encre au `brightness` et délavait aussi le drapeau.
+
+`marque-v2` est le verrou complet : emblème, mot-marque, barre tricolore et signature.
+Il sert **en tête et en pied**, en un seul et même dessin. L'en-tête a composé sa marque
+en HTML pendant plusieurs versions — l'emblème recadré, puis « RADAR » en mono espacée et
+« parlementaire » en italique — et le site portait donc deux marques légèrement
+différentes selon l'endroit où on la regardait.
+
+`embleme-v2` est l'emblème seul recadré au carré. Il ne sert plus que de **favicon** :
+à 32 pixels, le verrou complet est une bouillie. `partage-v2` est la carte OpenGraph
+1200×630, à fond plein — un PNG transparent disparaîtrait sur une plateforme qui compose
+sa vignette sur fond sombre.
+
+**Le verrou ne descend pas sous 165 px de large.** En dessous, la barre tricolore et
+« Ce que fait votre député » se referment en deux filets gris : ce n'est plus un verrou,
+c'est un mot-marque mal recadré. D'où 196 px en tête sur écran large (barre de 108 px) et
+168 px sous 720 px (barre de 92 px). Le CSS le note à l'endroit où il pourrait être réduit.
+
+**La maxime est sur « Qui édite ce site », et là seulement.** Elle a été essayée sous le
+logo du pied, où elle apparaissait sur les 581 pages à côté d'un taux de présence : une
+adresse au lecteur répétée à ce point devient un slogan de bas de page. Elle est dite une
+fois, sur la seule page qui explique pourquoi le site existe, et adossée à l'article 15 de
+la Déclaration de 1789 cité en dessous — le droit de demander des comptes est écrit, il se
+rappelle, il ne se revendique pas. C'est le seul endroit du site qui s'adresse au lecteur ;
+les autres pages comptent.
 
 **Le bleu et le rouge du logo n'entrent dans aucun graphique.** Ils sont déclarés dans
 `style.css` (`--marque`, `--drapeau-bleu`, `--drapeau-rouge`) uniquement pour être nommés
