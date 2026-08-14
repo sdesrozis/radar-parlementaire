@@ -1,3 +1,24 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/assets/marque-v2-sombre.png">
+    <img src="site/assets/marque-v2-clair.png" alt="Radar parlementaire — ce que fait votre député" width="440">
+  </picture>
+</p>
+
+<p align="center">
+  <strong>Le dépôt de <a href="https://radar-parlementaire.fr">radar-parlementaire.fr</a></strong><br>
+  Les données, les algorithmes, le générateur du site et la note méthodologique.
+</p>
+
+<p align="center">
+  <a href="https://github.com/sdesrozis/radar/actions/workflows/tests.yml"><img src="https://github.com/sdesrozis/radar/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <img src="https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue" alt="licence AGPL-3.0-or-later">
+  <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
+  <a href="https://creativecommons.org/licenses/by/4.0/deed.fr"><img src="https://img.shields.io/badge/note-CC%20BY%204.0-lightgrey" alt="note méthodologique sous CC BY 4.0"></a>
+</p>
+
+---
+
 # Radar parlementaire
 
 Un radar automatisé sur l'activité de l'Assemblée nationale, construit à partir
@@ -6,6 +27,27 @@ quels groupes se fissurent, quels sujets montent, qui dépose quels amendements.
 
 Le radar signale des écarts à la normale. Il ne produit aucune interprétation
 politique : la lecture reste au lecteur.
+
+**Tout ce que le site affiche est calculé ici.** Le site n'a ni serveur, ni API,
+ni base de données : `site/generer.py` lit les tables construites par `radar
+update` et écrit des fichiers HTML. Ce dépôt et le site publié ne peuvent donc
+pas diverger — il n'existe pas de chiffre qui vienne d'ailleurs.
+
+| | |
+|---|---|
+| **Le site** | [radar-parlementaire.fr](https://radar-parlementaire.fr) — une fiche par député, la matrice des accords, la méthode |
+| **La méthode** | [note méthodologique](https://radar-parlementaire.fr/methode/note-methodologique.pdf) (PDF, 25 p.) — chaque mesure définie formellement, source dans [`docs/`](docs/note-methodologique.tex) |
+| **Les erreurs** | [registre des corrections](https://radar-parlementaire.fr/corrections.html) — ce qui était faux, pourquoi, et l'avant/après chiffré |
+| **Qui édite** | [mentions](https://radar-parlementaire.fr/mentions.html) — un citoyen, sans financement, sans parti |
+| **Citer** | [`CITATION.cff`](CITATION.cff), et la section [Citer](#citer) plus bas |
+
+**Un chiffre vous paraît faux ?** C'est l'usage attendu de ce dépôt. Ouvrez une
+[issue](https://github.com/sdesrozis/radar/issues) ou écrivez à
+`contact@radar-parlementaire.fr` : toute contestation reçoit une réponse, et si
+elle est fondée, une entrée au registre des corrections. La note méthodologique
+existe précisément pour que la discussion porte sur la méthode plutôt que sur la
+conclusion — c'est-à-dire pour qu'elle puisse être tranchée. En cas de
+divergence entre la note et le code, **c'est le code qui a tort**.
 
 ```bash
 uv sync --extra notebook
