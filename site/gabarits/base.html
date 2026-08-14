@@ -46,12 +46,18 @@
 <header class="entete">
   <div class="cadre">
     <a class="marque" href="index.html">
-      <!-- Deux fichiers plutôt qu'un `<picture>` : le site a un bouton de thème
+      <!-- Le verrou complet, et non l'emblème recadré flanqué d'un mot-marque
+           retypographié : le logo porte déjà son nom, sa barre tricolore et sa
+           signature, et les reconstituer en HTML donnait deux marques
+           légèrement différentes selon l'endroit du site où on la regardait.
+           Deux fichiers plutôt qu'un `<picture>` : le site a un bouton de thème
            qui pose `data-theme` sur la racine, et une requête média ne sait pas
-           le suivre. Le CSS masque celui qui ne sert pas. -->
-      <img class="embleme clair" src="statique/embleme-v2-clair.png" alt="" width="256" height="256">
-      <img class="embleme sombre" src="statique/embleme-v2-sombre.png" alt="" width="256" height="256">
-      <span class="m1">Radar</span><span class="m2">parlementaire</span>
+           le suivre. Le CSS masque celui qui ne sert pas — en `display: none`,
+           donc le nom n'est annoncé qu'une fois aux lecteurs d'écran. -->
+      <img class="verrou clair" src="statique/marque-v2-clair.png"
+           alt="Radar parlementaire — ce que fait votre député" width="929" height="450">
+      <img class="verrou sombre" src="statique/marque-v2-sombre.png"
+           alt="Radar parlementaire — ce que fait votre député" width="929" height="447">
     </a>
     <nav class="menu">
       <a href="index.html"{{NAV_ACCUEIL}}>Comprendre</a>
@@ -105,13 +111,25 @@
 <footer class="cadre pied">
   <div class="grille">
     <div>
-      <!-- Le verrou complet — emblème, mot-marque et signature — tient dans le
-           pied, où il a la largeur pour rester lisible. Dans l'en-tête il serait
-           réduit à une vignette où « Ce que fait votre député » disparaîtrait. -->
+      <!-- Le même verrou qu'en tête de page, et non une seconde version : une
+           marque qui change de dessin entre le haut et le bas de la page se
+           lit comme deux marques. Ici il est décoratif — le nom du site a déjà
+           été annoncé par l'en-tête —, d'où le `alt` vide et l'`aria-hidden`,
+           qui évitent de le faire dire une deuxième fois. -->
       <img class="pied-logo clair" src="statique/marque-v2-clair.png"
-           alt="Radar parlementaire — ce que fait votre député" width="929" height="450">
+           alt="" aria-hidden="true" width="929" height="450">
       <img class="pied-logo sombre" src="statique/marque-v2-sombre.png"
-           alt="Radar parlementaire — ce que fait votre député" width="929" height="447">
+           alt="" aria-hidden="true" width="929" height="447">
+      <!-- La devise. Elle dit pourquoi ce site existe, ce qu'aucune mesure ne
+           peut dire à la place. Elle est ancrée sur l'article 15 de 1789 et pas
+           sur une indignation : le droit de demander des comptes est écrit, il
+           n'a pas à être revendiqué. C'est le seul endroit du site où l'on
+           s'adresse au lecteur — les 581 autres pages ne font que compter. -->
+      <p class="devise">Citoyen, liberté, égalité, fraternité n'excluent pas le
+        contrôle. Nous avons des droits, et des devoirs.</p>
+      <p class="devise-source provenance">Déclaration des droits de l'homme et du
+        citoyen, 1789, article 15&nbsp;: la Société a le droit de demander compte
+        à tout agent public de son administration.</p>
     </div>
     <div>
       <h4>Source</h4>

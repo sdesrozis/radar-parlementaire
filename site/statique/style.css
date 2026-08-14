@@ -153,64 +153,41 @@ a:hover { text-decoration-color: var(--accent); }
 }
 .entete .cadre {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 24px; height: 96px;
+  gap: 24px; height: 108px;
 }
-.marque { display: flex; align-items: center; gap: 15px; text-decoration: none; }
-/* L'emblème du logo, découpé du fichier d'origine. Il occupait 28 px : à cette
-   taille, le fronton, les colonnes et l'aiguille du cadran se confondaient en
-   une tache, et la marque n'était plus lisible que par son texte. À 34 px les
-   trois motifs se séparaient, mais l'ensemble — emblème et mot — pesait encore
-   moins que le menu posé en face : sur une page de fiche, le premier élément
-   que l'œil rencontrait était le nom du député, et le site n'était nulle part.
-   À 46 px avec le mot à l'avenant, la marque tenait le coin — mais sur un écran
-   large, à 1140 px de cadre, elle restait plus discrète que les quatre entrées
-   de menu réunies, et le site continuait de s'annoncer moins fort que sa propre
-   navigation. À 58 px, avec « RADAR » à 19 px et « parlementaire » à 25 px, la
-   marque pèse enfin ce que pèse le menu d'en face, sans déborder sur lui.
-   La source fait 256 px : l'agrandissement ne coûte aucune netteté, y compris
-   sur écran à haute densité.
-   `align-self: baseline` le poserait sur la ligne d'écriture, où il flotterait
-   au-dessus du texte : il est centré, et un demi-pixel de descente l'aligne
-   optiquement sur les capitales de « RADAR ». */
-.marque .embleme {
-  flex: none; width: 58px; height: 58px;
-  transform: translateY(0.5px);
-}
-/* « RADAR » passe en pleine encre : à `--encre-2`, le mot reculait derrière les
-   entrées de menu qui, elles, s'allument au survol. La marque doit être le seul
-   élément de l'en-tête qui n'a pas besoin d'être survolé pour se voir. */
-.marque .m1 {
-  font-family: var(--mono); font-size: 19px; font-weight: 700;
-  letter-spacing: 0.2em; text-transform: uppercase; color: var(--encre);
-}
-.marque .m2 {
-  font-family: var(--serif); font-style: italic; font-size: 25px;
-  color: var(--encre-2);
-}
-/* Sous 720 px le menu disparaît de l'en-tête : la marque n'a plus de voisin à
-   égaler, et la barre du bas prend le relais. Elle grandit donc moins que sur
-   écran large — assez pour rester la première chose lue, pas au point de manger
-   la hauteur d'écran d'un téléphone. */
+.marque { display: flex; align-items: center; text-decoration: none; }
+/* Le verrou complet dans l'en-tête, à 196 px de large. La hauteur de la barre
+   suit : le logo fait 0,484 fois sa largeur, soit 95 px, et une barre de 96 px
+   ne lui laissait pas de quoi respirer — 108 px lui donnent six pixels de marge
+   au-dessus et en dessous.
+   Le verrou n'est un verrou que tant qu'on lit ses quatre étages. Sous 165 px,
+   la barre tricolore et la signature « Ce que fait votre député » se referment
+   en deux filets gris et il ne reste qu'un mot-marque : c'est le plancher, et
+   il commande les tailles ci-dessous plutôt que l'inverse.
+   La source fait 929 px de large : l'agrandissement ne coûte aucune netteté,
+   y compris sur écran à haute densité. */
+.marque .verrou { display: block; width: 196px; height: auto; }
+/* Sous 720 px le menu disparaît de l'en-tête et la barre du bas prend le
+   relais : la marque n'a plus de voisin à égaler. Elle descend à 168 px — le
+   plancher de lisibilité de la signature — et la barre à 92 px, pour ne pas
+   manger la hauteur d'écran d'un téléphone. */
 @media (max-width: 720px) {
-  .entete .cadre { height: 80px; }
-  .marque { gap: 13px; }
-  .marque .embleme { width: 48px; height: 48px; }
-  .marque .m1 { font-size: 16px; }
-  .marque .m2 { font-size: 20px; }
+  .entete .cadre { height: 92px; }
+  .marque .verrou { width: 168px; }
 }
-/* Le mot « parlementaire » ne disparaît plus qu'au tout dernier ressort : c'est
-   lui qui dit de quel radar il s'agit, et l'emblème seul ne le dit à personne. */
-@media (max-width: 380px) { .marque .m2 { display: none; } }
+/* Il n'y a plus de palier en dessous. L'ancien en-tête cachait le mot
+   « parlementaire » sous 380 px parce que l'emblème et deux mots composés en
+   HTML débordaient ; le verrou seul, à 168 px dans un cadre qui en offre 340,
+   tient sans rien sacrifier. */
 .menu { display: flex; gap: 26px; font-size: 14.5px; }
 .menu a { text-decoration: none; color: var(--encre-2); padding: 4px 0; border-bottom: 1.5px solid transparent; }
 .menu a:hover { color: var(--encre); }
-/* La marque agrandie prend 50 px de plus qu'avant : sur une tablette en portrait
-   (768 px), « Les députés » et « Qui vote avec qui » passaient à la ligne et le
-   menu se cassait en deux étages. C'est le menu qui se resserre, pas la marque
-   qui rapetisse : quatre libellés à 13,5 px restent lisibles, une marque qu'on
-   ne remarque pas ne sert à rien. En dessous de 720 px, le menu disparaît de
-   toute façon au profit de la barre du bas. */
-@media (max-width: 1000px) { .menu { gap: 18px; font-size: 13.5px; } }
+/* Le menu ne se resserre plus sur tablette. Il le faisait parce que la marque
+   d'alors — emblème découpé plus « RADAR parlementaire » recomposé en HTML —
+   tenait 300 px et poussait « Les députés » et « Qui vote avec qui » à la
+   ligne. Le verrou en fait 196 : à 721 px, la plus étroite largeur où ce menu
+   s'affiche encore, la barre offre 681 px pour 636 de contenu. Rien ne casse,
+   et quatre libellés à 14,5 px valent mieux que quatre à 13,5. */
 .menu a[aria-current] { color: var(--encre); border-bottom-color: var(--accent); }
 @media (max-width: 720px) { .menu { display: none; } }
 
@@ -567,12 +544,26 @@ h1 {
 
 .pied { padding-block: 48px 72px; }
 .pied .grille { display: grid; gap: 30px; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
-/* Le logo complet, à sa seule place : le pied de page. Il est en couleurs et
-   loin de tout graphique, donc sans risque d'être lu comme une mesure. C'est
-   le seul endroit du site où la marque a le droit d'occuper de la place : à
-   108 px elle s'excusait d'être là, entre deux colonnes de texte qui la
-   dominaient. Elle tient maintenant sa colonne. */
+/* Le logo complet reprend en pied ce que l'en-tête a posé, à 236 px : à 108 px
+   il s'excusait d'être là, entre deux colonnes de texte qui le dominaient. Il
+   est en couleurs et loin de tout graphique, donc sans risque d'être lu comme
+   une mesure. */
 .pied-logo { display: block; width: min(236px, 100%); height: auto; }
+
+/* La devise, sous le logo. Elle est en romain et non en italique : le site
+   n'a pas de voix intérieure, et l'italique lui en donnerait une. Elle pèse
+   un demi-point de plus que les colonnes voisines et prend l'encre pleine —
+   c'est une phrase qu'on lit, pas une mention légale qu'on survole. */
+.pied .devise {
+  max-width: 30ch;
+  margin: 18px 0 0;
+  font-size: 15px; line-height: 1.55;
+  color: var(--encre);
+}
+/* La source, elle, se tient à sa place : en mono, en encre pâle, comme toute
+   provenance du site. Le site ne cite pas un texte de loi pour se réclamer de
+   son autorité, il donne sa référence pour qu'on aille la vérifier. */
+.pied .devise-source { max-width: 34ch; margin: 9px 0 0; font-size: 11.5px; line-height: 1.6; }
 
 /* ── la marque suit le thème, par deux fichiers ─────────────────────────────
    Le logo existe en deux versions dessinées : encre foncée pour le papier
@@ -584,22 +575,22 @@ h1 {
    deux sens. La version masquée l'est en `display: none`, donc invisible aussi
    des lecteurs d'écran — sans quoi le nom de la marque serait annoncé deux
    fois. */
-.marque .embleme.sombre, .pied-logo.sombre { display: none; }
+.marque .verrou.sombre, .pied-logo.sombre { display: none; }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .marque .embleme.clair,
+  :root:not([data-theme="light"]) .marque .verrou.clair,
   :root:not([data-theme="light"]) .pied-logo.clair { display: none; }
-  :root:not([data-theme="light"]) .marque .embleme.sombre { display: block; }
+  :root:not([data-theme="light"]) .marque .verrou.sombre { display: block; }
   :root:not([data-theme="light"]) .pied-logo.sombre { display: block; }
 }
-:root[data-theme="dark"] .marque .embleme.clair,
+:root[data-theme="dark"] .marque .verrou.clair,
 :root[data-theme="dark"] .pied-logo.clair { display: none; }
-:root[data-theme="dark"] .marque .embleme.sombre { display: block; }
+:root[data-theme="dark"] .marque .verrou.sombre { display: block; }
 :root[data-theme="dark"] .pied-logo.sombre { display: block; }
 
-:root[data-theme="light"] .marque .embleme.clair { display: block; }
+:root[data-theme="light"] .marque .verrou.clair { display: block; }
 :root[data-theme="light"] .pied-logo.clair { display: block; }
-:root[data-theme="light"] .marque .embleme.sombre,
+:root[data-theme="light"] .marque .verrou.sombre,
 :root[data-theme="light"] .pied-logo.sombre { display: none; }
 .pied h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--encre-3); margin: 0 0 10px; font-weight: 600; }
 .pied p, .pied li { font-size: 14.5px; color: var(--encre-2); margin: 0 0 7px; line-height: 1.6; }
