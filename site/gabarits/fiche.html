@@ -58,7 +58,7 @@
       <div>
         <div class="valeur">{{PART_ENG_PCT}}<span class="unite">%</span></div>
         <p class="provenance valeur-note">
-          <b>{{PART_ENG_N}}</b> votes exprimés<br>sur <b>{{PART_ENG_DENOM}}</b> votes qui engagent{{PART_ENG_RESERVE}}
+          <b>{{PART_ENG_N}}</b> votes exprimés{{PART_ENG_DELEGATION}}<br>sur <b>{{PART_ENG_DENOM}}</b> votes qui engagent{{PART_ENG_RESERVE}}
         </p>
       </div>
       <div>
@@ -89,8 +89,9 @@
           vote sur l'ensemble d'un texte, motion de censure. Ceux-là sont annoncés à l'avance,
           et y manquer est un choix.</p>
         <p>Le dénominateur ne compte par ailleurs que les scrutins où le mandat courait, et retire les
-          <b>non-votants structurels</b> — un ministre ou le président de séance ne peuvent pas voter :
-          ce ne sont pas des absences.</p>
+          <b>non-votants structurels</b> — un ministre, le président de séance ou le président de
+          l'Assemblée ne peuvent pas voter : ce ne sont pas des absences.</p>
+        {{PART_DELEGATION_PHRASE}}
       </div>
     </details>
   </section>

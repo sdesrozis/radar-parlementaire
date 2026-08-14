@@ -90,6 +90,25 @@ POSITIONS = ("pour", "contre", "abstention", "nonVotant")
 #: Positions qui comptent comme un vote exprimé.
 EXPRESSED = ("pour", "contre", "abstention")
 
-#: Causes de non-vote qui ne sont pas un choix du député (fonction incompatible).
-#: MG = membre du Gouvernement, PDS = président de séance, PSE = président de séance.
-STRUCTURAL_NONVOTE_CAUSES = frozenset({"MG", "PDS", "PSE"})
+#: Causes de non-vote qui ne sont pas un choix du député, mais la conséquence
+#: d'une fonction incompatible avec le vote. La source les nomme explicitement ;
+#: les compter comme des absences reviendrait à reprocher à un élu d'avoir
+#: occupé le perchoir ou un poste ministériel.
+#:
+#: - `MG`  — membre du Gouvernement ;
+#: - `PSE` — président de séance, celui qui préside au moment du scrutin ;
+#: - `PAN` — président de l'Assemblée nationale.
+#:
+#: `PAN` manquait à cette liste, et le coût était considérable : ses 7 508
+#: non-votes tombaient au dénominateur de présence de la seule personne
+#: concernée. Sur les votes qui engagent, la présidente de l'Assemblée était
+#: publiée à 8,6 % (19 sur 221) au lieu de 100 % (19 sur 19) — le site donnait
+#: la titulaire du perchoir pour la députée la moins assidue de la législature.
+#: C'est très exactement l'erreur que `analyze.participation` décrit et prétend
+#: écarter.
+#:
+#: `PDS` figurait ici et ne correspond à aucune ligne de la source : le code
+#: glosait deux fois « président de séance » pour deux codes différents, signe
+#: que la liste avait été écrite d'après une supposition plutôt que d'après les
+#: données. Les causes réellement présentes sont vérifiées par un test.
+STRUCTURAL_NONVOTE_CAUSES = frozenset({"MG", "PSE", "PAN"})

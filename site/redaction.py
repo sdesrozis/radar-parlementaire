@@ -137,10 +137,26 @@ def phrase_participation(a: dict, i: dict, dist: dict, rang_sup: int,
     if restrictions:
         assiette += " " + " et ".join(restrictions)
     p1 = (f"{assiette}, {g['il']} en a exprimé <b>{num(a['votes_engageants'])}</b>. {situation}")
-    p2 = (f"L'étalon n'est pas 100{NBSP}%. Le député le plus assidu de la législature "
-          f"atteint {pct(dist['max'])}{NBSP}%, et le député médian manque "
-          f"{dec(10 * (1 - dist['mediane']), 0)} votes qui engagent sur dix. "
-          f"Un taux se lit contre cette réalité, pas contre un idéal.")
+
+    # L'argument « l'étalon n'est pas 100 % » repose sur le maximum observé. Il
+    # ne tient que si ce maximum est effectivement inférieur à 100 %, ce qui
+    # cesse d'être vrai dès qu'un député au dénominateur très réduit — la
+    # présidente de l'Assemblée, qui ne vote pas tant qu'elle préside — vote à
+    # chacun des rares scrutins où il pouvait le faire. Écrire « l'étalon n'est
+    # pas 100 %, le plus assidu atteint 100,0 % » serait un non-sens, et le
+    # genre de phrase qui décrédibilise tout le reste de la page.
+    if dist["max"] < 0.99:
+        p2 = (f"L'étalon n'est pas 100{NBSP}%. Le député le plus assidu de la législature "
+              f"atteint {pct(dist['max'])}{NBSP}%, et le député médian manque "
+              f"{dec(10 * (1 - dist['mediane']), 0)} votes qui engagent sur dix. "
+              f"Un taux se lit contre cette réalité, pas contre un idéal.")
+    else:
+        p2 = (f"L'étalon n'est pas 100{NBSP}%. Le député médian manque "
+              f"{dec(10 * (1 - dist['mediane']), 0)} votes qui engagent sur dix, et les "
+              f"rares taux qui atteignent 100{NBSP}% sont ceux de députés dont une "
+              f"fonction — présider la séance, entrer au Gouvernement — a réduit le "
+              f"dénominateur à quelques votes. Un taux se lit avec l'effectif sur lequel "
+              f"il porte, pas contre un idéal.")
     return p1, p2
 
 
@@ -458,6 +474,59 @@ def reserve_denominateur(eligibles: int, votables: int, total: int) -> str:
         s = "s" if manquants > 1 else ""
         lignes.append(f"hors {num(manquants)} scrutin{s} de non-votant structurel")
     return ("<br>" + "<br>".join(lignes)) if lignes else ""
+
+
+def mention_delegation(delegues: int, exprimes: int) -> str:
+    """« dont N par délégation », accolé au numérateur de présence.
+
+    Le compte va au numérateur, pas au dénominateur : ces votes sont bien
+    imputés au député, le règlement le prévoit. Mais ils n'ont pas été émis par
+    lui, et « présence aux votes » se lit autrement quand on le sait. Le nombre
+    est donc affiché à côté de celui qu'il qualifie, jamais ailleurs.
+    """
+    if not delegues or not exprimes:
+        return ""
+    return f", dont <b>{num(delegues)}</b> par délégation"
+
+
+def phrase_delegation(delegues: int, exprimes: int, mediane: float) -> str:
+    """Le paragraphe du repli « pourquoi ce chiffre est trompeur ».
+
+    Trois cas, parce qu'un même dispositif ne se commente pas pareil selon son
+    ampleur : la pratique est générale, donc la signaler sans la situer ferait
+    passer pour singulier ce qui est ordinaire.
+    """
+    if not exprimes:
+        return ""
+    if not delegues:
+        return (f"<p><b>Aucun de ces votes n'a été émis par délégation</b>&nbsp;: "
+                f"ils ont tous été exprimés en personne. C'est assez rare pour "
+                f"être noté — à l'Assemblée, la moitié des députés délèguent au "
+                f"moins {pct(mediane)}{NBSP}% de leurs suffrages sur ces "
+                f"scrutins.</p>")
+    part = delegues / exprimes
+    situation = (
+        "c'est au-dessus de la pratique ordinaire"
+        if part > mediane * 1.5 else
+        "c'est en dessous de la pratique ordinaire"
+        if part < mediane * 0.5 else
+        "c'est l'ordre de grandeur habituel"
+    )
+    alerte = (
+        " <b>À ce niveau, le taux de présence ne décrit plus une présence "
+        "physique</b> : il décrit des suffrages émis en son nom."
+        if part >= 0.5 else ""
+    )
+    return (
+        f"<p><b>{num(delegues)} de ces votes ont été émis par délégation</b>, "
+        f"soit {pct(part)}{NBSP}%. Un député empêché peut confier son vote à un "
+        f"collègue, qui l'exprime pour lui&nbsp;; le règlement l'autorise et le "
+        f"vote lui est bien imputé. Rapporté à la médiane de l'Assemblée "
+        f"({pct(mediane)}{NBSP}% sur ces scrutins), {situation}.{alerte}</p>"
+        f"<p class=\"provenance\">La source indique qu'un vote a été délégué, "
+        f"jamais par qui il a été porté&nbsp;: ce site ne peut donc pas dire qui "
+        f"reçoit les délégations, et ne l'invente pas.</p>"
+    )
 
 
 def phrase_portee(apercu: dict) -> tuple[str, str]:

@@ -257,6 +257,46 @@ nécessitent du contexte politique, qualitatif et institutionnel.
 population de référence. C'est pourquoi les fonctions du projet renvoient les
 comptes bruts avec les taux.}
 
+\subsection{Qui fait quoi : les fonctions qui déplacent un chiffre}
+\label{sec:fonctions}
+
+Plusieurs calculs de ce document dépendent de la fonction exercée par un député.
+Ces fonctions sont familières au monde parlementaire et opaques pour tout le
+monde sinon ; les voici, avec l'endroit exact où chacune intervient. Ce n'est
+pas une présentation de l'Assemblée : c'est la liste des rôles dont l'oubli
+fausse un résultat.
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.22\linewidth}p{.40\linewidth}p{.30\linewidth}}
+\toprule
+Fonction & Ce que c'est & Où elle change un chiffre \\
+\midrule
+\textbf{Président de l'Assemblée} & Élu par ses pairs pour la durée de la législature, il dirige l'institution. Son siège surélevé a donné le mot \emph{perchoir}, employé comme synonyme de la fonction. Il ne prend pas part aux votes qu'il préside. & Non-vote structurel \code{PAN} : retiré du dénominateur de présence (§\ref{sec:participation}). \\
+\addlinespace
+\textbf{Président de séance} & La présidence tourne au cours de la journée : des vice-présidents se relaient au perchoir. Celui qui préside à l'instant du scrutin ne vote pas. & Non-vote structurel \code{PSE}, même retrait. \\
+\addlinespace
+\textbf{Membre du Gouvernement} & Un député nommé ministre cesse de siéger et son suppléant le remplace ; la source continue néanmoins d'enregistrer ses non-votes. & Non-vote structurel \code{MG}, même retrait. \\
+\addlinespace
+\textbf{Rapporteur} & Député chargé d'examiner un texte au nom d'une commission et d'en proposer les corrections. Deux co-rapporteurs cosignent par dizaines des amendements purement rédactionnels, quels que soient leurs groupes. & Amendements de rapporteur exclus du réseau de cosignatures (§\ref{sec:cosign}). \\
+\addlinespace
+\textbf{Commission} & Formation restreinte où les textes sont examinés avant la séance publique. L'essentiel du travail législatif s'y fait, le plus souvent \textbf{sans vote nominatif publié}. & Hors périmètre : invisible dans tous les indicateurs. \\
+\addlinespace
+\textbf{Groupe politique} & Réunion d'au moins quinze députés. Il structure le temps de parole, les postes et les positions de vote. & Population de référence de la cohésion, de la ligne et de la dissidence. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Les trois premières lignes ont un point commun qui justifie leur traitement
+identique : dans les trois cas, \textbf{c'est l'institution qui empêche le vote,
+pas l'élu qui s'y dérobe}, et la source le déclare. La cinquième ligne dit
+l'inverse : le travail en commission est réel, massif, et ce document n'en
+mesure rien — non par choix, mais parce qu'il ne laisse pas de trace nominative
+exploitable.
+
+\prudence{La conséquence pratique est qu'un député très investi en commission,
+ou occupé à présider, peut apparaître peu actif ici. Le taux de présence répond
+à « a-t-il voté quand il pouvait voter ? », jamais à « travaille-t-il ? ».}
+
 \section{Des fichiers bruts au cube de votes}\label{sec:cube}
 
 \subsection{Nettoyer sans inventer de données}
@@ -282,23 +322,107 @@ matrices booléennes de taille $n\times m$ :
 \]
 \[
  A_{ij}=\ind(\text{$i$ s'abstient au scrutin $j$}),\qquad
- N_{ij}=\ind(\text{$i$ est non-votant au scrutin $j$}).
+ N_{ij}=\ind(\text{$i$ est \emph{non-votant} au scrutin $j$}).
 \]
 Le vote est dit \emph{exprimé} lorsqu'il vaut pour, contre ou abstention :
 \[
  V_{ij}=P_{ij}+C_{ij}+A_{ij}.
 \]
-Puisque ces matrices sont booléennes et exclusives, $V_{ij}$ vaut $1$ si le
-député a exprimé une position, et $0$ sinon.
+Ces quatre matrices sont exclusives : un couple $(i,j)$ relève d'au plus une
+d'entre elles. $V_{ij}$ vaut donc $1$ si le député a exprimé une position, et
+$0$ sinon.
 
-Pour les analyses factorielles exploratoires, le projet utilise aussi une
+\subsection{Le non-votant : la quatrième matrice, et pourquoi elle compte}
+\label{sec:nonvotant}
+
+$N_{ij}$ demande plus d'explications que les trois autres, car elle recouvre
+une situation que le vocabulaire courant confond avec l'absence.
+
+\textbf{Cinq états, et non quatre.} Un couple $(i,j)$ peut se trouver dans cinq
+situations, dont la cinquième n'a pas de matrice parce qu'elle se déduit des
+autres :
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.20\linewidth}p{.36\linewidth}p{.34\linewidth}}
+\toprule
+État & Ce que contient la source & Codage \\
+\midrule
+Pour / contre / abstention & une ligne avec la position & $P$, $C$ ou $A$ vaut 1 \\
+Non-votant & une ligne, position \code{nonVotant}, \textbf{plus un code de cause} & $N_{ij}=1$ \\
+Absent & \textbf{aucune ligne} & les quatre matrices valent 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La différence entre les deux dernières lignes est la clé. Un \emph{absent} est
+un député dont la source ne dit rien : il pouvait voter, il ne l'a pas fait, et
+on ignore pourquoi. Un \emph{non-votant} est un député que l'Assemblée déclare
+comme n'ayant pas pris part au vote, \textbf{en indiquant le motif}. Ce motif
+n'est pas une explication a posteriori : c'est une donnée du fichier source.
+
+\textbf{Les motifs observés.} Sur la 17\textsuperscript{e} législature, la
+source n'emploie que trois codes, et tous trois désignent une fonction
+incompatible avec le fait de voter :
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.10\linewidth}p{.46\linewidth}p{.34\linewidth}}
+\toprule
+Code & Fonction & Portée \\
+\midrule
+\code{MG}  & membre du Gouvernement & un ministre ne vote pas \\
+\code{PSE} & président de séance & celui qui préside au moment du scrutin \\
+\code{PAN} & président de l'Assemblée nationale & le titulaire du perchoir \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+On note $\mathcal S$ l'ensemble de ces codes et
+$\mathrm{cause}_{ij}$ le motif déclaré. Un non-vote est dit \textbf{structurel}
+lorsque $\mathrm{cause}_{ij}\in\mathcal S$.
+
+\textbf{Pourquoi $N_{ij}$ n'entre pas dans $V_{ij}$.} Un non-votant n'a exprimé
+aucune position : il ne peut donc être ni d'accord ni en désaccord avec
+quiconque, et l'inclure dans un taux d'accord fabriquerait une concordance là
+où il n'y a pas de vote. $N$ n'apparaît pour cette raison ni dans $V$, ni dans
+le numérateur d'accord $K$ de la section~\ref{sec:proximite}.
+
+\textbf{Mais $N_{ij}$ n'est pas pour autant sans usage} : c'est elle qui permet
+de distinguer, au dénominateur de présence, ce qu'un député n'a pas fait de ce
+qu'on l'a empêché de faire. Elle réapparaît sous la forme du terme $R_i$ de la
+section~\ref{sec:participation}, et c'est son seul emploi.
+
+\important{Un non-vote structurel n'est pas une absence : c'est l'institution
+qui interdit le vote, pas l'élu qui s'y soustrait. Le confondre avec de
+l'absentéisme revient à reprocher à un député d'avoir présidé la séance ou
+d'être entré au Gouvernement.}
+
+\prudence{La réciproque est tout aussi importante : le retrait ne vaut que pour
+ce que la source justifie explicitement. Élargir $\mathcal S$ au-delà des motifs
+déclarés permettrait de faire disparaître n'importe quelle absence en la
+requalifiant, et le dénominateur cesserait d'être opposable.}
+
+\subsection{La matrice signée, et ce qu'elle écrase}
+\label{sec:signee}
+
+Pour les analyses factorielles exploratoires, le projet utilise enfin une
 matrice signée :
 \[
  S_{ij}=P_{ij}-C_{ij}\in\{-1,0,+1\}.
 \]
-Une abstention et un non-vote y sont tous deux codés $0$ ; cette convention est
-utile pour une carte descriptive, mais elle ne signifie pas que ces deux
-situations sont politiquement identiques.
+Cette matrice a une propriété qu'il faut énoncer avant de s'en servir : elle
+\textbf{n'a que trois valeurs pour cinq états}. Le $0$ y recouvre à lui seul
+l'abstention, le non-vote structurel, l'absence, et le cas d'un député non
+encore élu. Ces quatre situations sont politiquement très différentes et
+deviennent indiscernables.
+
+Ce n'est pas une remarque de principe. Sur la 17\textsuperscript{e}
+législature, un scrutin public réunit en moyenne moins du tiers de
+l'Assemblée : \textbf{environ trois quarts des cellules de $S$ valent $0$ sans
+que personne se soit abstenu}. Autrement dit, $S$ décrit d'abord qui était là,
+et seulement ensuite qui a voté quoi. Les conséquences sur l'ACP sont détaillées
+en section~\ref{sec:acp} ; elles sont assez sérieuses pour que la matrice signée
+soit réservée aux cartes descriptives et jamais employée à situer un député en
+particulier.
 
 \subsection{L'éligibilité : ne pas pénaliser un mandat qui n'avait pas commencé}
 
@@ -313,10 +437,45 @@ Pour un mandat en cours, la borne de fin est considérée comme future. Cette
 matrice est essentielle pour les mesures de présence : un élu arrivé en cours
 de législature ne pouvait pas participer aux scrutins antérieurs.
 
+\subsection{Le parcours d'un texte, en quatre mots}
+\label{sec:parcours}
+
+La suite parle d'amendements, d'articles et de « votes sur l'ensemble ». Ces
+termes désignent des moments distincts de la fabrication d'une loi, et c'est
+leur ordre qui explique pourquoi ils ne pèsent pas pareil.
+
+\begin{enumerate}
+  \item Un \textbf{texte} est déposé : \emph{projet de loi} s'il vient du
+  Gouvernement, \emph{proposition de loi} s'il vient d'un parlementaire. Il est
+  découpé en \textbf{articles}, numérotés.
+  \item Chaque article peut être modifié par des \textbf{amendements} — des
+  propositions de retouche, parfois d'un seul mot. N'importe quel député peut en
+  déposer, et un texte disputé en attire des milliers.
+  \item L'Assemblée vote, dans l'ordre : d'abord les amendements un par un, puis
+  chaque article, puis enfin \textbf{l'ensemble du texte}. Ce dernier vote est le
+  seul qui engage sur la loi entière.
+  \item Le texte part au Sénat, revient éventuellement — c'est la
+  \emph{navette} —, et en cas de désaccord persistant une \emph{commission mixte
+  paritaire} réunit les deux chambres pour chercher un compromis.
+\end{enumerate}
+
+Cette mécanique produit une asymétrie massive et purement arithmétique :
+\textbf{une seule loi très disputée génère des milliers de votes d'amendement
+et un unique vote sur l'ensemble}. Sur la 17\textsuperscript{e} législature,
+environ six scrutins publics sur sept portent sur un amendement.
+
+Une conséquence suit immédiatement. Un vote d'amendement est souvent tactique :
+on peut approuver un aménagement technique tout en combattant le texte, ou
+rejeter une retouche que l'on juge insuffisante sans s'opposer au principe.
+Agréger tous les scrutins « toutes portées confondues » revient donc à mesurer
+surtout de la tactique parlementaire, et à laisser une loi très amendée peser
+plus lourd que deux ans de votes solennels.
+
 \subsection{Portée politique d'un scrutin}
 
-Tous les scrutins publics ne disent pas la même chose. Le titre est classé par
-motifs réguliers en une catégorie, puis en une portée :
+C'est pourquoi le projet classe les scrutins par \textbf{portée}, selon ce sur
+quoi ils portent. Le titre est classé par motifs réguliers en une catégorie,
+puis en une portée :
 
 \begin{center}
 \begin{tabular}{>{\raggedright\arraybackslash}p{.25\linewidth}p{.30\linewidth}p{.32\linewidth}}
@@ -334,6 +493,40 @@ Le classement est déterministe : il dépend de la syntaxe du titre, pas d'un
 codage politique fait à la main. Les analyses peuvent être recalculées séparément
 pour les trois portées. Cette séparation évite qu'une longue séquence
 d'amendements écrase, par son seul nombre, les votes sur l'ensemble d'un texte.
+
+\subsection{Ordinaire, solennel, motion de censure : le type est autre chose}
+
+La portée décrit \emph{sur quoi} l'Assemblée vote. Le \textbf{type} décrit
+\emph{comment} elle vote, et la source le publie séparément. Les deux ne se
+recouvrent pas, et il faut les tenir distincts pour ne pas compter deux fois la
+même précaution.
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.10\linewidth}p{.30\linewidth}p{.50\linewidth}}
+\toprule
+Code & Type & Ce qui le caractérise \\
+\midrule
+\code{SPO} & scrutin public ordinaire & Le cas courant. Le vote a lieu depuis le pupitre, au fil de la séance, souvent devant un hémicycle clairsemé. \\
+\code{SPS} & scrutin public \textbf{solennel} & Annoncé à l'avance, inscrit à l'ordre du jour, généralement le mardi après les questions au Gouvernement. La présence y est bien plus forte. \\
+\code{MOC} & motion de censure & Procédure distincte : seuls les soutiens de la motion votent, et l'adoption exige la majorité absolue des membres de l'Assemblée, non des votants. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Le scrutin solennel est rare — quelques dizaines sur une législature — et
+presque toujours de portée \code{texte} : on solennise le vote sur l'ensemble
+d'une loi, pas sur un sous-amendement. L'inverse n'est pas vrai : la majorité
+des votes sur l'ensemble d'un texte reste des scrutins ordinaires.
+
+Ce type est disponible comme filtre (\code{types\_vote}), mais les indicateurs
+publiés ne l'utilisent pas : la portée est le découpage retenu, parce qu'elle
+sépare des populations bien plus grandes et repose sur le contenu du vote
+plutôt que sur son protocole.
+
+\prudence{La motion de censure ne se lit pas comme les autres scrutins. Ne pas
+la voter n'est pas s'y opposer : c'est le mode normal d'expression de ceux qui
+ne la soutiennent pas. La source n'y publie d'ailleurs ni « contre » ni
+abstention, et un taux de participation calculé dessus n'aurait pas de sens.}
 
 Le projet calcule aussi la \emph{contestation} du scrutin :
 \[
@@ -453,24 +646,101 @@ est un contrôle intuitif ; elle ne remplace pas un modèle causal.
 \section{Présence, ligne de groupe et dissidence}
 
 \subsection{Participation : un numérateur, deux retraits au dénominateur}
+\label{sec:participation}
 
 Pour le député $i$, le nombre de votes exprimés est
 \[
  X_i=\sum_j V_{ij}E_{ij}.
 \]
-Le nombre de scrutins éligibles est $L_i=\sum_jE_{ij}$. Certains non-votes sont
-structurels : par exemple l'exercice d'une fonction incompatible avec le vote.
-Si $R_i$ est leur nombre, le dénominateur est
+Le nombre de scrutins éligibles est $L_i=\sum_jE_{ij}$. Le nombre de non-votes
+structurels reprend la matrice $N$ et l'ensemble de motifs $\mathcal S$
+introduits en section~\ref{sec:nonvotant} :
+\[
+ R_i=\sum_j N_{ij}\,E_{ij}\,
+ \ind\!\left(\mathrm{cause}_{ij}\in\mathcal S\right).
+\]
+Le dénominateur et le taux sont alors
 \[
  D_i=\max(L_i-R_i,0),
  \qquad \mathrm{participation}_i=\frac{X_i}{D_i},
 \]
 avec une valeur manquante si $D_i=0$.
 
-Le premier retrait ($E_{ij}$) évite de compter des scrutins antérieurs au
-mandat. Le second ($R_i$) évite de traiter une impossibilité institutionnelle
-comme une absence. Le taux mesure la participation aux scrutins publics, pas
-le travail parlementaire dans son ensemble.
+Les deux retraits répondent à deux objections distinctes. Le premier ($E_{ij}$)
+écarte les scrutins antérieurs — ou postérieurs — au mandat : on ne reproche pas
+à un élu arrivé en cours de législature les votes tenus avant son arrivée. Le
+second ($R_i$) écarte les non-votes que l'institution impose. Le plancher à zéro
+n'a pas de rôle statistique : un non-vote structurel suppose un mandat en cours,
+donc $R_i\leq L_i$ par construction, et le \code{max} ne protège que d'une
+source incohérente.
+
+\textbf{Un cas limite qui n'en est pas un.} Le retrait $R_i$ peut être du même
+ordre que $L_i$, et c'est attendu. Le président de l'Assemblée ne vote pas tant
+qu'il préside : sur les votes qui engagent de la 17\textsuperscript{e}
+législature, la présidente est déclarée non-votante pour cause \code{PAN} sur la
+quasi-totalité des scrutins, et a exprimé un suffrage à chacun des scrutins
+restants. Son taux est donc de 100~\% sur un dénominateur de quelques dizaines
+de votes, et non de 8~\% sur l'ensemble. Les deux nombres sont issus des mêmes
+données ; un seul répond à la question « à quelle fraction des scrutins où cet
+élu pouvait voter a-t-il voté ? ».
+
+\important{Ce cas illustre pourquoi le dénominateur doit être publié à côté du
+taux, et non seulement calculé. « 100~\% sur 19 votes » et « 8~\% sur 221 »
+décrivent la même personne ; sans les effectifs, le lecteur ne peut pas savoir
+lequel des deux répond à sa question.}
+
+\prudence{Un $D_i$ petit rend le taux instable : à 19 scrutins, un vote de plus
+ou de moins déplace le taux de cinq points. Le dénominateur sert à lire le taux,
+pas seulement à le justifier.}
+
+Le taux mesure la participation aux scrutins publics, et rien d'autre : ni la
+présence en commission, ni le travail en circonscription, ni les interventions
+en séance sans vote.
+
+\subsection{Le vote par délégation : ce que « présence » recouvre}
+\label{sec:delegation}
+
+Un député empêché peut confier son vote à un collègue, qui l'exprime en son
+nom ; le règlement en autorise une par député. Le vote est alors juridiquement
+celui du délégant, et il entre au numérateur $X_i$ de la
+section~\ref{sec:participation} exactement comme un vote émis en personne.
+
+Cette convention est la seule défendable — la délégation transfère l'exercice
+du vote, pas son imputation — mais elle a une conséquence que le mot
+« présence » masque. On publie donc le compte séparément. En notant
+$\Delta_{ij}$ l'indicatrice d'un vote délégué :
+\[
+ \delta_i=\sum_j V_{ij}E_{ij}\Delta_{ij},
+ \qquad
+ \text{part déléguée}_i=\frac{\delta_i}{X_i}.
+\]
+Le dénominateur est ici $X_i$, le nombre de suffrages exprimés, et non $D_i$ :
+la question posée est « parmi les votes émis en son nom, combien l'ont été par
+un tiers ? », qui porte sur le numérateur de la présence et non sur son
+assiette.
+
+\textbf{Les ordres de grandeur importent pour lire ce chiffre.} La délégation
+n'est pas un cas limite : elle représente environ 15~\% des suffrages exprimés
+sur l'ensemble des scrutins, et près de 23~\% sur les seuls votes qui engagent
+— c'est-à-dire précisément l'assiette des mesures principales de ce projet. La
+médiane par député y avoisine 20~\%, et les valeurs extrêmes dépassent 90~\%.
+
+\important{Le taux de la section~\ref{sec:participation} mesure les suffrages
+\emph{émis au nom} du député, non sa présence physique dans l'hémicycle. Pour
+un député dont la moitié des votes sont délégués, ces deux lectures divergent
+franchement, et c'est la première qui est exacte.}
+
+\textbf{Ce que la source ne permet pas.} Le fichier de scrutin nomme le
+délégant et signale que son vote a été délégué ; il ne nomme jamais le collègue
+qui l'a porté. On ne peut donc ni classer les récipiendaires, ni reconstituer
+les binômes de délégation. Le site affiche pour cette raison un compte et une
+part, jamais un porteur : la donnée n'existe pas, et la déduire serait
+l'inventer.
+
+\prudence{Une part déléguée élevée ne se lit pas comme un manquement. Elle peut
+résulter d'une mission, d'un congé, d'une maladie ou d'une fonction — autant de
+motifs que la source ne donne pas. Le chiffre dit comment le vote a été émis,
+jamais pourquoi.}
 
 \subsection{Reconstruire la ligne à partir du dépouillement}
 
@@ -527,27 +797,119 @@ divisant fortement certains groupes.
 \section{Deux cartes descriptives : ACP et positionnement multidimensionnel}
 
 \subsection{Analyse en composantes principales (ACP)}
+\label{sec:acp}
 
-L'ACP est une réduction de dimension. On centre chaque colonne de la matrice
-signée $S$, puis on écrit sa décomposition en valeurs singulières :
+\subsubsection*{L'idée, avant la formule}
+
+Chaque député est décrit par une liste de $m$ nombres : sa colonne de votes,
+codée $+1$, $-1$ ou $0$. C'est un point dans un espace à $m$ dimensions, où $m$
+vaut plusieurs milliers — donc invisible. L'ACP cherche le \emph{plan} sur
+lequel projeter ce nuage en perdant le moins possible de sa forme, un peu comme
+on cherche l'angle sous lequel photographier une sculpture pour qu'elle reste
+reconnaissable.
+
+Elle ne suppose rien sur la politique. Elle constate seulement que les colonnes
+de votes ne se répartissent pas au hasard : si deux députés votent presque
+toujours pareil, leurs points sont voisins, et le nuage s'étire dans certaines
+directions plus que d'autres. L'ACP nomme ces directions.
+
+\subsubsection*{Le calcul}
+
+\textbf{Premier temps, centrer.} On retire à chaque colonne de $S$ sa moyenne :
 \[
- S_c=U\Sigma V^{\mathsf T}.
+ (S_c)_{ij}=S_{ij}-\bar S_{\cdot j},
+ \qquad \bar S_{\cdot j}=\frac1n\sum_{i}S_{ij}.
 \]
-Les coordonnées sur les deux premiers axes sont les deux premières colonnes de
-$U\Sigma$. La part d'inertie expliquée par l'axe $r$ est
+Après cette opération, un coefficient ne dit plus « ce député a voté pour »
+mais « ce député s'est écarté de la position moyenne du scrutin, et dans quel
+sens ». C'est ce qu'on veut : un vote acquis à l'unanimité ne distingue
+personne et devient une colonne de zéros, tandis qu'un vote serré garde toute
+son amplitude.
+
+\textbf{Second temps, décomposer.} On écrit la décomposition en valeurs
+singulières
+\[
+ S_c=U\Sigma V^{\mathsf T},
+\]
+où $\Sigma$ est diagonale, de coefficients $\sigma_1\geq\sigma_2\geq\cdots\geq0$
+appelés \emph{valeurs singulières}. Chaque colonne de $V$ est une direction de
+l'espace des scrutins — une combinaison de votes ; la valeur singulière associée
+mesure l'amplitude du nuage dans cette direction. Les coordonnées des députés
+sur les deux premiers axes sont les deux premières colonnes de $U\Sigma$.
+
+\textbf{L'inertie} est la dispersion totale du nuage, $\sum_q\sigma_q^2$. La
+part portée par l'axe $r$ est
 \[
  \frac{\sigma_r^2}{\sum_q\sigma_q^2}.
 \]
-L'ACP est descriptive : elle résume les régularités dominantes dans les votes
-codés. Les axes peuvent être retournés sans que le résultat ne change ; leurs
-signes ne sont donc pas des étiquettes politiques.
+Une part élevée sur le premier axe signifie qu'une seule direction résume
+l'essentiel des écarts entre députés — c'est-à-dire qu'un clivage domine. Elle
+ne dit rien de la \emph{nature} de ce clivage.
+
+Les axes peuvent être retournés sans que le résultat change : $U\Sigma$ et
+$-U\Sigma$ décrivent la même configuration. Leurs signes ne sont donc pas des
+étiquettes politiques, et « à gauche du graphique » ne veut pas dire « à gauche
+de l'hémicycle » autrement que par convention d'affichage.
+
+\subsubsection*{La limite principale : ce que le zéro cache}
+
+L'ACP travaille sur $S$, et $S$ code par $0$ quatre situations distinctes
+(section~\ref{sec:signee}). Elle traite donc une absence \textbf{exactement
+comme un point milieu} entre le pour et le contre. C'est une imputation, et
+c'est la plus forte hypothèse de tout ce document.
+
+Elle est d'autant plus lourde que les zéros sont majoritaires : sur la
+17\textsuperscript{e} législature, environ trois quarts des cellules du cube
+complet ne portent aucun suffrage exprimé. Les conséquences sont mesurables et
+vont dans un sens prévisible :
+
+\begin{itemize}
+  \item un député souvent absent a une colonne proche de zéro ; après
+  centrage, son point se retrouve près du centre du nuage, quelles que soient
+  ses convictions ;
+  \item la \emph{distance au centre} de la carte est donc corrélée à
+  l'assiduité. Sur les données de référence, la corrélation entre la valeur
+  absolue de la coordonnée sur l'axe 1 et le nombre de suffrages exprimés
+  dépasse $0{,}7$ ;
+  \item la zone centrale de la carte mêle en conséquence deux populations qu'il
+  ne faut pas confondre : des députés réellement intermédiaires, et des députés
+  peu présents.
+\end{itemize}
+
+Cette faiblesse est propre aux méthodes factorielles appliquées à des données
+lacunaires ; elle n'affecte pas le taux d'accord de la
+section~\ref{sec:proximite}, qui écarte explicitement les scrutins non partagés,
+ni le modèle de points idéaux de la section~\ref{sec:ideal}, qui ne calcule la
+vraisemblance que sur les votes observés.
+
+\prudence{L'ACP répond correctement à « quelle est la structure d'ensemble des
+votes ? » et incorrectement à « où se situe ce député ? ». Pour situer une
+personne, c'est le modèle de points idéaux qu'il faut lire, avec son intervalle.
+Le site n'emploie l'ACP que pour des vues d'ensemble, jamais sur une fiche
+individuelle.}
+
+\important{Une part d'inertie n'est pas une part de vérité. Elle est calculée
+sur la matrice telle qu'elle a été codée, imputations comprises : elle mesure
+la concentration du nuage, pas la qualité de la description.}
 
 \subsection{Positionnement multidimensionnel (MDS)}
 
-Une autre carte part de la distance $d_{ik}=1-T_{ik}$ : proches au vote signifie
-petite distance. Les taux indisponibles sont provisoirement remplacés par la
-moyenne des taux disponibles, puis la matrice des distances est doublement
-centrée :
+Le MDS répond à la même question par l'autre bout. Plutôt que de projeter des
+colonnes de votes, il part directement des proximités deux à deux et cherche
+une carte plane où les distances graphiques reproduisent au mieux les distances
+mesurées. On pose $d_{ik}=1-T_{ik}$ : voter pareil, c'est être près.
+
+L'intérêt est qu'il s'appuie sur $T_{ik}$, dont le dénominateur ne retient que
+les scrutins réellement partagés — l'imputation massive qui affecte l'ACP ne
+s'y produit donc pas. Une imputation subsiste néanmoins, mais bien plus
+limitée : les paires sous le seuil de scrutins communs n'ont pas de taux, et
+leur distance est provisoirement remplacée par la moyenne des distances
+disponibles, faute de quoi la double centralisation serait impossible. Ces
+paires sont peu nombreuses, et cette valeur de remplacement les place au centre
+du nuage : la même prudence que pour l'ACP s'applique à elles, à cette échelle
+réduite.
+
+La matrice des distances est ensuite doublement centrée :
 \[
  B=-\frac12 JD^{\circ2}J,\qquad
  J=I-\frac1n\mathbf{1}\mathbf{1}^{\mathsf T}.
@@ -561,6 +923,7 @@ de paires, mais il est plus coûteux.
 une idéologie, une stratégie commune ou une cause du vote.}
 
 \section{Le modèle de points idéaux : expliquer et prédire les votes binaires}
+\label{sec:ideal}
 
 \subsection{Le modèle statistique}
 
@@ -576,12 +939,47 @@ où
  \operatorname{logit}^{-1}(z)=\frac{1}{1+e^{-z}}.
 \]
 
-Dans cette équation, $x_i\in\R^d$ est la position latente du député,
-$\beta_j\in\R^d$ est le vecteur de discrimination du scrutin et $\alpha_j$
-son paramètre de difficulté. En dimension 1, le point de bascule est
-$\alpha_j/\beta_j$ si $\beta_j\neq0$ : à cette position, la probabilité de
-voter pour vaut $1/2$. Plus $|\beta_j|$ est grand, plus le scrutin sépare
-nettement les positions.
+\subsubsection*{Le vocabulaire, qui vient d'ailleurs}
+
+Ce modèle est celui de la \emph{réponse à l'item}, construit à l'origine pour
+analyser des examens : les élèves y ont une aptitude, les questions une
+difficulté et un pouvoir discriminant. Le vocabulaire a suivi jusqu'ici, et
+deux termes sur trois induisent en erreur si on les prend au pied de la lettre.
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.14\linewidth}p{.30\linewidth}p{.44\linewidth}}
+\toprule
+Symbole & Nom consacré & Ce que c'est ici \\
+\midrule
+$x_i\in\R^d$ & position \textbf{latente} & la position que l'on cherche. « Latente » signifie non observée : elle n'est écrite nulle part dans les données et n'est connue que par ses effets sur les votes. \\
+$\beta_j\in\R^d$ & \textbf{discrimination} & la direction et la netteté avec lesquelles le scrutin $j$ sépare l'Assemblée. Rien à voir avec le sens ordinaire du mot. \\
+$\alpha_j\in\R$ & \textbf{difficulté} & le terme le plus mal nommé : il ne mesure aucune difficulté, il situe le \emph{seuil} du vote — à partir de quelle position on bascule vers le « pour ». \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection*{Comment lire l'équation}
+
+Une image suffit à fixer les idées. Rangeons les députés sur une ligne. Chaque
+scrutin y trace une frontière : à gauche on vote contre, à droite on vote pour.
+Alors, en dimension 1 :
+
+\begin{itemize}
+  \item le \textbf{point de bascule} $\alpha_j/\beta_j$ (défini si
+  $\beta_j\neq0$) dit \emph{où} passe la frontière — c'est la position à
+  laquelle un député a exactement une chance sur deux de voter pour ;
+  \item $|\beta_j|$ dit \emph{à quel point elle est nette}. Grand, la frontière
+  est une coupure franche et la position prédit presque parfaitement le vote ;
+  proche de zéro, le passage est un dégradé et le scrutin traverse les camps
+  au lieu de les opposer.
+\end{itemize}
+
+Estimer le modèle revient donc à chercher le rangement des députés qui rend le
+plus grand nombre de scrutins explicables par une telle frontière.
+
+\important{Une position latente n'est pas une opinion : c'est la coordonnée qui
+prédit le mieux les votes observés, sur les textes effectivement soumis pendant
+la période. Changez les textes, vous changez l'axe.}
 
 Les abstentions ne sont pas transformées en demi-votes. Elles sont exclues de
 ce modèle parce qu'il est binaire, non parce qu'elles seraient dépourvues de
@@ -663,8 +1061,25 @@ $E_{\text{modèle}}$ le nombre d'erreurs de classification. APRE $=0$ signifie
 Pour choisir le nombre de dimensions et la pénalisation, une part des cellules
 de vote est mise de côté au hasard. Le modèle est estimé sur le reste puis
 évalué sur ces votes non vus. Une dimension supplémentaire qui n'améliore que
-l'ajustement d'apprentissage est du surajustement ; elle ne doit pas être lue
-comme un nouveau clivage politique.
+l'ajustement d'apprentissage est du \emph{surajustement} — elle a mémorisé du
+bruit propre à l'échantillon — et ne doit pas être lue comme un nouveau clivage
+politique.
+
+Le retrait porte sur des \textbf{cellules} et non sur des scrutins entiers, et
+ce choix est contraint : retirer un scrutin entier priverait le modèle de ses
+paramètres $\alpha_j$ et $\beta_j$, si bien qu'il n'y aurait plus rien à
+prédire dessus.
+
+\prudence{Il faut reconnaître une tension entre cette procédure et le bootstrap
+de la section~\ref{sec:bootstrap}. Ce dernier tire des blocs entiers au motif —
+exact — que les scrutins d'une même séance ne sont pas indépendants. La
+validation croisée, elle, retire des cellules isolées : le modèle voit alors la
+plupart des votes du même scrutin et peut en estimer précisément les
+paramètres, ce qui rend la prédiction des cellules retirées plus facile qu'une
+véritable prévision hors échantillon. Le protocole est celui d'usage pour ce
+type de modèle, mais il est plus indulgent que le bootstrap sur la même donnée.
+La conclusion sur le nombre de dimensions doit être lue comme une borne
+supérieure de ce qui est justifié, non comme une démonstration.}
 
 \subsection{Incertitude par bootstrap de blocs}
 
@@ -744,6 +1159,7 @@ intentions ; elle établit seulement qu'ils étaient assez nombreux pour modifie
 l'issue sous ce scénario arithmétique.
 
 \section{Amendements et réseau de cosignatures}
+\label{sec:cosign}
 
 \subsection{Volumes et adoption}
 
@@ -961,6 +1377,30 @@ Deux législatures ne sont pas comparables sur cette échelle.
 cours de mandat sont traités à la date d'effet publiée par l'Assemblée. Les
 mesures agrégées par groupe portent donc sur une composition qui a varié à
 l'intérieur de la période d'observation.
+
+\textbf{La délégation n'est pas neutralisée dans la dissidence.} La part
+déléguée est désormais définie et publiée (section~\ref{sec:delegation}), mais
+un seul indicateur en tire les conséquences : la présence, qui l'affiche à côté
+de son numérateur. Le taux de dissidence, lui, traite un vote délégué comme
+tous les autres, alors qu'un écart à la ligne du groupe a pu être matériellement
+produit par le collègue porteur. Recalculé sur les seuls votes émis en personne,
+le classement déplace le député médian de quelques rangs, et bien davantage ceux
+qui délèguent souvent. Publier les deux versions, ou au moins cette sensibilité,
+reste à faire.
+
+\textbf{Deux mesures sur trois sont publiées sans intervalle.} La position
+latente est accompagnée de son intervalle de bootstrap
+(section~\ref{sec:bootstrap}), et le site refuse d'ordonner deux députés dont
+les intervalles se recouvrent. La participation et la dissidence, elles, sont
+des proportions binomiales : elles ont un intervalle calculable, et il n'est
+aujourd'hui ni calculé ni affiché. Un intervalle de Jeffreys à 90~\% sur le taux
+de dissidence fait environ un point de large pour un député médian, et jusqu'à
+quatre points pour ceux dont le taux est élevé — de sorte qu'un rang publié
+sans réserve recouvre en réalité plusieurs dizaines de positions
+indiscernables. C'est une asymétrie de rigueur entre indicateurs, et elle n'a
+pas de justification méthodologique : le site refuse d'ordonner deux positions
+latentes qui se recouvrent, et ordonne sans réserve deux taux de dissidence qui
+se recouvrent tout autant.
 
 \textbf{La cosignature n'est pas la collaboration.} Signer un amendement est un
 acte peu coûteux, parfois collectif par défaut au sein d'un groupe. Le réseau

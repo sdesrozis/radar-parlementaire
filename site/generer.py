@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from radar.vues import MIN_COMMUNS, Donnees
+from radar.vues import BOOTSTRAP, MIN_COMMUNS, Donnees
 from redaction import (
     NBSP,
     accords,
@@ -43,10 +43,12 @@ from redaction import (
     dec,
     echapper,
     jour,
+    mention_delegation,
     num,
     ordinal,
     pct,
     phrase_carte,
+    phrase_delegation,
     phrase_dissidence,
     phrase_ecart,
     phrase_ecart_groupe,
@@ -357,6 +359,15 @@ class Site:
             [d["taux_dissidence"] for d in self.deputes if d["taux_dissidence"] is not None])
         self.d_pos = distribution(
             [d["axe1"] for d in self.deputes if d["axe1"] is not None])
+        # Médiane de la part déléguée sur les votes qui engagent. Elle sert de
+        # repère : sans elle, « 30 % de ses votes sont délégués » se lit comme
+        # une anomalie alors que c'est la pratique courante de l'Assemblée.
+        parts_deleg = [
+            d["part_delegation_engageants"] for d in self.deputes
+            if d.get("part_delegation_engageants") is not None
+        ]
+        self.mediane_delegation = (
+            distribution(parts_deleg)["mediane"] if parts_deleg else 0.0)
         self.donnees_json = json.dumps(
             {"participation": self.d_part, "dissidence": self.d_diss, "positions": self.d_pos},
             ensure_ascii=False, separators=(",", ":"))
@@ -648,7 +659,7 @@ class Site:
             "THESE": these,
             "THESE_SUITE": these_suite,
             "HATVP": i.get("uri_hatvp") or "https://www.hatvp.fr",
-            "BOOTSTRAP": num(self.apercu.get("bootstrap") or 40),
+            "BOOTSTRAP": num(self.apercu.get("bootstrap") or BOOTSTRAP),
 
             "PART_ENG_PCT": pct(taux),
             "PART_ENG_N": num(exprimes),
@@ -658,6 +669,14 @@ class Site:
             # faux à quiconque compare aux totaux de la législature.
             "PART_ENG_RESERVE": reserve_denominateur(
                 eligibles, votables, self.n_texte),
+            # La délégation qualifie le numérateur, pas le dénominateur : elle
+            # s'affiche donc accolée aux votes exprimés, et s'explique dans le
+            # repli déjà consacré aux pièges de la participation.
+            "PART_ENG_DELEGATION": mention_delegation(
+                a.get("engageants_delegues") or 0, exprimes),
+            "PART_DELEGATION_PHRASE": phrase_delegation(
+                a.get("engageants_delegues") or 0, exprimes,
+                self.mediane_delegation),
             "PART_TOUS": f"{taux:.4f}",
             "PART_TOUS_PCT": pct(a["participation"] or 0),
             "PART_PHRASE": part1,
@@ -791,8 +810,11 @@ def ecrire_index_moteurs(uids: list[str]) -> None:
 
 def main() -> None:
     parseur = argparse.ArgumentParser(description=__doc__)
-    parseur.add_argument("--bootstrap", type=int, default=40,
-                         help="rééchantillonnages pour les intervalles (0 = sans intervalle)")
+    # Le défaut est celui de `radar`, pas un second nombre écrit ici : les deux
+    # avaient divergé une fois déjà, et c'est la page Méthode qui l'annonce.
+    parseur.add_argument("--bootstrap", type=int, default=BOOTSTRAP,
+                         help=f"rééchantillonnages pour les intervalles "
+                              f"(défaut {BOOTSTRAP}, 0 = sans intervalle)")
     parseur.add_argument("--limite", type=int, default=0,
                          help="ne générer que N fiches, pour une mise au point rapide")
     parseur.add_argument("--servir", action="store_true",

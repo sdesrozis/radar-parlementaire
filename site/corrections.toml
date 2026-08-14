@@ -26,6 +26,67 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 [[correction]]
+date = "2026-08-14"
+titre = "Présence aux votes de la présidente de l'Assemblée"
+portee = "chiffre"
+erreur = """
+La présence aux votes qui engagent de la présidente de l'Assemblée nationale
+était publiée à 8,6 % — 19 votes exprimés sur 221 — ce qui la plaçait au dernier
+rang de l'Assemblée. Le taux exact est 100 % : 19 votes exprimés sur les 19
+scrutins où elle n'était pas empêchée de voter. Elle n'a manqué aucun des votes
+auxquels elle pouvait prendre part."""
+cause = """
+Le président de l'Assemblée ne vote pas tant qu'il préside. La source le dit
+explicitement, scrutin par scrutin, par le motif de non-vote « PAN ». Ce motif
+manquait à la liste des causes structurelles du code, qui ne contenait que le
+membre du Gouvernement et le président de séance : ses 7 508 non-votes restaient
+donc au dénominateur de présence, comme s'il s'agissait d'absences.
+
+La liste contenait par ailleurs un code « PDS » qui ne correspond à aucune ligne
+de la source, et glosait deux codes différents par « président de séance ».
+Elle avait été écrite d'après une supposition sur la nomenclature de
+l'Assemblée, jamais confrontée aux motifs réellement présents dans les fichiers.
+C'est exactement l'erreur que la mesure prétendait écarter : le site a publié
+comme de l'absentéisme ce que la source désignait comme une fonction
+incompatible avec le vote."""
+effet = """
+Présidente de l'Assemblée : 8,6 % (19/221) → 100 % (19/19) sur les votes qui
+engagent. Elle passait du dernier rang au premier. Quarante-six députés voient
+leur dénominateur de présence corrigé, ceux qui ont présidé une séance ou exercé
+une fonction ministérielle ; pour eux le retrait est marginal, l'écart étant
+concentré sur la seule titulaire du perchoir. La médiane de l'Assemblée est
+inchangée à 41 %.
+
+Un test verrouille désormais les deux sens de l'erreur : toute cause de non-vote
+présente dans la source doit être explicitement classée comme structurelle ou
+non, et toute cause déclarée structurelle doit exister dans la source."""
+pages = "La fiche de la présidente de l'Assemblée, l'annuaire, l'accueil, Méthode"
+commit = "0384307"
+
+[[correction]]
+date = "2026-08-13"
+titre = "Largeur de l'intervalle de la position estimée"
+portee = "methode"
+erreur = """
+Les intervalles publiés autour de la position estimée étaient environ 10 % trop
+courts, et ils changeaient de façon visible d'une exécution à l'autre du même
+calcul sur les mêmes données."""
+cause = """
+Le nombre de rééchantillonnages était fixé à 40, au motif qu'« au-delà, les
+bornes ne bougent plus ». C'était une affirmation, jamais mesurée — le genre
+même d'affirmation que ce site refuse partout ailleurs. Avec si peu de tirages,
+les quantiles extrêmes se resserrent vers le centre, et le bruit de tirage
+reste du même ordre que ce qu'on cherche à mesurer."""
+effet = """
+Mesuré contre une référence à 2 000 rééchantillonnages, sur dix répliques
+indépendantes : à 40, une borne variait de 0,041 selon la graine — 10,0 % de la
+largeur qu'elle borne — et l'intervalle sortait 0,042 trop court, soit 10,2 %.
+À 500, ces deux quantités tombent à 2,9 % et 1,5 %. Le nombre passe donc à 500,
+et une génération complète y gagne moins de deux minutes de calcul."""
+pages = "Les fiches de député, Méthode"
+commit = "0f50b1b"
+
+[[correction]]
 date = "2026-08-13"
 titre = "Présence aux votes qui engagent"
 portee = "chiffre"

@@ -56,9 +56,33 @@ MIN_COMMUNS = 30
 MIN_COMMUNS_TEXTE = 20
 
 #: Nombre de rééchantillonnages pour l'intervalle de confiance des positions.
-#: 40 suffit à séparer les zones qui se séparent ; au-delà, on paye du temps de
-#: démarrage pour des bornes qui ne bougent plus.
-BOOTSTRAP = 40
+#:
+#: Il valait 40, avec pour justification que « au-delà, les bornes ne bougent
+#: plus ». C'était une affirmation, et elle est fausse. Mesurée contre une
+#: référence à B=2000, sur dix répliques indépendantes par palier — l'écart-type
+#: inter-répliques donne le bruit de tirage, à données constantes, et le biais
+#: se lit sur chaque borne :
+#:
+#:     B      bruit d'une borne     largeur manquante     un bootstrap complet
+#:     40     0,041  (10,0 %)       −0,042  (−10,2 %)       9 s
+#:     200    0,019  ( 4,7 %)       −0,009  ( −2,3 %)      46 s
+#:     500    0,012  ( 2,9 %)       −0,006  ( −1,5 %)     114 s
+#:     2000   référence             référence             518 s
+#:
+#: (pourcentages rapportés à la largeur médiane publiée, 0,409)
+#:
+#: Deux choses en sortent. Le bruit d'abord : à 40, une borne bougeait de 10 %
+#: de la largeur qu'elle borne selon la graine — deux exécutions du même calcul
+#: sur les mêmes données publiaient des intervalles visiblement différents. Le
+#: biais ensuite, plus grave : trop peu de tirages resserrent les quantiles
+#: extrêmes vers le centre, et les intervalles sortaient 10 % trop courts. C'est
+#: exactement le défaut que le bootstrap par blocs venait corriger, réintroduit
+#: par la porte d'à côté.
+#:
+#: 500 est le point où le coût cesse d'acheter de la précision : passer à 2000
+#: quadruple le temps pour récupérer un dernier centième et demi de largeur. Le
+#: coût est de toute façon celui d'une génération, pas d'un affichage.
+BOOTSTRAP = 500
 
 #: Fonctions dans un organe qui méritent d'être affichées. « Membre » ne dit
 #: rien : tout le monde est membre de quelque chose.
@@ -151,7 +175,7 @@ class Donnees:
     index_cosign: dict[str, int] = field(default_factory=dict)
     #: Rééchantillonnages réellement effectués. La page Méthode publie ce
     #: nombre : servir la constante plutôt que la valeur employée ferait
-    #: annoncer 40 intervalles à un site généré avec `--bootstrap 0`.
+    #: annoncer `BOOTSTRAP` intervalles à un site généré avec `--bootstrap 0`.
     bootstrap: int = BOOTSTRAP
     #: Cube restreint aux députés en exercice, construit à la demande par
     #: `cube_en_exercice()`. Il sert à toute mesure publiée à côté d'un effectif
@@ -286,6 +310,7 @@ class Donnees:
             # le taux, son numérateur et son dénominateur voyagent ensemble.
             "participation_engageants", "votes_engageants",
             "engageants_eligibles", "engageants_votables",
+            "part_delegation_engageants",
         ]
         if self.avec_amendements:
             colonnes += ["amendements", "taux_adoption"]
@@ -327,6 +352,11 @@ class Donnees:
                         "votes_engageants", "engageants_eligibles",
                         "engageants_structurels", "engageants_votables",
                         "participation_engageants",
+                        # Ce que « présence » recouvre : les suffrages émis au
+                        # nom du député par un collègue mandaté. Comptés dans
+                        # les numérateurs ci-dessus, servis à part pour être dits.
+                        "votes_delegues", "part_delegation",
+                        "engageants_delegues", "part_delegation_engageants",
                     )
                 },
                 "position": {
@@ -783,6 +813,31 @@ def _age(colonne: pl.Expr) -> pl.Expr:
     ).cast(pl.Int32, strict=False)
 
 
+def _delegation(scrutins: pl.DataFrame, prefixe: str) -> pl.DataFrame:
+    """Suffrages émis **par délégation**, sur l'assiette de scrutins donnée.
+
+    Un député empêché donne délégation à un collègue, qui vote en son nom. Le
+    vote lui est imputé — c'est le droit — et il entre donc au numérateur de la
+    présence exactement comme un vote émis en personne.
+
+    D'où l'intérêt de publier ce compte à part : sans lui, « présence aux votes »
+    se lit comme une présence physique, alors que la mesure porte sur les
+    suffrages émis **au nom** du député. L'écart n'est pas anecdotique — la
+    délégation pèse près d'un quart des suffrages sur les votes qui engagent, et
+    certains députés dépassent 90 %.
+
+    On ne compte que le délégant : la source ne nomme jamais le porteur de la
+    délégation, et aucune statistique sur les récipiendaires n'est donc possible.
+    """
+    return (
+        load("votes")
+        .join(scrutins.select("scrutin_uid"), on="scrutin_uid", how="inner")
+        .filter(pl.col("position").is_in(list(EXPRESSED)))
+        .group_by("acteur_uid")
+        .agg(pl.col("par_delegation").sum().alias(f"{prefixe}_delegues"))
+    )
+
+
 def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
     """Participation, répartition des positions, dissidence — une ligne par député.
 
@@ -825,9 +880,8 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
     # Même fonction que ci-dessus, sur l'autre assiette de scrutins : le
     # dénominateur de présence ne se réécrit nulle part ailleurs. Cf.
     # `analyze.participation`, qui retire aussi les non-votants structurels.
-    engagement = analyze.participation(
-        analyze.build_cube(portee="texte", en_exercice_seulement=False)
-    ).select(
+    cube_texte = analyze.build_cube(portee="texte", en_exercice_seulement=False)
+    engagement = analyze.participation(cube_texte).select(
         "acteur_uid",
         pl.col("votes_exprimes").alias("votes_engageants"),
         pl.col("scrutins_eligibles").alias("engageants_eligibles"),
@@ -836,10 +890,34 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
         pl.col("participation").alias("participation_engageants"),
     )
 
+    # Les suffrages émis par délégation, sur les deux mêmes assiettes. Ils sont
+    # déjà comptés dans les numérateurs de présence — c'est le droit — et sont
+    # servis à part pour que la fiche puisse dire ce que « présence » recouvre.
+    delegation = _delegation(cube.scrutins, "votes")
+    delegation_texte = _delegation(cube_texte.scrutins, "engageants")
+
     return (
         part.join(diss, on="acteur_uid", how="left")
         .join(repartition, on="acteur_uid", how="left")
         .join(engagement, on="acteur_uid", how="left")
+        .join(delegation, on="acteur_uid", how="left")
+        .join(delegation_texte, on="acteur_uid", how="left")
+        .with_columns(
+            pl.col("votes_delegues").fill_null(0),
+            pl.col("engageants_delegues").fill_null(0),
+        )
+        .with_columns(
+            # La part est servie calculée : le site ne refait aucune division,
+            # c'est ce qui garantit qu'il n'existe qu'un seul chiffre par mesure.
+            pl.when(pl.col("votes_exprimes") > 0)
+            .then(pl.col("votes_delegues") / pl.col("votes_exprimes"))
+            .otherwise(None)
+            .alias("part_delegation"),
+            pl.when(pl.col("votes_engageants") > 0)
+            .then(pl.col("engageants_delegues") / pl.col("votes_engageants"))
+            .otherwise(None)
+            .alias("part_delegation_engageants"),
+        )
         # Un député sans aucun suffrage exprimé produit un NaN, que les moyennes
         # de groupe propageraient : c'est une absence de mesure, donc un `null`.
         .with_columns(pl.col(pl.Float64).fill_nan(None))

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import numpy as np
 import polars as pl
 from matplotlib.colors import LinearSegmentedColormap
@@ -203,9 +204,29 @@ def heatmap_groupes(accords: pl.DataFrame, ax=None, ordre: list[str] | None = No
 
 
 def barres_sujets(montants: pl.DataFrame, ax=None, k: int = 15):
-    """Termes en poussée cette semaine. Magnitude → rampe séquentielle."""
+    """Termes en poussée cette semaine. Magnitude → rampe séquentielle.
+
+    **Une semaine sans poussée est un résultat, pas une erreur.** En vacances
+    parlementaires, le corpus tombe à quelques dizaines de documents et aucun
+    terme ne franchit le seuil de fausses découvertes. On dessine alors un cadre
+    vide qui le dit, plutôt que de laisser la fonction tomber sur un tableau de
+    taille nulle — c'est la sortie normale du détecteur, pas une panne.
+    """
     d = montants.head(k).sort("score")
-    ax = ax or plt.subplots(figsize=(8, 0.34 * len(d) + 1.8))[1]
+    ax = ax or plt.subplots(figsize=(8, 0.34 * max(len(d), 3) + 1.8))[1]
+    semaine = montants["semaine"][0] if montants.height else ""
+
+    if not d.height:
+        ax.text(0.5, 0.5, "aucun terme ne dépasse le seuil cette semaine",
+                ha="center", va="center", fontsize=10,
+                color=_theme.texte_secondaire, transform=ax.transAxes)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        _habiller(ax, "Sujets qui montent",
+                  f"semaine du {semaine} · corpus trop mince pour conclure"
+                  if semaine else "aucune semaine analysable")
+        return ax
+
     v = d["score"].to_numpy()
     norm = (v - v.min()) / max(np.ptp(v), 1e-9)
     y = np.arange(len(d))
@@ -213,32 +234,47 @@ def barres_sujets(montants: pl.DataFrame, ax=None, k: int = 15):
     ax.barh(y, v, color=_theme.cmap(0.3 + 0.6 * norm), height=0.62)
     ax.set_yticks(y, d["terme"].to_list())
     ax.set_xlabel("score de poussée   (observé − attendu) / √attendu")
-    for i, (s, n, att) in enumerate(zip(v, d["n"], d["attendu"])):
-        ax.text(s + max(v) * 0.015, i, f"{n} vs {att:.0f}", va="center", fontsize=8.5,
-                color=_theme.texte_secondaire)
+    # `n_docs` et non `n` : l'attendu est un nombre de *documents*, et l'annoter
+    # avec un nombre d'occurrences comparerait deux unités différentes.
+    for i, (s, n, att) in enumerate(zip(v, d["n_docs"], d["attendu"])):
+        ax.text(s + max(v) * 0.015, i, f"{n} vs {att:.0f} doc.", va="center",
+                fontsize=8.5, color=_theme.texte_secondaire)
     ax.grid(axis="x", lw=0.6, alpha=0.6)
     ax.set_axisbelow(True)
-    semaine = montants["semaine"][0] if montants.height else ""
     _habiller(ax, "Sujets qui montent",
               f"semaine du {semaine} · observé vs attendu, à volume de documents égal")
     return ax
 
 
 def courbe_terme(serie: pl.DataFrame, terme: str, ax=None):
-    """Suivi d'un terme dans le temps. Série unique → pas de légende, le titre nomme."""
+    """Suivi d'un terme dans le temps. Série unique → pas de légende, le titre nomme.
+
+    **On trace `part`, pas `n`.** Le nombre brut d'occurrences suit d'abord le
+    volume du corpus : une semaine chargée fait monter tous les termes à la fois,
+    une semaine de vacances les fait tous tomber. La courbe des occurrences est
+    donc surtout celle du calendrier parlementaire. La part des documents qui
+    mentionnent le terme est bornée, comparable d'une semaine à l'autre, et c'est
+    elle que `topics.serie_terme` documente comme la colonne à tracer.
+    """
     ax = ax or plt.subplots(figsize=(9, 3.4))[1]
     x = serie["semaine"].to_list()
-    y = serie["n"].to_numpy()
+    y = serie["part"].to_numpy()
     ax.plot(x, y, lw=2, color=_theme.accent)
     ax.fill_between(x, y, alpha=0.12, color=_theme.accent, lw=0)
 
-    if len(y):
-        i = int(np.argmax(y))
+    if len(y) and np.isfinite(y).any():
+        i = int(np.nanargmax(y))
         ax.plot([x[i]], [y[i]], "o", ms=8, color=_theme.accent,
                 mec=_theme.surface, mew=2)
-        ax.annotate(f"  {y[i]} le {x[i]}", (x[i], y[i]), fontsize=9,
+        # Le pic est annoté avec la part *et* le dénombrement qui la produit :
+        # une part de 40 % sur 5 documents ne se lit pas comme sur 500.
+        n_docs = int(serie["n_docs"][i])
+        total = int(serie["n_documents"][i])
+        ax.annotate(f"  {y[i]:.0%} le {x[i]}  ({n_docs}/{total} doc.)",
+                    (x[i], y[i]), fontsize=9,
                     color=_theme.texte_secondaire, va="center")
-    ax.set_ylabel("occurrences")
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1))
+    ax.set_ylabel("part des documents de la semaine")
     ax.grid(axis="y", lw=0.6, alpha=0.6)
     ax.set_axisbelow(True)
     _habiller(ax, f"« {terme} » semaine par semaine")

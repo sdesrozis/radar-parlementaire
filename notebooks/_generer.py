@@ -264,8 +264,15 @@ md("""
 ## 6. Participation
 
 Le dénominateur compte autant que le numérateur : on rapporte les votes exprimés
-aux seuls scrutins où le député siégeait, et on retire les non-votes structurels
-(membre du Gouvernement, président de séance) qui ne sont pas des absences.
+aux seuls scrutins où le député siégeait, et on retire les **non-votes
+structurels** — membre du Gouvernement, président de séance, président de
+l'Assemblée. La source nomme le motif, scrutin par scrutin : ce ne sont pas des
+absences, c'est une fonction qui interdit de voter.
+
+Ce retrait n'est pas un détail de bord. Le président de l'Assemblée ne vote pas
+tant qu'il préside, sur la quasi-totalité des scrutins d'une législature :
+l'oublier revenait à publier le perchoir comme le siège le moins assidu de
+l'hémicycle.
 """)
 
 code("""
@@ -277,6 +284,87 @@ viz.barres_emphase(
 )
 plt.show()
 part.head(10).select("nom_complet", "groupe", "votes_exprimes", "scrutins_eligibles", "participation")
+""")
+
+md("""
+### Ce que « participation » ne dit pas : le vote par délégation
+
+**Le piège.** Un député empêché peut confier son vote à un collègue, qui
+l'exprime en son nom. Le vote lui est juridiquement imputé — c'est le règlement
+— et il entre donc au numérateur ci-dessus exactement comme un vote émis en
+personne. Le taux mesure les **suffrages émis au nom** du député, pas sa
+présence dans l'hémicycle. Les deux lectures divergent, et le mot
+« participation » laisse entendre la seconde.
+
+**Ce qu'on regarde.** La table `votes` porte un booléen `par_delegation`. On le
+rapporte aux suffrages exprimés, d'abord globalement, puis par portée de
+scrutin.
+""")
+
+code("""
+exprimes = load("votes").filter(pl.col("position").is_in(["pour", "contre", "abstention"]))
+print(f"suffrages exprimés   : {exprimes.height:>9,}".replace(",", " "))
+print(f"dont par délégation  : {exprimes['par_delegation'].sum():>9,}".replace(",", " "),
+      f"({exprimes['par_delegation'].mean():.1%})")
+
+# Par portée : c'est là que le résultat surprend.
+(exprimes
+ .join(scrutins.select("scrutin_uid", "portee"), on="scrutin_uid", how="inner")
+ .group_by("portee")
+ .agg(pl.col("par_delegation").mean().alias("part_deleguee"),
+      pl.len().alias("suffrages"))
+ .sort("part_deleguee", descending=True))
+""")
+
+md("""
+**Ce que ça change.** La délégation ne se répartit pas uniformément : elle est
+**la plus forte sur les votes qui engagent**, là où elle pèse près d'un
+suffrage sur quatre, contre environ un sur sept sur les amendements. C'est
+exactement l'assiette que le reste du projet privilégie parce qu'elle est la
+plus significative — et c'est celle où la présence affichée recouvre le plus de
+votes émis par un tiers.
+
+Rien d'étonnant une fois dit : un vote solennel est annoncé à l'avance, et un
+député empêché ce jour-là organise sa délégation, alors qu'il laisse simplement
+passer un amendement voté à l'improviste.
+
+Regardons maintenant les députés dont la présence repose le plus sur la
+délégation.
+""")
+
+code("""
+deleguants = (
+    exprimes
+    .join(scrutins.filter(pl.col("portee") == "texte").select("scrutin_uid"),
+          on="scrutin_uid", how="inner")
+    .group_by("acteur_uid")
+    .agg(pl.col("par_delegation").sum().alias("delegues"),
+         pl.len().alias("exprimes"))
+    .filter(pl.col("exprimes") >= 30)          # sinon la part n'est pas mesurée
+    .with_columns((pl.col("delegues") / pl.col("exprimes")).alias("part_deleguee"))
+    .join(load("deputes").select("acteur_uid", "nom_complet", "groupe"), on="acteur_uid")
+    .sort("part_deleguee", descending=True)
+)
+print(f"médiane de l'Assemblée : {deleguants['part_deleguee'].median():.1%}")
+deleguants.select("nom_complet", "groupe", "delegues", "exprimes", "part_deleguee").head(10)
+""")
+
+md("""
+Le seuil de trente votes exprimés n'est pas décoratif : une part calculée sur
+huit votes peut valoir 100 % sans rien signaler. C'est le même réflexe que le
+`min_communs` des taux d'accord — une part n'existe pas sans son effectif.
+
+**Ce que la source ne permet pas.** Elle indique qu'un vote a été délégué,
+**jamais par qui il a été porté** : le fichier de scrutin ne contient que la
+référence du délégant et un booléen. On ne peut donc ni classer ceux qui
+reçoivent le plus de délégations, ni reconstituer les binômes. C'est une
+question légitime à laquelle ces données ne répondent pas, et il vaut mieux
+l'écrire que de laisser croire le contraire.
+
+**Ce qui reste à faire.** Un seul indicateur tient compte de la délégation : la
+présence, qui affiche la part déléguée à côté de son numérateur. Le taux de
+dissidence, lui, traite un vote délégué comme les autres — alors qu'un écart à
+la ligne du groupe a pu être matériellement produit par le collègue porteur.
 """)
 
 md("""
@@ -296,8 +384,38 @@ plt.show()
 montants
 """)
 
+md("""
+**Une semaine peut ne rien renvoyer, et c'est une réponse.** Le détecteur teste
+plusieurs milliers de termes et ne retient que ceux qui passent le contrôle des
+fausses découvertes. En intersession, le corpus tombe à quelques dizaines de
+titres&nbsp;: plus rien n'est distinguable du hasard, et la liste est vide. Une
+liste vide dit « rien ne ressort à ce volume », pas « il ne s'est rien passé » —
+et c'est très différent d'un détecteur qui remonterait quand même ses quinze
+meilleurs scores.
+
+Pour voir le détecteur travailler, on se place donc sur la dernière semaine qui
+a effectivement du volume.
+""")
+
 code("""
-# Suivre un terme précis dans le temps
+# La dernière semaine où quelque chose ressort — en intersession, il n'y a rien
+# à détecter, et le détecteur doit le dire plutôt que remplir la liste.
+semaines = sorted(freqs["semaine"].unique().to_list())
+for s in reversed(semaines):
+    actifs = topics.sujets_qui_montent(freqs, semaine=str(s), k=15)
+    if actifs.height:
+        break
+
+print(f"semaine retenue : {s}")
+viz.barres_sujets(actifs)
+plt.show()
+actifs.select("terme", "n_docs", "n_documents", "attendu", "score", "q_valeur")
+""")
+
+code("""
+# Suivre un terme précis dans le temps. On trace la *part* des documents qui le
+# mentionnent, jamais le nombre brut d'occurrences : celui-ci suit d'abord le
+# volume du corpus, donc le calendrier parlementaire.
 terme = "agricole"
 viz.courbe_terme(topics.serie_terme(terme, freqs=freqs), terme)
 plt.show()
@@ -1261,8 +1379,9 @@ C'était une affirmation, pas un résultat. Ce notebook la teste.
 
 **Ce qu'on établit :**
 
-1. l'abstention est une **décision collective** — 79 % des abstentions
-   surviennent quand elle est la ligne du groupe ;
+1. l'abstention est une **décision collective** — 72 % des abstentions
+   surviennent quand elle est la ligne du groupe, et une sur dix reste
+   indéterminée faute de ligne ;
 2. elle est **le plus souvent intermédiaire**, contrairement à ce qu'affirmait
    le notebook `04` : les abstentionnistes se situent entre les deux camps dans
    71 % des scrutins, et à mi-chemin en médiane ;
@@ -1331,9 +1450,22 @@ abstention.decomposition()
 """)
 
 md("""
-**Quatre abstentions sur cinq sont des consignes de groupe.** L'abstention n'est
-donc pas, à l'Assemblée, l'expression d'une hésitation individuelle : c'est un
-instrument collectif.
+**Près de trois abstentions sur quatre sont des consignes de groupe** (72 %),
+contre 18 % de retraits individuels. L'abstention n'est donc pas, à l'Assemblée,
+l'expression d'une hésitation individuelle : c'est un instrument collectif.
+
+**Les 10 % restants ne sont pas un résidu technique**, et le dénominateur mérite
+qu'on s'y arrête. Ces abstentions surviennent dans des groupes qui n'avaient
+ce jour-là aucune ligne — aucune position n'y réunissait la majorité absolue des
+suffrages. Sans ligne, il n'y a ni consigne à suivre ni consigne à quitter, et
+les ranger dans l'une des deux autres cases inventerait une information.
+
+Une version précédente de ce notebook annonçait « quatre abstentions sur cinq »
+parce que le calcul écartait silencieusement ces scrutins-là : la part portait
+en réalité sur les 90 % d'abstentions qu'on sait classer, sans que rien ne le
+dise. Les trois parts somment désormais à 1. C'est exactement le piège que le
+notebook `02` décrit pour la population de scrutins, rencontré ici sur la
+population d'abstentions.
 
 Ce qui amène une question : une consigne d'abstention est-elle aussi suivie
 qu'une consigne de vote ?
@@ -1458,7 +1590,7 @@ trois, ni pour ni contre, et se diluent dans une moyenne.
 
 | Question | Réponse |
 |---|---|
-| L'abstention est-elle individuelle ? | Non — 79 % suivent une consigne de groupe. |
+| L'abstention est-elle individuelle ? | Non — 72 % suivent une consigne de groupe, 18 % sont des retraits, 10 % restent indéterminées. |
 | Une consigne d'abstention est-elle suivie ? | Moins bien : 88 % contre 96 % pour un vote. |
 | Est-elle une position intermédiaire ? | Oui dans 71 % des scrutins, médiane à 0,52. |
 | Faut-il la réintégrer au modèle ? | Pas ainsi : il faudrait un modèle ordonné. |
