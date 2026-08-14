@@ -276,3 +276,35 @@ plus embarrassante que ce qui était écrit — on écarte une position qui port
 l'information — et elle est dite comme telle."""
 pages = "Méthode"
 commit = "537df20"
+
+[[correction]]
+date = "2026-08-14"
+titre = "Le chiffre de tête d'une mesure absente"
+portee = "site"
+erreur = """
+La fiche d'un député dont la source ne publie aucun vote nominatif affichait
+« 0,0 % » en très gros caractères, comme chiffre de présence, de délégation et
+d'écart à la ligne. Le paragraphe placé juste en dessous expliquait au même
+moment que « nous préférons une case vide à un zéro trompeur ». Le texte avait
+raison et le chiffre le démentait ; c'est le chiffre qu'on lit."""
+cause = """
+Le générateur passait `pct(valeur or 0)` au gabarit : une mesure absente
+traversait la frontière en zéro, et rien en aval ne pouvait plus distinguer
+« zéro pour cent » de « pas de mesure ». La couche rédactionnelle, elle, testait
+bien l'absence et produisait le bon texte — les deux couches ne se parlaient
+pas.
+
+C'est exactement l'erreur que le site reproche à tout le monde, et il la
+commettait sur ses trois mesures de tête à la fois."""
+effet = """
+Une fiche sur 577 est concernée — celle du seul député en exercice dont la
+source ne publie aucun suffrage — et ses trois mesures de tête à la fois :
+« 0,0 % » → « — » sur la présence, sur la délégation et sur l'écart à la
+ligne. Aucun taux réel ne change ; les zéros réellement mesurés — un député
+qui n'a jamais délégué, un député qui ne s'est jamais écarté de sa ligne —
+continuent de s'afficher « 0,0 % », parce qu'ils sont exacts.
+
+Le chiffre de tête de toute mesure passe désormais par `grand_chiffre()`, qui
+rend un tiret cadratin quand la valeur est absente."""
+pages = "Les 577 fiches de député"
+commit = "fb5d5e6"
