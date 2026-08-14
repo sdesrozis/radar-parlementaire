@@ -938,6 +938,13 @@ def main() -> None:
     # Les images de marque vivent dans `assets/` — elles ne sont ni du style ni
     # du comportement — mais elles sont servies depuis `statique/`, parce que
     # c'est le seul dossier que l'hébergeur voit.
+    #
+    # Seuls les fichiers de premier niveau sont copiés. `assets/sources/` garde
+    # les originaux dont sont tirés les fichiers publiés : ils appartiennent au
+    # dépôt, pas au site. La distinction n'est pas cosmétique — les planches
+    # d'origine du logo comportent le bloc-marque de l'État, réservé aux
+    # entités publiques, et les recopier telles quelles les aurait mises en
+    # ligne sur radar-parlementaire.fr.
     for image in sorted(ASSETS.glob("*")):
         if image.is_file():
             shutil.copy2(image, SORTIE / "statique" / image.name)

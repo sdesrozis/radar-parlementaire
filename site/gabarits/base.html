@@ -9,11 +9,18 @@
      distinctes, qui se concurrencent. -->
 <link rel="canonical" href="{{CANONIQUE}}">
 
-<!-- `marque.png` est l'emblème du logo, découpé du fichier d'origine et recadré
-     dans un carré : le verrou complet porte le mot « RADAR », illisible à 32
-     pixels et redondant avec le texte de l'onglet. -->
-<link rel="icon" href="statique/marque.png" type="image/png">
-<link rel="apple-touch-icon" href="statique/marque.png">
+<!-- Le favicon est l'emblème seul, jamais le verrou complet : à 32 pixels le mot
+     « RADAR » devient une bouillie, et il est de toute façon redondant avec le
+     titre de l'onglet posé juste à côté.
+     Deux fichiers et un attribut `media` : la barre d'onglets suit le thème du
+     système, et l'emblème à encre foncée disparaît sur une barre sombre. Un
+     navigateur qui ignore `media` prend le premier, la version claire, qui est
+     le cas le plus courant. -->
+<link rel="icon" type="image/png" href="statique/embleme-v2-clair.png"
+      media="(prefers-color-scheme: light)">
+<link rel="icon" type="image/png" href="statique/embleme-v2-sombre.png"
+      media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="statique/embleme-v2-clair.png">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Radar parlementaire">
@@ -25,13 +32,25 @@
      navigateur mais pas par les robots qui fabriquent les aperçus de lien. Ils
      lisent la balise hors de tout document et n'ont aucune base pour la
      résoudre — l'aperçu partait donc sans image, sur les 581 pages. -->
-<meta property="og:image" content="{{BASE_URL}}/statique/logo.png">
-<meta name="twitter:card" content="summary">
+<!-- Une carte 1200×630 à fond plein, et non le PNG transparent de la marque :
+     une plateforme qui compose sa carte sur fond sombre ferait disparaître un
+     logo à encre foncée. Le fond est figé côté image. -->
+<meta property="og:image" content="{{BASE_URL}}/statique/partage-v2.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<!-- `summary_large_image` et non `summary` : la carte de partage est un
+     1200×630 pensé pour la grande vignette ; en petit carré elle serait rognée
+     au centre et ne montrerait que trois lettres du mot-marque. -->
+<meta name="twitter:card" content="summary_large_image">
 
 <header class="entete">
   <div class="cadre">
     <a class="marque" href="index.html">
-      <img class="embleme" src="statique/marque.png" alt="" width="256" height="256">
+      <!-- Deux fichiers plutôt qu'un `<picture>` : le site a un bouton de thème
+           qui pose `data-theme` sur la racine, et une requête média ne sait pas
+           le suivre. Le CSS masque celui qui ne sert pas. -->
+      <img class="embleme clair" src="statique/embleme-v2-clair.png" alt="" width="256" height="256">
+      <img class="embleme sombre" src="statique/embleme-v2-sombre.png" alt="" width="256" height="256">
       <span class="m1">Radar</span><span class="m2">parlementaire</span>
     </a>
     <nav class="menu">
@@ -86,7 +105,13 @@
 <footer class="cadre pied">
   <div class="grille">
     <div>
-      <img class="pied-logo" src="statique/logo.png" alt="Radar parlementaire" width="120" height="120">
+      <!-- Le verrou complet — emblème, mot-marque et signature — tient dans le
+           pied, où il a la largeur pour rester lisible. Dans l'en-tête il serait
+           réduit à une vignette où « Ce que fait votre député » disparaîtrait. -->
+      <img class="pied-logo clair" src="statique/marque-v2-clair.png"
+           alt="Radar parlementaire — ce que fait votre député" width="929" height="450">
+      <img class="pied-logo sombre" src="statique/marque-v2-sombre.png"
+           alt="Radar parlementaire — ce que fait votre député" width="929" height="447">
     </div>
     <div>
       <h4>Source</h4>

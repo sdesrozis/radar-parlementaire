@@ -572,19 +572,35 @@ h1 {
    le seul endroit du site où la marque a le droit d'occuper de la place : à
    108 px elle s'excusait d'être là, entre deux colonnes de texte qui la
    dominaient. Elle tient maintenant sa colonne. */
-.pied-logo { display: block; width: min(168px, 100%); height: auto; }
+.pied-logo { display: block; width: min(236px, 100%); height: auto; }
 
-/* Le bleu d'encre du logo (#0A1F44) est presque noir : sur le papier sombre il
-   disparaît, et le fronton devient une masse. On l'éclaircit — le drapeau reste
-   reconnaissable, l'emblème redevient lisible. C'est le seul filtre du site, et
-   il ne s'applique qu'à la marque : aucune donnée n'est retouchée à l'affichage. */
+/* ── la marque suit le thème, par deux fichiers ─────────────────────────────
+   Le logo existe en deux versions dessinées : encre foncée pour le papier
+   clair, encre claire pour le papier sombre. C'est mieux qu'un filtre — la
+   version précédente éclaircissait le bleu d'encre au `brightness`, ce qui
+   délavait aussi le drapeau.
+   Trois blocs, comme partout ailleurs : la préférence système, puis les deux
+   valeurs de `data-theme`, pour que le bouton du lecteur l'emporte dans les
+   deux sens. La version masquée l'est en `display: none`, donc invisible aussi
+   des lecteurs d'écran — sans quoi le nom de la marque serait annoncé deux
+   fois. */
+.marque .embleme.sombre, .pied-logo.sombre { display: none; }
+
 @media (prefers-color-scheme: dark) {
-  .marque .embleme, .pied-logo { filter: brightness(1.75) saturate(0.95); }
+  :root:not([data-theme="light"]) .marque .embleme.clair,
+  :root:not([data-theme="light"]) .pied-logo.clair { display: none; }
+  :root:not([data-theme="light"]) .marque .embleme.sombre { display: block; }
+  :root:not([data-theme="light"]) .pied-logo.sombre { display: block; }
 }
-:root[data-theme="dark"] .marque .embleme,
-:root[data-theme="dark"] .pied-logo { filter: brightness(1.75) saturate(0.95); }
-:root[data-theme="light"] .marque .embleme,
-:root[data-theme="light"] .pied-logo { filter: none; }
+:root[data-theme="dark"] .marque .embleme.clair,
+:root[data-theme="dark"] .pied-logo.clair { display: none; }
+:root[data-theme="dark"] .marque .embleme.sombre { display: block; }
+:root[data-theme="dark"] .pied-logo.sombre { display: block; }
+
+:root[data-theme="light"] .marque .embleme.clair { display: block; }
+:root[data-theme="light"] .pied-logo.clair { display: block; }
+:root[data-theme="light"] .marque .embleme.sombre,
+:root[data-theme="light"] .pied-logo.sombre { display: none; }
 .pied h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--encre-3); margin: 0 0 10px; font-weight: 600; }
 .pied p, .pied li { font-size: 14.5px; color: var(--encre-2); margin: 0 0 7px; line-height: 1.6; }
 .pied ul { list-style: none; padding: 0; margin: 0; }
