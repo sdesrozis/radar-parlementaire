@@ -108,8 +108,8 @@ CORRECTIONS = ICI / "corrections.toml"
 EDITEUR = "Sylvain Desroziers"
 EDITEUR_BIB = "Desroziers, Sylvain"
 CONTACT = "contact@radar-parlementaire.fr"
-DEPOT = "https://github.com/sdesrozis/radar"
-DEPOT_COURT = "github.com/sdesrozis/radar"
+DEPOT = "https://github.com/sdesrozis/radar-parlementaire"
+DEPOT_COURT = "github.com/sdesrozis/radar-parlementaire"
 
 # La version du paquet, lue là où elle est déclarée. La réécrire ici en ferait
 # une seconde source de vérité, qui divergerait à la première publication.

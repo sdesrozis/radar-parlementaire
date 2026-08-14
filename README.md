@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sdesrozis/radar/actions/workflows/tests.yml"><img src="https://github.com/sdesrozis/radar/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="https://github.com/sdesrozis/radar-parlementaire/actions/workflows/tests.yml"><img src="https://github.com/sdesrozis/radar-parlementaire/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
   <img src="https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue" alt="licence AGPL-3.0-or-later">
   <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
   <a href="https://creativecommons.org/licenses/by/4.0/deed.fr"><img src="https://img.shields.io/badge/note-CC%20BY%204.0-lightgrey" alt="note méthodologique sous CC BY 4.0"></a>
@@ -42,7 +42,7 @@ pas diverger — il n'existe pas de chiffre qui vienne d'ailleurs.
 | **Citer** | [`CITATION.cff`](CITATION.cff), et la section [Citer](#citer) plus bas |
 
 **Un chiffre vous paraît faux ?** C'est l'usage attendu de ce dépôt. Ouvrez une
-[issue](https://github.com/sdesrozis/radar/issues) ou écrivez à
+[issue](https://github.com/sdesrozis/radar-parlementaire/issues) ou écrivez à
 `contact@radar-parlementaire.fr` : toute contestation reçoit une réponse, et si
 elle est fondée, une entrée au registre des corrections. La note méthodologique
 existe précisément pour que la discussion porte sur la méthode plutôt que sur la
@@ -686,7 +686,7 @@ travail qui rejoue les calculs cite les deux.
              l'Assemblée nationale},
   year    = {2026},
   version = {0.1.0},
-  url     = {https://github.com/sdesrozis/radar},
+  url     = {https://github.com/sdesrozis/radar-parlementaire},
   license = {AGPL-3.0-or-later},
   note    = {Données : open data de l'Assemblée nationale, Licence Ouverte 2.0}
 }
