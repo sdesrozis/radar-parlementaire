@@ -95,6 +95,26 @@ aux médianes de groupes nommées, jamais par une étiquette politique.
 4. Ajouter un `<details class="piege">` qui dit ce que la mesure écarte. Toujours.
 5. `page()` s'arrête si un jeton du gabarit n'a pas de valeur — laisser cette garde.
 
+## La note méthodologique voyage avec le site
+
+`docs/note-methodologique.pdf` est compilé par LaTeX, hors du générateur, et **ignoré
+par git** : un clone frais ne l'a pas. `generer.py` le copie dans
+`sortie/methode/`, la page Méthode l'y lie et le sitemap l'annonce — s'il est là.
+
+**Une note absente et une note périmée ne se valent pas.** L'absence est honnête :
+l'encart disparaît, rien n'est promis. Le retard publie sous l'autorité du document de
+référence une définition que le code n'applique plus, alors que la page Méthode affirme
+que « si le site et la note divergent, c'est le site qui a tort ». La génération
+s'arrête donc quand le PDF est plus ancien que son `.tex`, avant les trente secondes de
+calcul, et donne la commande. `--note-perimee` passe outre.
+
+**Toute modification d'une définition se fait dans les deux endroits, le même jour** :
+`radar/` et le `.tex`. Puis on recompile.
+
+```bash
+cd docs && latexmk -pdf note-methodologique.tex
+```
+
 ## Contrôler après génération
 
 ```bash

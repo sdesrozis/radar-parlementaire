@@ -104,6 +104,24 @@ SORTIE = ICI / "sortie"
 NOTE_SOURCE = ICI.parent / "docs" / "note-methodologique.pdf"
 NOTE_CHEMIN = "methode/note-methodologique.pdf"
 
+# Le source LaTeX, uniquement pour savoir si le PDF est en retard sur lui.
+# **Une annexe absente et une annexe périmée ne se valent pas.** L'absence est
+# honnête : la page Méthode retire son encart et personne n'est trompé. Le
+# retard, lui, publie sous l'autorité du document de référence une définition
+# que le code n'applique plus — or le site affirme que « si le site et la note
+# divergent, c'est le site qui a tort ». Servir une note périmée, c'est donc
+# publier soi-même la preuve qu'on a tort. C'est arrivé le jour où le
+# dénominateur du taux d'adoption est passé des dépôts aux examens : le `.tex`
+# était corrigé, le PDF de la veille tenait encore l'ancienne formule, et rien
+# ne l'aurait signalé.
+NOTE_TEX = ICI.parent / "docs" / "note-methodologique.tex"
+
+
+def note_perimee() -> bool:
+    """Le PDF est-il plus ancien que le source dont il est tiré ?"""
+    return (NOTE_SOURCE.exists() and NOTE_TEX.exists()
+            and NOTE_SOURCE.stat().st_mtime < NOTE_TEX.stat().st_mtime)
+
 # Adresse canonique, pour le sitemap et les URL absolues des métadonnées de
 # partage. Une URL relative suffit à la navigation ; un moteur de recherche et
 # un aperçu de lien, eux, exigent l'adresse complète.
@@ -1234,7 +1252,23 @@ def main() -> None:
     parseur.add_argument("--servir", action="store_true",
                          help="servir sortie/ après génération, comme le fera l'hébergeur")
     parseur.add_argument("--port", type=int, default=8000, help="port du mode --servir")
+    parseur.add_argument("--note-perimee", action="store_true",
+                         help="générer malgré un PDF de note plus ancien que son source")
     args = parseur.parse_args()
+
+    # Le contrôle vient avant les trente secondes de calcul, et il arrête tout :
+    # une annexe en retard sur le code publie, sous l'autorité du document de
+    # référence, une définition que le site n'applique plus. Une commande le
+    # règle, et l'échappatoire existe pour qui n'a pas de moteur TeX sous la main.
+    if note_perimee() and not args.note_perimee:
+        raise SystemExit(
+            f"La note méthodologique est en retard sur son source.\n"
+            f"  {NOTE_TEX} a changé après {NOTE_SOURCE}\n\n"
+            f"Le site servirait un document de référence qui contredit ses "
+            f"propres chiffres. Recompiler d'abord :\n\n"
+            f"    cd docs && latexmk -pdf note-methodologique.tex\n\n"
+            f"…ou passer --note-perimee pour générer quand même."
+        )
 
     debut = time.monotonic()
     donnees = Donnees.construire(bootstrap=args.bootstrap, journal=lambda m: print(f"  · {m}"))
