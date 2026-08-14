@@ -311,7 +311,64 @@ h1 {
   .these p + p { margin-top: 8px; }
 }
 
+/* ── renvoi vers le socle pédagogique (fiches) ─────────────────────── */
+
+/* Le socle vit sur l'accueil, pas sur les 577 fiches. Cette bande y renvoie
+   sans occuper la place d'une mesure : un lecteur qui connaît l'Assemblée doit
+   pouvoir la traverser des yeux, celui qui la découvre doit la voir. D'où le
+   registre discret — une seule ligne, pas d'encadré, pas de titre. */
+.renvoi-socle {
+  padding-block: 20px 22px;
+  border-bottom: 1px solid var(--trait);
+}
+.renvoi-socle p {
+  max-width: var(--lecture);
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--encre-2);
+}
+.renvoi-socle a {
+  color: var(--encre);
+  text-decoration-color: var(--trait-fort);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.renvoi-socle a:hover { color: var(--accent); text-decoration-color: currentColor; }
+
 /* ── encart pédagogique ────────────────────────────────────────────── */
+
+/* Le parcours d'un texte : une liste numérotée qui doit se lire comme une
+   suite d'étapes, pas comme une énumération. Le numéro est en chasse fixe,
+   comme tous les repères dénombrables du site. */
+.parcours {
+  max-width: var(--lecture);
+  margin: 0 0 26px;
+  padding: 0;
+  list-style: none;
+  counter-reset: etape;
+}
+.parcours li {
+  counter-increment: etape;
+  position: relative;
+  padding-left: 34px;
+  margin-bottom: 14px;
+  color: var(--encre-2);
+  line-height: 1.7;
+}
+.parcours li::before {
+  content: counter(etape);
+  position: absolute;
+  left: 0; top: 0.15em;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  border: 1px solid var(--trait-fort);
+  border-radius: 50%;
+  width: 21px; height: 21px;
+  display: grid; place-items: center;
+}
+.parcours li b { color: var(--encre); }
 
 .socle {
   padding-block: 40px 48px;
