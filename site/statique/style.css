@@ -500,6 +500,9 @@ h1 {
 .rang { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--trait); }
 .rang:last-of-type { border-bottom: 0; }
 .rang .nom { flex: 1; min-width: 0; font-size: 15.5px; }
+/* Un voisin dont le mandat est terminé n'a pas de fiche : il garde son nom,
+   sans lien ni soulignement, et se distingue par l'encre secondaire. */
+.rang .nom.ancien { color: var(--encre-2); cursor: default; }
 .rang .grp { font-family: var(--mono); font-size: 10.5px; color: var(--encre-3); letter-spacing: 0.06em; }
 .rang .tx { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .rang .n { font-family: var(--mono); font-size: 10.5px; color: var(--encre-3); min-width: 62px; text-align: right; }

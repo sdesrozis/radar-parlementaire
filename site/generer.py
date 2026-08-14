@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import unicodedata
 import shutil
 import time
 import tomllib
@@ -60,6 +61,22 @@ from redaction import (
     reserve_denominateur,
     situer,
 )
+
+def slug(*morceaux: str | int | None) -> str:
+    """Fragment d'URL lisible : minuscules, sans accent, mots liés par un tiret.
+
+    Le nom seul suffirait aujourd'hui à distinguer les 648 fiches, mais il ne
+    le garantit pas : deux homonymes élus la même législature — cas déjà vu à
+    l'Assemblée — se disputeraient la même adresse, et la seconde fiche
+    écraserait silencieusement la première. Le département et la
+    circonscription lèvent l'ambiguïté et sont stables pour la durée du mandat,
+    là où le groupe politique, lui, change en cours de route.
+    """
+    texte = "-".join(str(m) for m in morceaux if m not in (None, ""))
+    texte = unicodedata.normalize("NFKD", texte.lower())
+    texte = "".join(c for c in texte if not unicodedata.combining(c))
+    return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", texte)).strip("-")
+
 
 ICI = Path(__file__).parent
 GABARITS = ICI / "gabarits"
@@ -135,19 +152,59 @@ def participation_engageants(tous: list[dict]) -> dict[str, dict]:
 
 # ── fragments HTML ─────────────────────────────────────────────────────────
 
-def rangs_html(voisins: list[dict], surligne: str | None = None) -> str:
+def rangs_html(voisins: list[dict], adresse: dict[str, str],
+               publiees: set[str], surligne: str | None = None) -> str:
+    """Les colonnes de proximité. `adresse` est la table uid → fichier : cette
+    fonction ne fabrique pas d'URL, elle en lit une.
+
+    Un voisin dont la fiche n'est pas publiée — un ancien député, ministre parti
+    en cours de mandat — garde son nom et perd son lien. Un lien mort sur la
+    page qui promet la vérifiabilité coûte plus cher que l'absence de lien.
+    """
     lignes = []
     for v in voisins:
         classe = "rang souligne" if v["nom_complet"] == surligne else "rang"
+        uid = v["acteur_uid"]
+        nom = (
+            f'<a class="nom" href="{adresse[uid]}">{echapper(v["nom_complet"])}</a>'
+            if uid in publiees else
+            f'<span class="nom ancien" title="mandat terminé">'
+            f'{echapper(v["nom_complet"])}</span>'
+        )
         lignes.append(
             f'<div class="{classe}">'
-            f'<a class="nom" href="{v["acteur_uid"]}.html">{echapper(v["nom_complet"])}</a>'
+            f'{nom}'
             f'<span class="grp">{echapper(v["groupe"])}</span>'
             f'<span class="tx">{pct(v["accord"])}{NBSP}%</span>'
             f'<span class="n">n={num(v["scrutins_communs"])}</span>'
             f"</div>"
         )
     return "\n        ".join(lignes)
+
+
+def redirection(vers: str) -> str:
+    """Page de renvoi minimale, laissée à l'ancienne adresse d'une fiche.
+
+    Les fiches ont longtemps porté l'identifiant de l'acteur — `PA267780.html`.
+    Ces adresses sont en ligne, indexées, et citées dans des liens que ce site
+    ne contrôle pas ; les supprimer casserait tout ce qui pointe vers elles.
+
+    Trois signaux, parce qu'aucun ne suffit seul : `canonical` dit au moteur
+    laquelle des deux adresses fait foi, `robots noindex` retire la page de
+    renvoi de l'index sans retirer le lien qu'elle transmet, et le
+    `meta refresh` emmène le lecteur. Un vrai 301 vaudrait mieux, mais il
+    suppose une configuration d'hébergeur ; ceci fonctionne partout, y compris
+    en local et sur un simple dossier servi tel quel.
+    """
+    return (
+        '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+        f'<link rel="canonical" href="{BASE}/{vers}">'
+        '<meta name="robots" content="noindex,follow">'
+        f'<meta http-equiv="refresh" content="0; url={vers}">'
+        '<title>Radar parlementaire</title></head>'
+        f'<body><p>Cette fiche a une nouvelle adresse : '
+        f'<a href="{vers}">{vers}</a></p></body></html>\n'
+    )
 
 
 def bloc_note_html() -> str:
@@ -242,7 +299,7 @@ def registre_html(entrees: list[dict]) -> str:
     return "\n      ".join(lignes)
 
 
-def index_departements_html(deputes: list[dict]) -> str:
+def index_departements_html(deputes: list[dict], adresse: dict[str, str]) -> str:
     """Les députés en exercice, groupés par département, en liens HTML.
 
     C'est le seul endroit du site où les {{EN_EXERCICE}} fiches sont atteignables
@@ -263,7 +320,7 @@ def index_departements_html(deputes: list[dict]) -> str:
     for (num, nom), membres in sorted(par_departement.items()):
         membres.sort(key=lambda d: (int(d["num_circo"] or 0), d["nom_complet"]))
         liens = "\n          ".join(
-            f'<li><a href="{d["acteur_uid"]}.html">{echapper(d["nom_complet"])}'
+            f'<li><a href="{adresse[d["acteur_uid"]]}">{echapper(d["nom_complet"])}'
             f'<span class="circo mono">{d["num_circo"]}{ordinal(d["num_circo"])}</span></a></li>'
             for d in membres
         )
@@ -342,6 +399,17 @@ def lignes_groupes_html(groupes: list[dict]) -> str:
 class Site:
     """Porte le contexte calculé une fois, et écrit les pages."""
 
+    @staticmethod
+    def _adresse(d: dict) -> str:
+        """`agnes-firmin-le-bodo-seine-maritime-10.html`.
+
+        Un identifiant d'acteur — `PA267780` — ne dit rien à un lecteur, ne se
+        retient pas, ne se lit pas à voix haute et ne porte aucun des mots par
+        lesquels on cherche un député. Le nom et la circonscription portent les
+        deux.
+        """
+        return slug(d["nom_complet"], d.get("departement"), d.get("num_circo")) + ".html"
+
     def __init__(self, donnees: Donnees):
         self.donnees = donnees
         self.apercu = donnees.apercu()
@@ -350,6 +418,24 @@ class Site:
         self.groupes = {g["groupe"]: g for g in self.apercu["groupes"]}
         self.portees = self.apercu["scrutins_par_portee"]
         self.n_texte = self.portees.get("texte", 0)
+
+        # L'adresse d'une fiche, calculée une fois et lue partout. Cinq endroits
+        # fabriquaient auparavant `{uid}.html` chacun de leur côté ; une table
+        # unique garantit qu'un lien interne, le plan du site et le fichier
+        # écrit sur le disque désignent la même page.
+        self.adresse = {d["acteur_uid"]: self._adresse(d) for d in self.tous}
+        # Les fiches ne sont écrites que pour les députés en exercice, alors que
+        # les colonnes de proximité peuvent citer un ancien — un ministre parti
+        # en cours de mandat reste un voisin de vote. Lier vers une page qui
+        # n'existe pas produisait 61 liens morts, bien avant cette version. On
+        # garde le nom, on retire le lien.
+        self.publiees = {d["acteur_uid"] for d in self.deputes}
+        doublons = len(self.adresse) - len(set(self.adresse.values()))
+        if doublons:
+            raise SystemExit(
+                f"{doublons} députés partagent une même adresse : le slug ne "
+                "distingue pas assez. Ajouter un discriminant avant de publier."
+            )
 
         pe = participation_engageants(self.tous)
         self.pe = pe
@@ -702,8 +788,8 @@ class Site:
             "POS_ECART_GROUPE": phrase_ecart_groupe(p, i, groupe) if estimee else "",
             "POS_INCERTITUDE": phrase_incertitude(p, i, a, self.d_pos) if estimee else "",
 
-            "PROCHES_TOUS": rangs_html(f["proches"]["tous"], surligne),
-            "PROCHES_TEXTE": rangs_html(f["proches"]["texte"], surligne),
+            "PROCHES_TOUS": rangs_html(f["proches"]["tous"], self.adresse, self.publiees, surligne),
+            "PROCHES_TEXTE": rangs_html(f["proches"]["texte"], self.adresse, self.publiees, surligne),
             "ECART_VERDICT": ec1,
             "ECART_EXPLIC": ec2,
 
@@ -715,7 +801,7 @@ class Site:
             description=(f"{i['nom_complet']}, député{'e' if i.get('civilite') == 'Mme' else ''} "
                          f"de {i['departement']} ({i['groupe']}) : présence aux votes, écarts à la "
                          f"ligne de son groupe et position estimée, chaque chiffre avec son dénominateur."),
-            chemin=f"{uid}.html", onglet="deputes")
+            chemin=self.adresse[uid], onglet="deputes")
 
     # -- accueil et annuaire ----------------------------------------------
 
@@ -747,7 +833,7 @@ class Site:
             return "" if valeur is None else forme(valeur)
 
         index = [{
-            "u": d["acteur_uid"],
+            "u": self.adresse[d["acteur_uid"]].removesuffix(".html"),
             "n": d["nom_complet"],
             "d": d["departement"] or "",
             "dn": str(d["num_departement"] or ""),
@@ -768,7 +854,7 @@ class Site:
             corps,
             {
                 "ANNUAIRE_JSON": self.index_annuaire(),
-                "INDEX_DEPARTEMENTS": index_departements_html(self.deputes),
+                "INDEX_DEPARTEMENTS": index_departements_html(self.deputes, self.adresse),
             },
             titre="Trouver un député — Radar parlementaire",
             description=("Cherchez votre député par nom, département, région ou groupe "
@@ -789,7 +875,7 @@ def ecrire_index_moteurs(uids: list[str]) -> None:
             "corrections.html", "mentions.html"]
     if NOTE_SOURCE.exists():
         urls.append(NOTE_CHEMIN)
-    urls += [f"{uid}.html" for uid in uids]
+    urls += list(uids)   # déjà des adresses complètes, cf. Site.adresse
 
     lignes = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -874,11 +960,17 @@ def main() -> None:
 
     cibles = site.deputes[: args.limite] if args.limite else site.deputes
     for n, d in enumerate(cibles, 1):
-        (SORTIE / f"{d['acteur_uid']}.html").write_text(site.fiche(d["acteur_uid"]))
+        uid = d["acteur_uid"]
+        (SORTIE / site.adresse[uid]).write_text(site.fiche(uid))
+        # L'ancienne adresse `PA267780.html` reste servie : elle est en ligne,
+        # indexée, et citée dans des liens qu'on ne contrôle pas. Un site
+        # statique n'a pas de 301 à offrir, mais une page de renvoi porte le
+        # `canonical` qui dit aux moteurs laquelle des deux compte.
+        (SORTIE / f"{uid}.html").write_text(redirection(site.adresse[uid]))
         if n % 100 == 0 or n == len(cibles):
             print(f"  · fiches {n}/{len(cibles)}")
 
-    ecrire_index_moteurs([d["acteur_uid"] for d in cibles])
+    ecrire_index_moteurs([site.adresse[d["acteur_uid"]] for d in cibles])
 
     poids = sum(f.stat().st_size for f in SORTIE.rglob("*") if f.is_file())
     pages = len(list(SORTIE.glob("*.html")))
