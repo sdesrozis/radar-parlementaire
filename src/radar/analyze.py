@@ -581,7 +581,21 @@ def votes_vs_ligne(
     )
 
 
-def dissidence(cube: VoteCube, min_votes: int = 50) -> pl.DataFrame:
+#: Votes comparables en deçà desquels un taux de dissidence ne peut pas servir
+#: de repère aux autres. C'est le pendant exact de `vues.MIN_VOTABLES` pour la
+#: présence, et il existe pour la même raison : trois députés entrés en juillet
+#: 2026 ont 4, 8 et 25 votes où leur groupe avait une ligne, n'en ont enfreint
+#: aucune, et fixaient à eux seuls l'extrémité « discipline » de la distribution
+#: de l'Assemblée. Leur taux de 0 % est exact ; il ne mesure pas la même chose
+#: que le 0,4 % d'un député mesuré sur deux mille votes.
+#:
+#: Le taux reste calculé, reste publié, reste accompagné de son dénominateur.
+#: Ce qu'il ne fait plus, c'est entrer dans la médiane, le maximum, les rangs et
+#: la bande des 577.
+MIN_VOTES_LIGNE = 50
+
+
+def dissidence(cube: VoteCube, min_votes: int = MIN_VOTES_LIGNE) -> pl.DataFrame:
     """Part des votes où le député s'écarte de la ligne majoritaire de son groupe."""
     deputes = cube.deputes.select("acteur_uid", "nom_complet", "groupe")
 

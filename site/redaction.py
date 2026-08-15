@@ -282,9 +282,15 @@ def phrase_position(p: dict, a: dict, i: dict, dist: dict, recouvre: int,
     etendue = dist["max"] - dist["min"]
     qualificatif = ("large" if largeur > 0.22 * etendue
                     else "étroit" if largeur < 0.08 * etendue else "moyen")
+    # Le dénominateur de l'incertitude est le nombre de votes que le *modèle* a
+    # lus, et non les votes du député sur les scrutins qui engagent : celui-ci
+    # compte des abstentions et des motions de censure, dont un modèle binaire
+    # ne fait rien. Annoncer le second expliquait un intervalle par une matière
+    # dont le modèle n'a pas disposé.
     p2 = (f"Son intervalle est {qualificatif} — de {dec(p['borne_basse'])} à "
-          f"{dec(p['borne_haute'])} — parce qu'{g['il']} a exprimé {num(a['votes_engageants'])} votes "
-          f"qui engagent. <b>{g['Il']} est indiscernable de {num(recouvre)} autres députés</b>, dont "
+          f"{dec(p['borne_haute'])} — parce qu'{g['il']} a exprimé "
+          f"{num(p.get('votes_modele') or 0)} « pour » ou « contre » sur les scrutins que "
+          f"le modèle retient. <b>{g['Il']} est indiscernable de {num(recouvre)} autres députés</b>, dont "
           f"l'intervalle recouvre le sien. Le rang n'a donc de sens qu'à cette réserve près.")
     return p1, p2
 
@@ -309,14 +315,17 @@ def phrase_incertitude(p: dict, i: dict, a: dict, dist: dict) -> str:
     g = accords(i)
     largeur = p["borne_haute"] - p["borne_basse"]
     etendue = dist["max"] - dist["min"]
+    # Même correction que dans `phrase_position` : c'est la matière du modèle
+    # qui explique la largeur de l'intervalle, pas les votes qui engagent.
+    lus = num(p.get("votes_modele") or 0)
     if largeur > 0.22 * etendue:
         return (f"L'intervalle de {echapper(i['nom'])} est large ({dec(p['borne_basse'])} à "
-                f"{dec(p['borne_haute'])})&nbsp;: {g['il']} a exprimé {num(a['votes_engageants'])} votes "
-                f"qui engagent, ce qui laisse au modèle peu de matière. Le rang {num(p['rang'])} "
+                f"{dec(p['borne_haute'])})&nbsp;: le modèle n'a lu que {lus} de ses votes, "
+                f"ce qui lui laisse peu de matière. Le rang {num(p['rang'])} "
                 f"doit être lu avec cette réserve.")
     return (f"L'intervalle de {echapper(i['nom'])} est resserré ({dec(p['borne_basse'])} à "
-            f"{dec(p['borne_haute'])}), parce qu'{g['il']} a exprimé {num(a['votes_engageants'])} votes "
-            f"qui engagent&nbsp;: le modèle a de la matière. Le rang {num(p['rang'])} reste "
+            f"{dec(p['borne_haute'])}), parce que le modèle a lu {lus} de ses votes&nbsp;: "
+            f"il a de la matière. Le rang {num(p['rang'])} reste "
             f"néanmoins indicatif.")
 
 
@@ -401,15 +410,25 @@ def phrase_these(f: dict, d_diss: dict, d_part: dict, rang_diss: int, rang_part:
 
     # ── angle « il vote presque toujours avec son groupe » ────────────────
     if diss_mesurable and force(ecart_diss) >= force(ecart_part) and ecart_diss <= 0.6:
-        plus_disciplines = max(n - rang_diss - 1, 0)
+        # « Encore plus disciplinés » se compte strictement en dessous, jamais
+        # par `n - rang - 1` : ce dernier compte les ex æquo comme des supérieurs.
+        # Les trois députés à 0,0 % s'annonçaient ainsi mutuellement « 2 députés
+        # font mieux », alors que personne ne fait mieux que zéro écart.
+        plus_disciplines = sum(
+            1 for v in d_diss["valeurs"] if v < a["taux_dissidence"])
         t1 = (f"{nom} suit la ligne de son groupe dans "
               f"<em>{pct(1 - a['taux_dissidence'])}{NBSP}% des cas</em> où celui-ci en avait "
               f"une. {g['Il']} ne s'en écarte que {num(a['votes_dissidents'])} fois sur "
               f"{num(a['votes_avec_ligne'])}.")
         coh = (f" et son groupe affiche {pct(groupe['cohesion'])}{NBSP}% de cohésion interne"
                if groupe else "")
-        t2 = (f"C'est peu, mais ce n'est pas rare{NBSP}: {num(plus_disciplines)} députés sur "
-              f"{num(n)} sont encore plus disciplinés{coh}. "
+        rarete = (
+            f"{num(plus_disciplines)} députés sur {num(n)} sont encore plus disciplinés"
+            if plus_disciplines
+            else f"personne, sur les {num(n)} députés dont le taux est comparable, "
+                 f"ne s'écarte moins souvent de sa ligne"
+        )
+        t2 = (f"C'est peu, mais ce n'est pas rare{NBSP}: {rarete}{coh}. "
               f"<b>La discipline est la règle à l'Assemblée, pas l'exception</b> — c'est le "
               f"contexte qui manque à la plupart des chiffres qu'on lit ailleurs.")
         return t1, t2
@@ -849,10 +868,15 @@ def phrase_portee(apercu: dict) -> tuple[str, str]:
     total = apercu["scrutins"]
     facteur = detail / texte if texte else 0
 
+    # « Une déclaration de politique générale » figurait ici et sur la page
+    # Méthode, alors que `parse.PORTEES` range `declaration` en portée
+    # intermédiaire : les votes qui engagent sont les votes sur l'ensemble et
+    # les motions de censure, et rien d'autre. La phrase décrivait donc une
+    # assiette qui n'est pas celle que le site mesure partout ailleurs.
     p1 = (f"Sur les {num(total)} scrutins publics de la législature, "
           f"<b>{num(detail)} portent sur un détail de texte</b> — le plus souvent un "
-          f"amendement — et <b>{num(texte)} seulement</b> sur l'ensemble d'un texte, une "
-          f"motion de censure ou une déclaration de politique générale. Il y a donc "
+          f"amendement — et <b>{num(texte)} seulement</b> sur l'ensemble d'un texte ou "
+          f"sur une motion de censure. Il y a donc "
           f"{dec(facteur, 0)} fois plus des premiers que des seconds.")
     p2 = ("C'est le fait qui gouverne tout le reste de ce site. Un chiffre calculé sur "
           "« tous les scrutins » est en réalité un chiffre sur les amendements&nbsp;: ils "

@@ -26,6 +26,11 @@ function bande(hote) {
   const serie = DONNEES[hote.dataset.bande];
   const valeurs = serie.valeurs;
   const mode = hote.dataset.format;
+  /* Pas de valeur, pas de bande. Une mesure absente n'a pas de place dans une
+     population : posée à zéro, elle plaçait le losange à une extrémité de
+     l'axe et l'aria-label énonçait un taux que la page dit juste au-dessus ne
+     pas pouvoir calculer. On retire le dispositif au lieu de le remplir. */
+  if (!hote.dataset.valeur) { hote.remove(); return; }
   const valeur = parseFloat(hote.dataset.valeur);
   const bas = hote.dataset.bas ? parseFloat(hote.dataset.bas) : null;
   const haut = hote.dataset.haut ? parseFloat(hote.dataset.haut) : null;

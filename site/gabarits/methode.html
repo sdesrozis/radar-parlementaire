@@ -39,9 +39,14 @@
         téléchargeons les archives brutes — la liste des députés et leurs
         mandats, les organes (commissions, groupes), le dépouillement nominatif
         de chaque scrutin — et nous reconstruisons nos propres tables.</p>
-      <p><b>Aucun chiffre publié par l'Assemblée n'est repris tel quel.</b> Les
-        totaux affichés ici sont recalculés depuis les votes individuels. C'est
-        plus long, et c'est la seule façon de savoir ce qu'un nombre contient.</p>
+      <p><b>Aucun indicateur n'est repris de l'Assemblée&nbsp;: tous sont
+        calculés depuis les votes individuels.</b> Les totaux d'un scrutin — les
+        « pour », les « contre », les abstentions — sont, eux, ceux que
+        l'Assemblée publie dans sa synthèse&nbsp;; nous les <b>recomptons</b>
+        depuis le dépouillement nominatif et nous les confrontons aux siens sur
+        les {{SCRUTINS}} scrutins, avant toute publication. Un seul écart arrête
+        la génération. C'est ce contrôle, et non une réécriture, qui autorise la
+        page d'un vote à dire que ses chiffres sont vérifiés.</p>
 
       <p class="jalon">Le périmètre</p>
       <h2>Ce que couvre ce site, et ce qu'il ne couvre pas</h2>
@@ -81,10 +86,14 @@
         heures du matin. Les compter ensemble, c'est laisser les seconds décider
         du résultat, puisqu'ils sont {{PART_DETAIL_PCT}}&nbsp;% du total.</p>
       <p>Nous appelons <b>votes qui engagent</b> les scrutins sur l'ensemble d'un
-        texte, les motions de censure et les déclarations de politique générale.
-        Les fiches donnent systématiquement les deux lectures, et c'est leur
-        écart qui informe&nbsp;: deux députés très proches sur les amendements
-        peuvent diverger sur ce qui engage.</p>
+        texte et les motions de censure, et eux seuls&nbsp;: {{N_ENSEMBLE}} votes
+        sur l'ensemble et {{N_MOTIONS}} motions de censure. Les déclarations de
+        politique générale n'en font pas partie — il y en a {{N_DECLARATIONS}},
+        et elles comptent parmi les autres scrutins. Cette page les a rangées
+        dans les votes qui engagent jusqu'à sa correction&nbsp;; le calcul, lui,
+        ne les y a jamais mises. Les fiches donnent les deux lectures, et c'est
+        leur écart qui informe&nbsp;: deux députés très proches sur les
+        amendements peuvent diverger sur ce qui engage.</p>
     </details>
   </section>
 
@@ -145,7 +154,9 @@
       <p>Le dénominateur est propre à chaque paire, et il est affiché à chaque
         fois. Les scrutins où l'un des deux n'a pas voté sont <b>écartés</b>, pas
         comptés comme des désaccords&nbsp;: ne pas voter n'est pas voter contre.
-        Sous {{MIN_COMMUNS}} scrutins en commun, nous n'affichons aucun taux — un
+        Sous {{MIN_COMMUNS}} scrutins en commun sur l'ensemble des scrutins — et
+        sous {{MIN_COMMUNS_TEXTE}} sur les seuls votes qui engagent, dont
+        l'assiette est bien plus étroite —, nous n'affichons aucun taux&nbsp;: un
         pourcentage calculé sur une poignée de votes est un accident
         d'échantillon. Voir <a href="carte.html">la page « Qui vote avec
         qui&nbsp;? »</a>.</p>
@@ -156,12 +167,29 @@
         de précautions. L'idée&nbsp;: chercher le classement des députés sur une
         ligne qui <em>prédit le mieux leurs votes</em>. Chaque scrutin y devient
         une frontière, et chaque député une position par rapport à ces
-        frontières. Le modèle est estimé sur les seuls votes qui engagent.</p>
-      <p><b>Le modèle ne connaît aucune étiquette politique.</b> Il ne sait pas
-        qui siège dans quel groupe, ni ce que veulent dire « gauche » et
-        « droite ». Que l'axe qu'il trouve ressemble à un clivage connu est un
-        <em>résultat</em>, pas une hypothèse — et c'est pourquoi nous ne le
-        nommons jamais ainsi. Nous situons par des repères mesurés&nbsp;: « entre
+        frontières.</p>
+      <p><b>Il n'est pas estimé sur les {{PORTEE_TEXTE}} votes qui engagent,
+        mais sur {{MODELE_SCRUTINS}} d'entre eux</b>, et il faut dire lesquels
+        partent. Le modèle est binaire&nbsp;: il ne lit que les « pour » et les
+        « contre », les abstentions n'y entrent pas. Il écarte ensuite les
+        scrutins joués d'avance, qui n'ordonnent personne, et ceux qui ont trop
+        peu de votants. <b>Les {{N_MOTIONS_N}} motions de censure en sortent
+        toutes</b>&nbsp;: la source n'y publie ni « contre » ni abstention, seuls
+        les soutiens de la motion votent, et un scrutin auquel un seul camp
+        participe ne sépare pas l'Assemblée. Chaque fiche indique le nombre de
+        votes de ce député qui ont réellement servi à le situer.</p>
+      <p><b>Le modèle ne connaît aucune étiquette politique</b> — à une exception
+        près, qu'il faut nommer. Il ignore qui siège dans quel groupe, et ce que
+        veulent dire « gauche » et « droite »&nbsp;: aucun groupe n'entre dans
+        l'ajustement. Mais un axe estimé est défini au miroir près — le retourner
+        ne change rien à ce qu'il prédit —, et il faut donc fixer son sens pour
+        que deux calculs successifs se lisent pareil. Nous le fixons en plaçant
+        {{ANCRAGE}} du côté négatif. <b>C'est une convention d'affichage, elle
+        n'affecte aucune position relative</b>, et c'est le seul endroit où un
+        nom de groupe touche ce calcul. Que l'axe trouvé ressemble à un clivage
+        connu reste un <em>résultat</em>, pas une hypothèse — et c'est pourquoi
+        nous ne le nommons jamais ainsi. Nous situons par des repères
+        mesurés&nbsp;: « entre
         la médiane du groupe X et celle du groupe Y ».</p>
       <p><b>Un rang ne se lit jamais sans son intervalle.</b> Un député ayant peu
         voté a une position mal déterminée. Nous rééchantillonnons les scrutins
@@ -176,14 +204,28 @@
         {{PORTEE_TEXTE}} votes comme {{PORTEE_TEXTE}} observations indépendantes
         alors qu'ils forment {{BLOCS}} paquets — et à publier des intervalles
         trop serrés, donc des classements trop assurés. Le dossier législatif
-        serait un meilleur niveau de regroupement encore&nbsp;; l'open data ne le
-        renseigne pas.</p>
-      <p>Nous ne retenons qu'<b>une seule dimension</b>. Un second axe n'est
-        ajouté que s'il prédit mieux des votes que le modèle n'a pas vus, ce qui
-        se teste — et ne se suppose pas. C'est aussi la raison pour laquelle ce
-        site ne publie pas de « carte politique » en deux dimensions&nbsp;: la
-        seconde dimension serait décorative, et elle serait lue comme
-        significative.</p>
+        serait un meilleur niveau de regroupement encore&nbsp;: la source ne le
+        renseigne que depuis le {{DOSSIERS_DEPUIS}}, sur {{DOSSIERS_ENGAGEANTS}}
+        des {{PORTEE_TEXTE}} votes qui engagent. Un regroupement qui manquerait
+        sur la moitié des scrutins n'en est pas un&nbsp;; nous nous en tiendrons
+        à la séance tant que la lacune n'est pas résorbée, et nous le dirons
+        quand elle le sera.</p>
+      <p>Nous ne publions qu'<b>une seule dimension, et c'est un choix, pas un
+        résultat de test</b>. Le test, nous le faisons, et il dit l'inverse&nbsp;:
+        un second axe prédit nettement mieux les votes que le modèle n'a pas vus
+        — la qualité de prédiction passe de {{APRE_1D}} à {{APRE_2D}}. Écrire
+        que la seconde dimension serait « décorative » était donc faux, et cette
+        page l'a écrit.</p>
+      <p>Si nous n'en publions qu'une, c'est que <b>tout ce qu'une fiche dit
+        d'une position se lit sur une ligne</b>&nbsp;: un rang, un intervalle,
+        « indiscernable de tant d'autres », une bande. Un second axe demanderait
+        son propre intervalle et sa propre lecture, et deux axes affichés
+        ensemble forment un plan — c'est-à-dire une « carte politique », que ce
+        site refuse de publier parce qu'elle serait lue comme une carte des
+        opinions. La conséquence doit être connue&nbsp;: <b>la position affichée
+        sur chaque fiche résume une Assemblée qui a au moins deux clivages sur
+        un seul d'entre eux</b>, et deux députés que le second axe sépare
+        peuvent apparaître ici au même endroit.</p>
 
       <h3>Cohésion d'un groupe</h3>
       <p class="provenance">taux d'accord moyen entre toutes les paires de députés du même groupe, en exercice</p>

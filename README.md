@@ -514,12 +514,18 @@ Par ailleurs `en_exercice_seulement=True` est le défaut : **71 députés et 4,7
 des votes** sont écartés des analyses, y compris de mesures de cohésion qui
 portent justement sur des groupes ayant perdu des membres.
 
-**Les scrutins ne sont pas rattachés à un dossier législatif.** Le champ
-`objet.dossierLegislatif` est nul dans les 8 434 fichiers source : ce n'est pas
-un défaut de parsing, la donnée n'y est pas. Y remédier demande d'ingérer le
-jeu *Dossiers législatifs* de l'Assemblée, ou de rattacher par titre. Les
-amendements, eux, portent déjà `texte_legislatif_uid` à 100 % : une unité
-« texte » est disponible de ce côté-là.
+**Le rattachement au dossier législatif ne commence qu'en mars 2026.** Ce
+paragraphe a longtemps affirmé que `objet.dossierLegislatif` était nul dans les
+8 434 fichiers source et que « ce n'est pas un défaut de parsing, la donnée n'y
+est pas ». **C'était faux, et c'était bien un défaut de parsing** : le champ est
+un objet `{libelle, dossierRef}` auquel on appliquait `text()`, qui rendait
+`None`. Corrigé, il est renseigné sur tous les scrutins postérieurs au
+26 mars 2026 — dont 73 des 245 votes qui engagent, sur 61 dossiers distincts —
+et absent avant. La lacune reste donc réelle sur la première moitié de la
+législature, et c'est pourquoi le bootstrap de `ideal.py` regroupe toujours par
+séance : `blocs_de_scrutins` écarte toute colonne comportant un nul. Ce que
+cette erreur doit rappeler : un commentaire de code qui affirme une propriété de
+la source est une mesure non vérifiée tant qu'aucun test ne la recompte.
 
 **Compter les amendements ne mesure pas l'influence législative.** Le volume
 favorise la quantité, les dépôts collectifs et parfois l'obstruction. Distinguer

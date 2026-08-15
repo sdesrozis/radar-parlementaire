@@ -847,10 +847,24 @@ $i$, la dissidence est
  \frac{\sum_{j\in\mathcal L_i}\ind(\text{vote de $i$}\neq
  \text{ligne de son groupe au scrutin $j$})}{|\mathcal L_i|}.
 \]
-Une personne avec trop peu de votes comparables est écartée du classement
-(minimum de 50 par défaut). Cette mesure décrit un écart à la majorité
-\emph{observée} du groupe : elle ne prouve ni une opposition idéologique ni une
-désobéissance à une consigne privée.
+Cette mesure décrit un écart à la majorité \emph{observée} du groupe : elle ne
+prouve ni une opposition idéologique ni une désobéissance à une consigne privée.
+
+\paragraph{Le seuil de comparabilité, et ce qu'il ne fait pas.} Une personne
+avec trop peu de votes comparables est écartée du \emph{classement} — minimum de
+50 par défaut, la valeur \code{analyze.MIN\_VOTES\_LIGNE}. La règle est
+exactement celle de la présence (§\ref{sec:participation}) et elle a la même
+portée : le taux reste calculé, reste publié, reste accompagné de son
+dénominateur ; ce qu'il ne fait plus, c'est entrer dans la médiane, le maximum,
+les rangs et la représentation graphique de la population.
+
+Ce document a longtemps énoncé ce seuil pendant que le site n'en appliquait
+aucun, et l'écart n'était pas théorique. Les trois seuls députés en exercice à
+0~\% de dissidence de la 17\textsuperscript{e} législature sont précisément ceux
+dont le groupe n'avait eu de ligne que sur 4, 8 et 25 scrutins : ils fixaient à
+eux seuls l'extrémité « discipline » de la distribution, et chaque fiche
+annonçait aux deux autres qu'ils étaient dépassés par des députés qui leur
+étaient en réalité à égalité. Correctif porté au registre des corrections.
 
 \subsubsection*{L'incertitude du taux}
 
@@ -872,6 +886,24 @@ environ un point pour un député médian et jusqu'à quatre points pour les tau
 élevés. Un rang de dissidence recouvre donc, en pratique, plusieurs dizaines de
 positions que les données ne départagent pas. Le site publie le rang \emph{et}
 le nombre de députés dont l'intervalle recouvre celui du député consulté.}
+
+\prudence{\textbf{Cet intervalle suppose des votes indépendants, et ils ne le
+sont pas.} La loi Beta ci-dessus traite les $|\mathcal L_i|$ votes d'un député
+comme autant de tirages indépendants. Or les scrutins d'une même séance portent
+sur le même texte dans le même rapport de force, et une rupture avec la ligne du
+groupe se produit typiquement \emph{par épisode} — un député qui s'écarte sur un
+texte s'écarte souvent sur la série d'amendements qui l'accompagne. Le nombre
+d'observations réellement indépendantes est donc inférieur au nombre de votes,
+et l'intervalle publié est \emph{plus étroit} que la variabilité réelle.
+
+La conséquence est asymétrique et il faut la dire dans le bon sens : quand le
+site annonce que $N$ députés ont un intervalle recouvrant celui du député
+consulté, ce $N$ est un \textbf{minorant}. Un intervalle plus honnête en
+recouvrirait davantage, jamais moins. Un recouvrement doit donc être lu comme
+une preuve d'indiscernabilité, et une absence de recouvrement comme une
+présomption faible — non l'inverse. Le bootstrap par blocs employé pour les
+positions (§\ref{sec:bootstrap}) répondrait à cette objection ; l'appliquer à la
+dissidence reste à faire.}
 
 \subsection{Scrutins serrés et scrutins clivants}
 
@@ -1089,6 +1121,23 @@ Un vote quasi unanime peut être politiquement important mais apporte très peu
 d'information pour ordonner les députés sur un axe. Ce filtre sert à stabiliser
 l'estimation, pas à déclarer ces scrutins sans intérêt.
 
+\paragraph{L'assiette réelle du modèle, qui n'est pas celle des mesures
+voisines.} Ces filtres ne sont pas marginaux, et il faut publier ce qu'ils
+retirent. Sur la 17\textsuperscript{e} législature, le modèle est estimé sur
+\textbf{127 des 245 votes qui engagent}. Le site a longtemps présenté la
+position estimée comme calculée « sur les votes qui engagent », ce qui laissait
+entendre 245 ; chaque fiche indique désormais le nombre de scrutins retenus et
+le nombre de suffrages de ce député que le modèle a effectivement lus.
+
+\textbf{Les 23 motions de censure en sortent toutes}, et ce n'est pas un effet
+de réglage : la source n'y publie ni « contre » ni abstention — seuls les
+soutiens de la motion votent (§\ref{sec:question}). La position minoritaire y
+est donc nulle, la contestation vaut 0, et un scrutin auquel un seul camp prend
+part ne peut pas séparer l'Assemblée le long d'un axe. C'est cohérent avec la
+mise en garde déjà faite plus haut sur la lecture des motions de censure, et
+c'est la raison pour laquelle elles comptent dans la présence sans compter dans
+la position.
+
 \subsection{Estimation alternée et pénalisation}
 
 Le projet maximise une vraisemblance logistique pénalisée. Schématiquement, il
@@ -1117,8 +1166,36 @@ produits matriciels, ce qui rend possible le bootstrap.
 La pénalisation de $\beta_j$ est importante : avec une séparation parfaite,
 le maximum de vraisemblance non pénalisé tend vers $|\beta_j|=\infty$. On
 obtiendrait des frontières verticales et des positions artificiellement tassées.
-La valeur de $\lambda_\beta$ n'est pas choisie à l'œil : elle est comparée par
-validation croisée.
+
+\paragraph{Comment $\lambda_\beta$ est choisi, et pourquoi ce n'est pas le
+maximum d'APRE.} La valeur retenue est $\lambda_\beta=0{,}5$. Elle n'est pas
+celle qui maximise l'ajustement hors échantillon, et il serait malhonnête de
+laisser croire le contraire : la validation croisée donne, sur les données de
+référence,
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+$\lambda_\beta$ & APRE hors échantillon & $\max_j|\beta_j|$ \\
+\midrule
+0,02 & 0,825 & 26,9 \\
+0,10 & 0,824 & 13,5 \\
+\textbf{0,50} & \textbf{0,812} & \textbf{7,7} \\
+2,00 & 0,807 & 5,0 \\
+8,00 & 0,776 & 2,9 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La règle de choix est donc explicite, et elle a deux termes : \emph{la plus
+faible pénalisation dont les discriminations restent bornées}. À
+$\lambda_\beta=0{,}02$, on gagne 1,3 point d'APRE et $|\beta_j|$ monte à 27 —
+c'est-à-dire des frontières quasi verticales, une séparation numériquement
+presque parfaite sur certains scrutins, et des intervalles de bootstrap dont la
+largeur devient dictée par quelques votes. Nous préférons un demi-point
+d'ajustement à des positions dont la stabilité ne survivrait pas au
+rééchantillonnage. C'est un arbitrage, il est discutable, et c'est précisément
+pourquoi le tableau est publié plutôt que la seule conclusion.
 
 \subsection{Le problème d'identification}
 
@@ -1171,6 +1248,38 @@ véritable prévision hors échantillon. Le protocole est celui d'usage pour ce
 type de modèle, mais il est plus indulgent que le bootstrap sur la même donnée.
 La conclusion sur le nombre de dimensions doit être lue comme une borne
 supérieure de ce qui est justifié, non comme une démonstration.}
+
+\subsection{Combien de dimensions, et combien le site en publie}
+\label{sec:dimensions}
+
+Ces deux questions n'ont pas la même réponse, et les confondre a produit sur le
+site une affirmation fausse qu'il faut redresser ici.
+
+\textbf{Ce que le test dit.} Sur les données de référence, l'APRE hors
+échantillon vaut 0,81 à une dimension et 0,93 à deux. Le gain est large,
+reproductible d'un tirage à l'autre, et très supérieur à l'écart entre
+répétitions. Une seconde dimension \emph{n'est pas} du surajustement : elle
+prédit mieux des votes que le modèle n'a pas vus. Substantiellement, le premier
+axe oppose LFI au reste et le second le RN au reste — deux oppositions
+systématiques qui ne portent pas sur les mêmes textes et ne peuvent donc pas
+tenir sur une seule ligne. À trois dimensions l'APRE monte encore (0,94), mais
+l'écart entre apprentissage et test se creuse, et nous nous arrêtons à deux.
+
+\textbf{Ce que le site publie.} Une seule dimension. Le site l'a longtemps
+justifié en écrivant qu'une seconde serait « décorative » — c'est-à-dire en
+présentant comme un résultat de test l'exact contraire de ce que le test donne.
+La justification correcte est autre, et elle est éditoriale : tout ce qu'une
+fiche affirme d'une position se lit sur une ligne — un rang, un intervalle, un
+nombre de voisins indiscernables, une bande. Deux axes affichés ensemble
+forment un plan, c'est-à-dire une carte que le lecteur lira comme une carte des
+opinions, ce que ce projet refuse de publier (§\ref{sec:acp}).
+
+\prudence{La conséquence doit être connue du lecteur, et le site la publie
+désormais : la position affichée sur une fiche résume par une seule coordonnée
+une Assemblée qui en demande au moins deux. Deux députés que le second axe
+sépare nettement peuvent apparaître au même endroit du premier. La position
+publiée n'est pas fausse — elle est incomplète d'une dimension dont nous savons
+qu'elle existe.}
 
 \subsection{Incertitude par bootstrap de blocs}
 
@@ -1478,10 +1587,16 @@ fixée par convention, son échelle est arbitraire, et son interprétation
 substantielle dépend entièrement des textes soumis au vote pendant la période.
 Deux législatures ne sont pas comparables sur cette échelle.
 
-\textbf{L'appartenance de groupe est datée.} Les changements de groupe en
-cours de mandat sont traités à la date d'effet publiée par l'Assemblée. Les
-mesures agrégées par groupe portent donc sur une composition qui a varié à
-l'intérieur de la période d'observation.
+\textbf{L'appartenance de groupe n'est datée qu'à moitié.} La table des votes
+porte le groupe du député \emph{au moment du scrutin}, et c'est ce groupe-là qui
+sert à reconstruire la ligne et à compter la dissidence : ces deux mesures sont
+exactes historiquement. En revanche, les agrégats qui passent par la table des
+députés — accord entre groupes, cohésion, cosignatures — rattachent un vote
+passé au groupe \emph{actuel} de son auteur. Sur les données de référence, cela
+concerne 19\,033 votes sur 1\,270\,476, soit 1,5~\%, répartis sur 348 députés.
+Une version antérieure de ce document affirmait que les changements de groupe
+étaient partout traités à leur date d'effet ; c'était vrai de la dissidence et
+faux des agrégats, et la formulation est corrigée ici plutôt qu'atténuée.
 
 \textbf{La délégation n'est pas neutralisée dans la dissidence.} La part
 déléguée est désormais définie et publiée (section~\ref{sec:delegation}), mais

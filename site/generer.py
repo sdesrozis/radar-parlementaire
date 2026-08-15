@@ -38,7 +38,8 @@ import polars as pl
 
 from radar import controles
 from radar.controles import CONTROLES
-from radar.vues import BOOTSTRAP, MIN_COMMUNS, Donnees
+from radar.ideal import GROUPE_ANCRAGE
+from radar.vues import BOOTSTRAP, MIN_COMMUNS, MIN_COMMUNS_TEXTE, Donnees
 from redaction import (
     NBSP,
     STATUTS,
@@ -922,6 +923,8 @@ class Site:
         self.deputes = [d for d in self.tous if d["en_exercice"]]
         self.groupes = {g["groupe"]: g for g in self.apercu["groupes"]}
         self.portees = self.apercu["scrutins_par_portee"]
+        self.categories = self.apercu["scrutins_par_categorie"]
+        self.modele = self.apercu["modele"]
         self.n_texte = self.portees.get("texte", 0)
         # Les votes qui engagent, dans l'ordre où l'onglet les montre. Calculés
         # une fois : l'index de la recherche, l'index HTML et les 245 pages en
@@ -959,8 +962,14 @@ class Site:
             if d.get("participation_comparable")
         }
         self.d_part = distribution([p["taux"] for u, p in pe.items() if u in comparables])
-        self.d_diss = distribution(
-            [d["taux_dissidence"] for d in self.deputes if d["taux_dissidence"] is not None])
+        # Même règle pour la dissidence, et pour la même raison. Elle n'y était
+        # pas : les trois députés à 0,0 % de la législature sont exactement ceux
+        # dont le groupe n'a eu de ligne que sur 4, 8 et 25 scrutins, et ils
+        # fixaient l'extrémité « discipline » de la bande des 577.
+        # Cf. `analyze.MIN_VOTES_LIGNE`.
+        self.d_diss = distribution([
+            d["taux_dissidence"] for d in self.deputes
+            if d["taux_dissidence"] is not None and d.get("dissidence_comparable")])
         self.d_pos = distribution(
             [d["axe1"] for d in self.deputes if d["axe1"] is not None])
         # La part déléguée sur les votes qui engagent, distribuée comme les
@@ -1223,6 +1232,27 @@ class Site:
                 "BOOTSTRAP": num(self.apercu["bootstrap"]),
                 "BLOCS": num(self.apercu["blocs_bootstrap"]),
                 "MIN_COMMUNS": num(MIN_COMMUNS),
+                "MIN_COMMUNS_TEXTE": num(MIN_COMMUNS_TEXTE),
+                # La composition exacte de l'assiette « votes qui engagent ».
+                # La page l'énonçait de mémoire, et se trompait : elle y rangeait
+                # les déclarations de politique générale, que `parse.PORTEES`
+                # classe en portée intermédiaire. Ces trois nombres viennent
+                # désormais du même comptage que le reste du site.
+                "N_ENSEMBLE": num(self.categories.get("ensemble", 0)),
+                "N_MOTIONS": num(self.categories.get("motion_censure", 0)),
+                "N_DECLARATIONS": num(self.categories.get("declaration", 0)),
+                "N_MOTIONS_N": num(self.categories.get("motion_censure", 0)),
+                # Ce que le modèle retient réellement, et ce qu'un second axe
+                # apporterait. Cf. `vues._modele_apercu` et `vues._ajustement`.
+                "MODELE_SCRUTINS": num(self.modele["scrutins_retenus"]),
+                "APRE_1D": dec(self.modele["apre_test_1d"], 2),
+                "APRE_2D": dec(self.modele["apre_test_2d"], 2),
+                "ANCRAGE": echapper(GROUPE_ANCRAGE),
+                # La lacune du dossier législatif, datée. La page affirmait que
+                # l'open data ne renseignait pas ce champ ; il le renseigne
+                # depuis mars 2026, et c'est le parseur qui le perdait.
+                "DOSSIERS_DEPUIS": jour(self.apercu["dossiers"]["depuis"]),
+                "DOSSIERS_ENGAGEANTS": num(self.apercu["dossiers"]["engageants_avec"]),
                 "BLOC_NOTE": bloc_note_html(),
                 "CITATION_COURTE": echapper(self.citation_courte),
                 "CITATION_BIBTEX": echapper(self.citation_bibtex),
@@ -1480,7 +1510,16 @@ class Site:
                 "%"),
             "DISS_N": num(a["votes_dissidents"] or 0),
             "DISS_DENOM": num(a["votes_avec_ligne"] or 0),
-            "DISS_VAL": f"{a['taux_dissidence'] or 0:.4f}",
+            # La bande ne situe que ce qui est mesuré. Elle recevait `0` quand le
+            # taux était absent, et posait donc le losange à l'extrémité
+            # « le plus discipliné de l'Assemblée » sous une phrase disant qu'il
+            # n'y avait rien à compter — l'aria-label allait jusqu'à énoncer
+            # « Bouloux : 0,0 % ». Une valeur vide efface la bande ; c'est la
+            # même règle que `grand_chiffre`, appliquée au dispositif d'à côté.
+            "DISS_VAL": (
+                f"{a['taux_dissidence']:.4f}"
+                if a["taux_dissidence"] is not None and a.get("dissidence_comparable")
+                else ""),
             # L'intervalle est affiché sous le taux, dans la même colonne de
             # provenance que le dénominateur : c'est là qu'on lit ce que le
             # chiffre vaut, pas dans une note de bas de page.
@@ -1500,6 +1539,12 @@ class Site:
             "POS_HAUT_BRUT": f"{p['borne_haute']:.4f}" if estimee else "0",
             "POS_RANG": num(p["rang"]) if estimee else "—",
             "POS_CLASSES": num(p["classes"]) if estimee else "—",
+            # Les votes qui ont réellement situé ce député. La fiche annonçait
+            # ses votes sur les scrutins qui engagent — plus nombreux, puisque
+            # le modèle est binaire et qu'il écarte des scrutins entiers.
+            "POS_N_VOTES": num(p.get("votes_modele") or 0),
+            "POS_IL": accords(i)["il"],
+            "MODELE_SCRUTINS": num(self.modele["scrutins_retenus"]),
             "POS_PHRASE": pos1,
             "POS_PHRASE_2": pos2,
             "POS_ECART_GROUPE": phrase_ecart_groupe(p, i, groupe) if estimee else "",

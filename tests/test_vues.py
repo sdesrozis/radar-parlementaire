@@ -121,12 +121,23 @@ class TestPositions:
                 "axe1": [0.5, -1.5, 2.0],
                 "borne_basse": [0.3, -1.7, 1.8],
                 "borne_haute": [0.7, -1.3, 2.2],
+                # L'assiette réelle du modèle voyage avec la position : c'est
+                # elle que la fiche annonce sous l'intervalle.
+                "votes_modele": [120, 45, 200],
+                "modele_scrutins": [127, 127, 127],
+                "modele_scrutins_offerts": [245, 245, 245],
             }
         )
         monkeypatch.setattr(vues.ideal, "intervalles", lambda *a, **k: table)
         p = vues._positions(cube=None, bootstrap=10)
         rangs = dict(zip(p["acteur_uid"].to_list(), p["rang_axe1"].to_list()))
         assert rangs == {"PA2": 1, "PA1": 2, "PA3": 3}
+        # Le nombre de votes réellement lus par le modèle doit rester attaché au
+        # bon député après le tri : c'est lui que la fiche publie à côté de
+        # l'intervalle, et un décalage y ferait expliquer une largeur par la
+        # matière d'un autre.
+        lus = dict(zip(p["acteur_uid"].to_list(), p["votes_modele"].to_list()))
+        assert lus == {"PA1": 120, "PA2": 45, "PA3": 200}
 
 
 class TestLigneDeGroupe:

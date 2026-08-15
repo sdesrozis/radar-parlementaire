@@ -247,6 +247,11 @@ class Donnees:
     #: nombre : servir la constante plutôt que la valeur employée ferait
     #: annoncer `BOOTSTRAP` intervalles à un site généré avec `--bootstrap 0`.
     bootstrap: int = BOOTSTRAP
+    #: Ajustement hors échantillon du modèle de points idéaux, à une et deux
+    #: dimensions. Mesuré à chaque génération plutôt qu'affirmé : la page
+    #: Méthode énonce une règle de sélection, et une règle dont on ne publie pas
+    #: le résultat n'est pas vérifiable. Cf. `_ajustement`.
+    ajustement: dict = field(default_factory=dict)
     #: Cube restreint aux députés en exercice, construit à la demande par
     #: `cube_en_exercice()`. Il sert à toute mesure publiée à côté d'un effectif
     #: actuel — cf. `_table_groupes` et `matrice_groupes`.
@@ -326,6 +331,8 @@ class Donnees:
         )
         journal("groupes")
         d.groupes = d._table_groupes()
+        journal("ajustement du modèle à une et deux dimensions")
+        d.ajustement = _ajustement(cube_texte)
         return d
 
     # -- vues --------------------------------------------------------------
@@ -354,6 +361,14 @@ class Donnees:
                 "mandats_interrompus": int(self.deputes["mandat_interrompu"].sum()),
                 "scrutins": s.height,
                 "scrutins_par_portee": par_portee,
+                # La ventilation fine, servie parce que la page Méthode décrit
+                # la composition de l'assiette « votes qui engagent » et qu'elle
+                # l'a décrite de mémoire — en y rangeant les déclarations de
+                # politique générale, que le calcul classe en intermédiaire.
+                "scrutins_par_categorie": {
+                    r["categorie"]: r["len"]
+                    for r in s.group_by("categorie").len().to_dicts()
+                },
                 "votes": self.votes.height,
                 "debut": s["date"].min(),
                 "fin": s["date"].max(),
@@ -378,8 +393,41 @@ class Donnees:
                 },
                 "solennels": self._solennels_apercu(),
                 "dossiers": self._dossiers_apercu(),
+                "modele": self._modele_apercu(),
             }
         )
+
+    def _modele_apercu(self) -> dict:
+        """L'assiette réelle du modèle de points idéaux, et ce qu'elle écarte.
+
+        Le site a longtemps présenté la position estimée comme calculée « sur
+        les votes qui engagent », c'est-à-dire sur 245 scrutins. Le modèle en
+        retient beaucoup moins : il est binaire — les abstentions n'y entrent
+        pas —, il écarte les scrutins quasi unanimes, qui n'ordonnent personne,
+        et ceux qui ont trop peu de votants.
+
+        **Les 23 motions de censure en sortent toutes**, et ce n'est pas un
+        réglage malheureux : la source n'y publie ni « contre » ni abstention,
+        de sorte que la position minoritaire y est nulle. Un vote auquel un seul
+        camp participe ne peut pas séparer l'Assemblée sur un axe.
+
+        Ces nombres sont publiés parce que l'écart entre 245 et le nombre retenu
+        est précisément ce qu'un lecteur doit connaître pour juger de la
+        matière dont le modèle a disposé.
+        """
+        d = self.deputes
+        retenus = d["modele_scrutins"].drop_nulls()
+        offerts = d["modele_scrutins_offerts"].drop_nulls()
+        s = self.cube_texte.scrutins
+        return {
+            "scrutins_retenus": int(retenus[0]) if retenus.len() else None,
+            "scrutins_offerts": int(offerts[0]) if offerts.len() else s.height,
+            "motions_censure": s.filter(pl.col("categorie") == "motion_censure").height,
+            "deputes_situes": int(d["axe1"].is_not_null().sum()),
+            "contestation_min": 0.025,
+            "dimensions": 1,
+            **self.ajustement,
+        }
 
     def _solennels_apercu(self) -> dict:
         """Combien de scrutins solennels, sur combien de mois, et leur recoupement.
@@ -482,8 +530,9 @@ class Donnees:
             "acteur_uid", "nom_complet", "groupe", "groupe_libelle", "departement",
             "num_departement", "num_circo", "en_exercice", "participation",
             "taux_dissidence", "dissidence_basse", "dissidence_haute",
+            "dissidence_comparable",
             "votes_avec_ligne", "part_abstention", "votes_exprimes", "axe1",
-            "borne_basse", "borne_haute", "age", "cat_socio_pro",
+            "borne_basse", "borne_haute", "votes_modele", "age", "cat_socio_pro",
             # Servies ici pour que le site n'ait jamais à refaire la division :
             # le taux, son numérateur et son dénominateur voyagent ensemble.
             "participation_engageants", "votes_engageants",
@@ -532,6 +581,10 @@ class Donnees:
                         "part_pour", "part_contre", "part_abstention",
                         "votes_avec_ligne", "votes_dissidents", "taux_dissidence",
                         "dissidence_basse", "dissidence_haute",
+                        # Le taux peut-il servir de repère aux autres ? Servi
+                        # avec le taux, parce que c'est la fiche qui décide
+                        # d'afficher ou non la bande de comparaison.
+                        "dissidence_comparable",
                         # Les quatre colonnes de la présence aux votes qui
                         # engagent : le numérateur, les deux retraits et le
                         # dénominateur réellement divisé. Le site n'en recalcule
@@ -561,6 +614,14 @@ class Donnees:
                     "borne_haute": r["borne_haute"],
                     "rang": r["rang_axe1"],
                     "classes": int(self.deputes["axe1"].is_not_null().sum()),
+                    # Les votes qui ont réellement situé ce député : ses « pour »
+                    # et « contre » sur les scrutins que le modèle a gardés. La
+                    # fiche annonçait jusqu'ici ses votes sur les scrutins qui
+                    # engagent, qui sont plus nombreux — les abstentions et les
+                    # motions de censure n'entrent pas dans un modèle binaire.
+                    "votes_modele": r.get("votes_modele"),
+                    "scrutins_modele": r.get("modele_scrutins"),
+                    "scrutins_offerts": r.get("modele_scrutins_offerts"),
                 },
                 "amendements": (
                     {
@@ -1516,6 +1577,12 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
             (pl.col("engageants_votables") >= MIN_VOTABLES)
             .fill_null(False)
             .alias("participation_comparable"),
+            # La même question, pour la dissidence. Elle n'était pas posée : la
+            # distribution retenait tous les taux, quel que soit le nombre de
+            # votes où le groupe avait une ligne. Cf. `analyze.MIN_VOTES_LIGNE`.
+            (pl.col("votes_avec_ligne") >= analyze.MIN_VOTES_LIGNE)
+            .fill_null(False)
+            .alias("dissidence_comparable"),
         )
         .with_columns(
             # La part est servie calculée : le site ne refait aucune division,
@@ -1539,6 +1606,47 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
     )
 
 
+def _ajustement(cube: VoteCube, *, repetitions: int = 2) -> dict:
+    """Ce qu'un second axe apporte, mesuré sur des votes que le modèle n'a pas vus.
+
+    **Pourquoi ce calcul est publié.** La page Méthode énonçait une règle — « un
+    second axe n'est ajouté que s'il prédit mieux des votes que le modèle n'a pas
+    vus, ce qui se teste » — sans jamais publier le test. Or le test la contredit :
+    le second axe fait passer l'APRE hors échantillon d'environ 0,81 à 0,93. Une
+    règle dont on tait le résultat n'engage à rien ; celle-ci engageait à
+    l'inverse de ce que le site fait.
+
+    Le site continue de ne publier qu'un axe, et c'est désormais annoncé comme un
+    **choix de publication** et non comme un résultat de test : tout ce qu'une
+    fiche dit d'une position — un rang, un intervalle, « indiscernable de N
+    autres », une bande à une dimension — se lit sur une ligne. Un second axe
+    demanderait son propre intervalle et sa propre lecture, et un plan se lit
+    comme une carte politique, ce que ce site refuse de publier.
+
+    Deux répétitions suffisent ici : l'écart entre les deux dimensions est d'une
+    dizaine de points d'APRE, très au-delà de la dispersion entre tirages.
+    """
+    table = ideal.evaluer_dimensionnalite(
+        cube, max_dimensions=2, n_repetitions=repetitions
+    )
+    par_dim = {
+        int(r["dimensions"]): r
+        for r in table.group_by("dimensions")
+        .agg(
+            pl.col("apre_test").mean(),
+            pl.col("apre_apprentissage").mean(),
+        )
+        .to_dicts()
+    }
+    return {
+        "apre_test_1d": par_dim.get(1, {}).get("apre_test"),
+        "apre_test_2d": par_dim.get(2, {}).get("apre_test"),
+        "apre_apprentissage_1d": par_dim.get(1, {}).get("apre_apprentissage"),
+        "apre_apprentissage_2d": par_dim.get(2, {}).get("apre_apprentissage"),
+        "repetitions": repetitions,
+    }
+
+
 def _positions(cube: VoteCube, *, bootstrap: int) -> pl.DataFrame:
     """Points idéaux avec intervalle de confiance, et rang sur l'axe.
 
@@ -1550,13 +1658,30 @@ def _positions(cube: VoteCube, *, bootstrap: int) -> pl.DataFrame:
         iv = ideal.intervalles(cube, n_bootstrap=bootstrap)
     else:
         modele = ideal.estimer(cube)
-        iv = modele.table_deputes().select(
-            "acteur_uid", "axe1",
-            pl.lit(None, dtype=pl.Float64).alias("borne_basse"),
-            pl.lit(None, dtype=pl.Float64).alias("borne_haute"),
+        iv = (
+            modele.table_deputes()
+            .select(
+                "acteur_uid", "axe1",
+                pl.lit(None, dtype=pl.Float64).alias("borne_basse"),
+                pl.lit(None, dtype=pl.Float64).alias("borne_haute"),
+            )
+            .join(
+                pl.DataFrame({
+                    "acteur_uid": modele.deputes["acteur_uid"],
+                    "votes_modele": modele.votes_observes.sum(axis=1).astype(np.int64),
+                }),
+                on="acteur_uid", how="left",
+            )
+            .with_columns(
+                pl.lit(modele.scrutins.height).alias("modele_scrutins"),
+                pl.lit(cube.n_scrutins).alias("modele_scrutins_offerts"),
+            )
         )
     return (
-        iv.select("acteur_uid", "axe1", "borne_basse", "borne_haute")
+        iv.select(
+            "acteur_uid", "axe1", "borne_basse", "borne_haute",
+            "votes_modele", "modele_scrutins", "modele_scrutins_offerts",
+        )
         .sort("axe1")
         .with_row_index("rang_axe1", offset=1)
         .with_columns(pl.col("rang_axe1").cast(pl.Int64))

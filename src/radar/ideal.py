@@ -219,6 +219,19 @@ def _identifier(X: np.ndarray, ancrage: np.ndarray | None) -> np.ndarray:
     return X
 
 
+#: Groupe placé du côté négatif du premier axe, pour que deux estimations
+#: successives se lisent dans le même sens. Un axe latent est défini au miroir
+#: près : le retourner ne change ni les positions relatives, ni les intervalles,
+#: ni ce que le modèle prédit.
+#:
+#: C'est **le seul endroit** où un nom de groupe touche ce calcul — aucun groupe
+#: n'entre dans l'ajustement. La constante est nommée parce que la page Méthode
+#: écrivait « le modèle ne sait pas qui siège dans quel groupe » sans réserve :
+#: c'est vrai de l'estimation, faux de l'orientation, et le site doit pouvoir
+#: citer le groupe d'ancrage plutôt que de laisser croire qu'il n'y en a pas.
+GROUPE_ANCRAGE = "LFI-NFP"
+
+
 def estimer(
     cube: VoteCube,
     *,
@@ -229,7 +242,7 @@ def estimer(
     min_votes_depute: int = 10,
     min_votes_scrutin: int = 20,
     contestation_min: float = 0.025,
-    groupe_ancrage: str = "LFI-NFP",
+    groupe_ancrage: str = GROUPE_ANCRAGE,
     tolerance: float = 1e-5,
     part_test: float = 0.0,
     graine_test: int = 0,
@@ -524,9 +537,28 @@ def intervalles(
             borne_basse=pl.Series(np.nanquantile(tirages, q, axis=0)),
             borne_haute=pl.Series(np.nanquantile(tirages, 1 - q, axis=0)),
             ecart_type=pl.Series(np.nanstd(tirages, axis=0)),
+            # Le nombre de votes qui ont **réellement** servi à situer ce
+            # député : ses « pour » et « contre » sur les seuls scrutins que les
+            # filtres ont gardés. Ce n'est pas son nombre de votes sur les
+            # scrutins qui engagent, et l'écart n'est pas anecdotique — les
+            # abstentions et les motions de censure en sortent. Une fiche qui
+            # annonce le second à côté d'une position estimée surestime la
+            # matière dont le modèle a disposé ; cette colonne existe pour
+            # qu'elle puisse annoncer le premier.
+            votes_modele=pl.Series(
+                base.votes_observes.sum(axis=1).astype(np.int64)
+                if base.votes_observes is not None
+                else np.zeros(base.deputes.height, dtype=np.int64)
+            ),
         )
         .with_columns(
-            (pl.col("borne_haute") - pl.col("borne_basse")).alias("largeur")
+            (pl.col("borne_haute") - pl.col("borne_basse")).alias("largeur"),
+            # L'assiette du modèle, portée en colonne constante comme
+            # `carte_politique` porte son inertie : le site publie ces deux
+            # nombres, et les recalculer ailleurs rouvrirait l'écart entre le
+            # périmètre annoncé et le périmètre estimé.
+            pl.lit(base.scrutins.height).alias("modele_scrutins"),
+            pl.lit(cube.n_scrutins).alias("modele_scrutins_offerts"),
         )
         .sort("axe1")
     )
