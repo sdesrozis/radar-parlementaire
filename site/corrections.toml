@@ -308,3 +308,45 @@ Le chiffre de tête de toute mesure passe désormais par `grand_chiffre()`, qui
 rend un tiret cadratin quand la valeur est absente."""
 pages = "Les 577 fiches de député"
 commit = "fb5d5e6"
+
+[[correction]]
+date = "2026-08-15"
+titre = "Le texte de loi derrière chaque scrutin"
+portee = "site"
+erreur = """
+Le site n'a jamais publié le nom de la loi sur laquelle portait un scrutin, ni
+de lien vers son dossier législatif, en affirmant dans son code que la source ne
+le renseignait pas. La source le renseigne : 2 608 des 8 434 scrutins de la
+législature portent le nom de leur loi et l'identifiant de son dossier, dont 73
+des 245 votes qui engagent. Ces 2 608 rattachements étaient perdus à la lecture
+des fichiers, et l'absence était présentée comme une lacune de l'Assemblée."""
+cause = """
+Dans les JSON de l'Assemblée, `dossierLegislatif` n'est pas une chaîne mais un
+objet à deux champs — le titre de la loi et la référence du dossier. Le parseur
+lui appliquait la fonction qui extrait une valeur textuelle, laquelle rend
+`None` sur un objet dépourvu de champ `#text`. La colonne sortait donc nulle sur
+les 8 434 lignes, sans qu'aucune erreur ne soit levée.
+
+Le plus grave n'est pas le bug, c'est ce qu'on en a conclu. Deux commentaires du
+code — dans la définition de la table des scrutins, et dans le module qui
+calcule les intervalles de confiance — affirmaient que « la source ne remplit
+jamais dossierLegislatif », et le second justifiait par là un choix de méthode :
+faute de dossier, le bootstrap regroupe les scrutins par séance. Une conclusion
+tirée de notre propre défaut de lecture avait été écrite comme un fait sur les
+données de l'Assemblée, puis avait servi d'argument."""
+effet = """
+Aucun chiffre publié ne change. Le rattachement récupéré fait apparaître le
+titre de la loi et le lien vers son dossier sur les pages de vote qui en
+disposent, et permet de compter les amendements déposés sur chaque loi.
+
+La lacune restante est datée et publiée comme telle : l'Assemblée ne renseigne
+ce champ que depuis le 26 mars 2026 — 2 des 5 824 scrutins antérieurs, la
+totalité des 2 606 postérieurs. Les 172 votes qui engagent sans dossier
+affichent la phrase qui le dit, et non un lien manquant en silence.
+
+Le regroupement du bootstrap reste la séance : une colonne remplie à 31 % ne
+peut pas servir de bloc de rééchantillonnage, et le commentaire qui justifiait
+ce choix dit désormais pourquoi, au lieu d'invoquer un champ prétendument vide.
+"""
+pages = "Les 245 pages de vote, l'onglet « Les votes »"
+commit = "bbcdbea"
