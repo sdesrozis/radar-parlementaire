@@ -89,6 +89,42 @@ def accords(identite: dict) -> dict[str, str]:
     }
 
 
+def phrase_mandat(identite: dict) -> str:
+    """« députée depuis le 22 octobre 2024 », et le trou s'il y en a un.
+
+    Un mandat peut être interrompu — le titulaire nommé au Gouvernement rend son
+    siège à son suppléant, puis le reprend. 29 des 648 mandats de la
+    17ᵉ législature sont dans ce cas. Écrire « député depuis le 8 juillet 2024 »
+    sur un mandat troué de treize mois n'est pas une approximation : c'est la
+    phrase qui rendait publiables les treize mois d'absences que ce député n'a
+    pas pu commettre, et le lecteur qui connaît la circonscription le sait avant
+    nous. Les périodes sont donc dites, toutes, dans l'ordre.
+
+    Le site a compté ces interruptions comme du temps de mandat. Voir le
+    registre des corrections.
+    """
+    g = accords(identite)
+    # Les bornes des trous sont calculées en amont — lendemain de la sortie,
+    # veille du retour. Les recalculer ici depuis les périodes ferait écrire
+    # deux jours d'absence que le député n'a pas eus : ces jours-là, il siégeait
+    # encore, ou siégeait déjà.
+    trous = [
+        f"du {jour(t['debut'])} au {jour(t['fin'])}"
+        for t in (identite.get("interruptions") or []) if t["debut"] and t["fin"]
+    ]
+    debut = f"{g['depute']} depuis le {jour(identite['mandat_debut'])}"
+    if not trous:
+        return debut + ("" if identite.get("en_exercice")
+                        else f", jusqu'au {jour(identite['mandat_fin'])}")
+
+    liste = trous[0] if len(trous) == 1 else \
+        ", ".join(trous[:-1]) + f" et {trous[-1]}"
+    fin = "" if identite.get("en_exercice") \
+        else f", et jusqu'au {jour(identite['mandat_fin'])}"
+    return (f"{debut}, mandat interrompu {liste} — "
+            f"{g['il']} ne siégeait pas et ne pouvait pas voter{fin}")
+
+
 def combien(n: int, total: int, singulier: str, pluriel: str) -> str:
     """« Seuls 12 députés » se dit, « seuls 184 députés » non.
 
@@ -296,6 +332,17 @@ def phrase_these(f: dict, d_diss: dict, d_part: dict, rang_diss: int, rang_part:
     g = accords(i)
     n = d_diss["n"]
     nom = echapper(i["nom_complet"])
+
+    # Aucun scrutin ne relevait de son mandat : ce n'est pas une lacune, et le
+    # dire comme une lacune serait à son tour une insinuation. Le mandat a
+    # commencé après le dernier scrutin publié, c'est tout, et cela se date.
+    if not a["scrutins_eligibles"]:
+        return (f"Aucun scrutin de la législature ne relève du mandat de {nom}&nbsp;: "
+                f"{g['il']} est {g['depute']} depuis le {jour(i['mandat_debut'])}, "
+                f"après le dernier vote couvert par ce site.",
+                "Il n'y a donc rien à mesurer, et rien qui manque&nbsp;: la fiche "
+                "se remplira au prochain scrutin. Un taux de présence calculé ici "
+                "n'aurait aucun dénominateur.")
 
     # Aucun vote nominatif dans les données. Afficher « 0 % de présence » serait
     # l'accusation la plus grave du site, portée sur ce qui est peut-être une
@@ -834,6 +881,84 @@ def phrase_sort(s: dict) -> str:
         return f"{echapper(verdict)}."
     return (f"{echapper(verdict)}, par <b>{num(pour)} voix contre {num(contre)}</b> — "
             f"un écart de {num(ecart)} voix.")
+
+
+def phrase_effectif_scrutin(resume: dict, date: str) -> str:
+    """À combien de députés les nombres du scrutin se rapportent, et pourquoi.
+
+    **C'est la phrase la plus attaquable du site**, et elle l'a été : elle a
+    annoncé « les 581 députés dont le mandat courait le 2 juin 2026 » alors que
+    l'Assemblée en compte 577. Un lecteur muni de la Constitution pouvait la
+    réfuter sans rien connaître de nos calculs — et il aurait eu raison.
+
+    Elle obéit donc à trois exigences, dans cet ordre :
+
+    1. **Le repère d'abord.** 577 sièges, et ce n'est pas une mesure : c'est
+       l'article 24 de la Constitution. Un effectif publié sans son repère
+       oblige le lecteur à aller chercher lui-même s'il est plausible.
+    2. **L'écart s'explique, ou il ne s'écrit pas.** Un effectif inférieur à 577
+       vient de sièges vacants — décès, démission, élection annulée — entre le
+       départ et la partielle qui le remplace. Cette phrase le dit ; sans elle,
+       « 575 députés » ressemble à une erreur de trois.
+    3. **Aucun écart supérieur n'est possible.** Il n'y a pas de 578ᵉ siège, et
+       `controles.effectifs` refuse de publier une page qui le prétendrait.
+    """
+    concernes, sieges = resume["concernes"], resume["sieges"]
+    vacants = resume["vacants"]
+    debut = (f"Les quatre nombres ci-dessus se rapportent aux "
+             f"<b>{num(concernes)} députés qui occupaient leur siège</b> le {date}")
+    if not vacants:
+        return debut + (f", soit la totalité des {num(sieges)} sièges de "
+                        f"l'Assemblée.")
+    vacance = ("un siège était vacant" if vacants == 1
+               else f"{num(vacants)} sièges étaient vacants")
+    # On ne nomme pas la cause de la vacance : la source ne la publie pas
+    # scrutin par scrutin, et l'inventer serait le travers que ce site
+    # reproche aux autres. Ce qui est écrit est ce qui est vérifiable — le
+    # siège n'avait pas de titulaire ce jour-là.
+    return (debut + f", sur les {num(sieges)} sièges que compte l'Assemblée&nbsp;: "
+            f"{vacance} ce jour-là, entre la fin d'un mandat et l'entrée en "
+            f"fonction du député qui l'a suivi.")
+
+
+def phrase_hors_mandat(resume: dict) -> str:
+    """Ce que « hors mandat » recouvre, et pourquoi ces députés sont dans le relevé.
+
+    Le relevé porte les 648 députés qu'a connus la législature, pas les 577 d'un
+    jour donné : il fallait donc un statut pour ceux dont le mandat ne couvrait
+    pas ce scrutin. Sans explication, ce statut est le pire des deux mondes — il
+    fait apparaître un total de 648 sous une phrase qui parle de 577, et laisse
+    croire à un décompte fantaisiste. Il est ici nommé, compté, et justifié.
+    """
+    hors = resume.get("hors_mandat", 0)
+    if not hors:
+        return ""
+    return (f" Le relevé nominatif porte les {num(resume['total'])} députés "
+            f"qu'a connus la législature&nbsp;: {num(hors)} d'entre eux "
+            f"n'étaient pas en fonction à cette date — pas encore élus, mandat "
+            f"achevé, ou remplacés pendant une interruption — et sont signalés "
+            f"«&nbsp;hors mandat&nbsp;» plutôt que comptés absents.")
+
+
+def phrase_interruptions(apercu: dict) -> str:
+    """Le cas du mandat interrompu, dit une fois, là où il se rencontre.
+
+    C'est le cas qu'un lecteur n'imagine pas et qui rend pourtant un
+    dénominateur incompréhensible : un ministre n'est pas député pendant qu'il
+    est ministre, son suppléant occupe le siège, puis le titulaire le reprend.
+    Tant que ce n'est pas écrit, un député absent de treize mois de scrutins
+    passe soit pour un absentéiste, soit pour une erreur de notre part.
+    """
+    n = apercu.get("mandats_interrompus") or 0
+    if not n:
+        return ""
+    return (f"<b>{num(n)} mandats de cette législature ont été interrompus.</b> "
+            f"Un député nommé au Gouvernement quitte son siège, son suppléant "
+            f"l'occupe, puis le titulaire le reprend. Les scrutins tenus pendant "
+            f"l'interruption ne sont comptés ni à l'un ni à l'autre&nbsp;: ils "
+            f"sont hors mandat pour celui qui ne siégeait pas, et c'est ce qui "
+            f"empêche un ancien ministre d'apparaître absent de votes auxquels "
+            f"il ne pouvait pas prendre part.")
 
 
 def phrase_delegation_scrutin(resume: dict) -> str:

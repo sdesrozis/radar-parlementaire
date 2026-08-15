@@ -1,13 +1,31 @@
 
-  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════ -->
+  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════
+       Le portrait officiel est servi depuis ce domaine, recomprimé : la page
+       Mentions promet que le site « n'envoie aucune requête à un service
+       tiers », images comprises, et une adresse en assemblee-nationale.fr ici
+       ferait mentir cette phrase sur 577 fiches.
+
+       Il est petit, et il le reste. Le système visuel interdit que le site
+       ressemble à un portail de l'État : un portrait officiel composé en
+       grand, en tête de page, est précisément ce qui produit cette
+       ressemblance. Il sert à reconnaître quelqu'un, pas à le mettre en scène.
+
+       Deux députés n'en ont pas — la balise est alors vide, et le texte reprend
+       toute la largeur.
+       ══════════════════════════════════════════════════════════════ -->
   <section class="cadre chapeau">
-    <p class="fil">{{FIL}}</p>
-    <h1>{{NOM}}</h1>
-    <p class="sous-titre-fiche">
-      Siège avec le groupe <b>{{GROUPE_LIBELLE}}</b> ({{GROUPE}}).
-      {{IDENTITE_PHRASE}}
-      <span class="etat">{{ETAT}}</span>
-    </p>
+    <div class="chapeau-corps">
+      {{PORTRAIT}}
+      <div class="chapeau-texte">
+        <p class="fil">{{FIL}}</p>
+        <h1>{{NOM}}</h1>
+        <p class="sous-titre-fiche">
+          Siège avec le groupe <b>{{GROUPE_LIBELLE}}</b> ({{GROUPE}}).
+          {{IDENTITE_PHRASE}}
+          <span class="etat">{{ETAT}}</span>
+        </p>
+      </div>
+    </div>
   </section>
 
   <!-- ══ LA THÈSE ══════════════════════════════════════════════════ -->

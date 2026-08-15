@@ -242,6 +242,44 @@ a:hover { text-decoration-color: var(--accent); }
 /* ── titre de fiche ────────────────────────────────────────────────── */
 
 .chapeau { padding-block: 72px 0; }
+
+/* Le portrait officiel, à gauche du nom.
+ *
+ * Trois choses s'y jouent, et aucune n'est cosmétique :
+ *
+ * — La taille. Le système visuel interdit au site de ressembler à un portail
+ *   de l'État, et un portrait officiel en grand est ce qui produit cette
+ *   ressemblance le plus vite. 96 px : de quoi reconnaître quelqu'un, pas de
+ *   quoi le mettre en scène. La source ne fait de toute façon que 150 px de
+ *   large — l'agrandir donnerait une image molle en plus d'un mauvais registre.
+ *
+ * — Le rectangle. Un disque est la convention du profil de réseau social, où
+ *   la photo *est* la personne. Ici la page porte des taux de présence : le
+ *   rectangle à filet est celui de la revue et de la pièce d'archive.
+ *
+ * — `flex-shrink: 0` et `align-self: start`. Sans le premier, la vignette se
+ *   comprime avant le texte et perd son rapport ; sans le second, elle
+ *   s'étire sur toute la hauteur du bloc quand le sous-titre passe à trois
+ *   lignes. */
+.chapeau-corps { display: flex; align-items: flex-start; gap: 30px; }
+.chapeau-texte { min-width: 0; }
+.portrait {
+  flex: 0 0 auto;
+  align-self: start;
+  width: 96px; height: auto;
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  /* Aucun filtre, en thème sombre non plus. Le blanc de studio de ces
+     portraits ressort franchement sur le papier sombre, et la tentation est
+     d'y poser un `brightness` — c'est l'erreur déjà commise sur la marque, où
+     l'éclaircissement du bleu d'encre délavait aussi le drapeau. Ici il
+     délaverait des visages. Une photographie est publiée telle quelle ou ne
+     l'est pas. */
+  /* Un cran de plus de marge que le `.fil` qu'il longe, pour que le haut de
+     l'image s'aligne optiquement sur la ligne de capitales de l'ariane. */
+  margin-top: 3px;
+}
+
 .fil {
   font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.15em;
   text-transform: uppercase; color: var(--encre-3); margin-bottom: 22px;
@@ -750,6 +788,15 @@ h1 {
   .cadre { padding: 0 20px; }
   .chapeau { padding-block-start: 44px; }
   .rang .n { display: none; }
+  /* Le portrait passe au-dessus du nom. À gauche, il prélève 90 px sur les
+     335 de la colonne, et « Agnès Pannier-Runacher » composé en serif de
+     3 rem y tombe à trois lignes — le grand nom est la signature typographique
+     de la fiche, et c'est la première chose que cet écran perd.
+     Mesuré sur cette fiche : à gauche, chapeau de 374 px dont 142 de titre ;
+     au-dessus, 411 px dont 95. Trente-sept pixels de page pour une ligne de
+     titre en moins, à pleine mesure. */
+  .chapeau-corps { display: block; }
+  .portrait { width: 84px; margin: 0 0 20px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

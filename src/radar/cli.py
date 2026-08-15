@@ -15,9 +15,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from . import alerts, analyze, topics
+from . import alerts, analyze, controles, topics
 from .config import LEGISLATURE, paths
-from .fetch import fetch_all
+from .fetch import fetch_all, fetch_portraits
 from .parse import build_all, load
 
 app = typer.Typer(
@@ -79,12 +79,77 @@ def build(
 
 
 @app.command()
+def verifier(
+    legislature: int = typer.Option(LEGISLATURE, help="Numéro de législature."),
+) -> None:
+    """Contrôle les invariants des données — au plus 577 députés, un siège par personne…
+
+    C'est le contrôle que `site/generer.py` exécute avant d'écrire quoi que ce
+    soit. Il est ici parce qu'il doit pouvoir être passé seul, après un `build`
+    et avant de décider de publier : il répond en une seconde, là où la
+    génération demande une demi-minute de calcul.
+    """
+    anomalies = controles.verifier(legislature=legislature)
+    for nom, _ in controles.CONTROLES:
+        echecs = [a for a in anomalies if a.controle == nom]
+        marque = "[red]✗[/]" if echecs else "[green]✓[/]"
+        console.print(f"  {marque} {nom}")
+        for a in echecs:
+            console.print(f"      [red]{a.message}[/]")
+            for e in a.exemples[:controles.MAX_EXEMPLES]:
+                console.print(f"        · {e}")
+            reste = len(a.exemples) - controles.MAX_EXEMPLES
+            if reste > 0:
+                console.print(f"        · … et {reste} autres")
+    if anomalies:
+        console.print(f"\n  [bold red]{len(anomalies)} anomalie(s) — "
+                      f"ces données ne sont pas publiables.[/]")
+        raise typer.Exit(1)
+    console.print(f"\n  [green]{len(controles.CONTROLES)} invariants vérifiés.[/]")
+
+
+@app.command()
+def portraits(
+    legislature: int = typer.Option(LEGISLATURE, help="Numéro de législature."),
+    force: bool = typer.Option(False, help="Retélécharger, y compris les absents connus."),
+) -> None:
+    """Télécharge les portraits officiels des députés, tels que le site les sert.
+
+    Ils ne viennent pas de l'open data — aucun jeu de données ne les publie —
+    mais du site institutionnel, à une adresse déduite de l'identifiant.
+    """
+    deputes = load("deputes")
+
+    def noms(uids: list[str]) -> str:
+        return ", ".join(sorted(deputes.filter(pl.col("acteur_uid").is_in(uids))["nom_complet"]))
+
+    r = fetch_portraits(deputes["acteur_uid"].to_list(), legislature=legislature, force=force)
+    console.print(f"  {r}")
+    # Un portrait retiré de la source se dit : c'est la seule chose que cette
+    # commande fait disparaître du site, et elle ne doit pas le faire en silence.
+    if r.retires:
+        console.print(f"  · [bold]portrait retiré par la source[/] : {noms(r.retires)}")
+    if r.absents:
+        console.print(f"  · sans portrait à la source : {noms(r.absents)}")
+    console.print(f"\n  → {r.dossier}")
+
+
+@app.command()
 def update(
     amendements: bool = typer.Option(False, help="Inclure les amendements."),
 ) -> None:
     """Télécharge puis reconstruit tout, en une commande."""
     fetch(amendements=amendements, force=False)
     build(amendements=amendements, legislature=LEGISLATURE)
+    # Après `build` et pas avant : la liste des députés dont on veut le
+    # portrait est celle de la table qui vient d'être écrite.
+    portraits(legislature=LEGISLATURE, force=False)
+    # Et les invariants après tout le reste. Une mise à jour de la source peut
+    # les casser sans qu'aucun code ait changé — un remplacement mal daté à
+    # l'Assemblée suffit —, et c'est précisément le cas qu'aucun test ne
+    # rattrape. Mieux vaut l'apprendre ici qu'en publiant.
+    console.print()
+    verifier(legislature=LEGISLATURE)
 
 
 # --------------------------------------------------------------------------

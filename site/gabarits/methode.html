@@ -104,7 +104,13 @@
       <p>D'abord les scrutins tenus <b>hors du mandat</b>&nbsp;:
         {{ENTRES_EN_COURS}} députés en exercice sont entrés en cours de
         législature, et leur taux serait faussé s'il portait sur
-        {{PORTEE_TEXTE}} scrutins qu'ils n'ont pas pu voter. Ensuite les
+        {{PORTEE_TEXTE}} scrutins qu'ils n'ont pas pu voter. Un mandat peut de
+        surcroît être <b>interrompu</b> — {{INTERROMPUS}} l'ont été dans cette
+        législature&nbsp;: un député nommé au Gouvernement rend son siège à son
+        suppléant, puis le reprend. Les scrutins de l'interruption sortent du
+        dénominateur de l'un comme de l'autre. Ce site les y a laissés jusqu'à
+        sa correction, et publiait à ce titre des absences impossibles.
+        Ensuite les
         <b>non-votants structurels</b> — un membre du Gouvernement, le
         président de séance et le président de l'Assemblée ne peuvent pas
         voter, et la source le dit explicitement, motif par motif&nbsp;: ce ne
@@ -258,6 +264,40 @@
         composition. <b>La date de calcul figure en bas de chaque page</b> pour
         cette raison — un taux sans sa date est aussi incomplet qu'un taux sans
         son dénominateur.</p>
+
+      <p class="jalon">Avant publication</p>
+      <h2>Ce que le site refuse de publier</h2>
+      <p>{{N_CONTROLES}} invariants sont vérifiés sur l'intégralité des données
+        avant qu'une seule page ne soit écrite. S'ils échouent, <b>rien n'est
+        publié</b>&nbsp;: la génération s'arrête, sans avertissement à afficher
+        ni page dégradée. Un site qui ne sait pas compter ses députés n'est pas
+        discutable, il est réfuté.</p>
+      <ul class="liste-limites">
+        <li><b>Au plus {{SIEGES}} députés en fonction</b> à la date de chaque
+          scrutin. L'article 24 de la Constitution plafonne l'effectif de
+          l'Assemblée&nbsp;; un effectif supérieur est une impossibilité, pas
+          une approximation. Ce site en a publié davantage, jusqu'à sa
+          correction&nbsp;: le <a href="corrections.html">registre</a> dit
+          combien, et sur quelles pages.</li>
+        <li><b>Un siège par personne.</b> Deux députés d'une même
+          circonscription ne peuvent pas être en fonction le même jour&nbsp;:
+          un remplacement n'est pas un cumul.</li>
+        <li><b>Aucun vote hors mandat.</b> Si l'Assemblée attribue un suffrage
+          à un député que nos dates placent hors de son mandat, ce sont nos
+          dates qui sont fausses — la source, elle, publie le dépouillement.</li>
+        <li><b>Un relevé qui s'additionne.</b> Les six statuts d'une page de
+          vote partitionnent l'effectif&nbsp;: aucun député ne porte deux
+          positions sur un même scrutin.</li>
+        <li><b>Des totaux égaux à ceux de l'Assemblée.</b> Les « pour », les
+          « contre » et les abstentions de chacun des {{SCRUTINS}} scrutins sont
+          recomptés depuis le dépouillement nominatif et confrontés aux totaux
+          publiés par l'Assemblée. Un seul écart arrête la publication.</li>
+      </ul>
+      <p>Ces contrôles ne vérifient pas des formules mais des <b>effectifs</b>,
+        et c'est délibéré. Le site a longtemps annoncé sur ses pages de vote un
+        nombre de députés supérieur au nombre de sièges sans qu'aucun de ses
+        tests ne s'en aperçoive&nbsp;: un chiffre faux qui ne contredit aucun
+        calcul ne se voit pas, il se compte.</p>
 
       <p class="jalon">Une erreur&nbsp;?</p>
       <h2>Comment la signaler</h2>

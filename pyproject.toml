@@ -17,6 +17,11 @@ dependencies = [
     "rich>=13.7",
     "matplotlib>=3.9",
     "reportlab>=4.2",
+    # Recompression des portraits par le générateur du site. Elle arrivait déjà
+    # dans l'environnement par matplotlib ; s'en remettre à cette dépendance
+    # indirecte, c'est laisser la génération du site casser le jour où
+    # matplotlib cesse d'en avoir besoin.
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]

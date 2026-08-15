@@ -150,15 +150,7 @@ def build_cube(
         sel = pos == p
         mat[ii[sel], jj[sel]] = True
 
-    # Éligibilité : le mandat du député couvre-t-il la date du scrutin ?
-    dates = scrutins["date_d"].to_numpy().astype("datetime64[D]")
-    debut = deputes["mandat_debut_d"].to_numpy().astype("datetime64[D]")
-    fin_raw = deputes["mandat_fin_d"].to_list()
-    fin = np.array(
-        [np.datetime64("2999-12-31") if f is None else np.datetime64(f) for f in fin_raw],
-        dtype="datetime64[D]",
-    )
-    eligible = (dates[None, :] >= debut[:, None]) & (dates[None, :] <= fin[:, None])
+    eligible = _eligibilite(deputes, scrutins)
 
     return VoteCube(
         deputes=deputes,
@@ -169,6 +161,35 @@ def build_cube(
         non_votant=mats["nonVotant"],
         eligible=eligible,
     )
+
+
+def _eligibilite(deputes: pl.DataFrame, scrutins: pl.DataFrame) -> np.ndarray:
+    """`E[i, j]` : le député `i` occupait-il son siège le jour du scrutin `j` ?
+
+    **Une union d'intervalles, jamais un intervalle.** Un mandat peut être
+    interrompu — le titulaire nommé au Gouvernement rend son siège, son
+    suppléant l'occupe, puis le titulaire le reprend. Prendre la première
+    entrée et la dernière sortie comble le trou, et deux personnes se
+    retrouvent en fonction sur le même siège au même moment : l'effectif d'un
+    scrutin de juin 2026 montait alors à 581 sur 577 sièges, et les
+    surnuméraires étaient publiés comme absents de votes auxquels la question
+    ne leur était pas posée.
+
+    La borne de fin nulle vaut « mandat en cours ». Les bornes sont **closes
+    des deux côtés** : la source date la sortie du titulaire au jour `d` et
+    l'entrée du suppléant au jour `d + 1`, si bien que deux périodes voisines
+    ne se recouvrent jamais d'une journée. `controles.effectifs` le vérifie
+    plutôt que de le supposer.
+    """
+    dates = scrutins["date_d"].to_numpy().astype("datetime64[D]")
+    lointain = np.datetime64("2999-12-31")
+    eligible = np.zeros((deputes.height, scrutins.height), dtype=bool)
+    for i, periodes in enumerate(deputes["periodes_mandat"].to_list()):
+        for p in periodes or []:
+            debut = np.datetime64(p["debut"])
+            fin = lointain if p["fin"] is None else np.datetime64(p["fin"])
+            eligible[i] |= (dates >= debut) & (dates <= fin)
+    return eligible
 
 
 # --------------------------------------------------------------------------

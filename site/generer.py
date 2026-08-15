@@ -36,6 +36,8 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
+from radar import controles
+from radar.controles import CONTROLES
 from radar.vues import BOOTSTRAP, MIN_COMMUNS, Donnees
 from redaction import (
     NBSP,
@@ -57,11 +59,15 @@ from redaction import (
     phrase_dissidence,
     phrase_ecart,
     phrase_ecart_groupe,
+    phrase_effectif_scrutin,
+    phrase_hors_mandat,
     phrase_incertitude,
+    phrase_interruptions,
     phrase_delegation_scrutin,
     phrase_groupes_scrutin,
     phrase_journal,
     phrase_loi,
+    phrase_mandat,
     phrase_participation,
     phrase_portee,
     phrase_position,
@@ -135,6 +141,19 @@ STATIQUE = ICI / "statique"
 ASSETS = ICI / "assets"
 SORTIE = ICI / "sortie"
 
+# Les portraits officiels, téléchargés par `radar portraits` dans `data/raw/`.
+# Le générateur les republie recompressés : le site institutionnel sert des
+# JPEG de 150×192 qui pèsent 38 Ko, soit 24 Mo pour l'Assemblée entière, pour
+# une image de la taille d'une vignette. Recomprimés à taille native, ils font
+# 6 Ko — 3,8 Mo en tout, moins qu'une seule page de scrutin.
+#
+# Ils ne sont pas dans `assets/` : `assets/` porte la marque du site, qui est
+# de nous et vit dans le dépôt. Ceux-ci sont une donnée récupérée, absente d'un
+# clone frais, et le site se construit sans eux.
+PORTRAITS = ICI.parent / "data" / "raw" / "portraits"
+PORTRAITS_PUBLIES = "statique/portraits"
+PORTRAIT_QUALITE = 80
+
 # La note méthodologique est compilée par LaTeX, hors de ce script : exiger un
 # moteur TeX pour générer le site rendrait la publication dépendante d'une
 # chaîne d'outils qui n'a rien à voir avec elle. On recopie le PDF s'il est là,
@@ -160,6 +179,70 @@ def note_perimee() -> bool:
     """Le PDF est-il plus ancien que le source dont il est tiré ?"""
     return (NOTE_SOURCE.exists() and NOTE_TEX.exists()
             and NOTE_SOURCE.stat().st_mtime < NOTE_TEX.stat().st_mtime)
+
+
+def publier_portraits(uids: set[str]) -> tuple[int, int]:
+    """Recomprime les portraits de `data/raw/` vers `sortie/statique/portraits/`.
+
+    `uids` est l'ensemble des députés qui ont une fiche. Il est restreignant, et
+    c'est le but : `data/raw/portraits/` porte les 648 de la table, fiche ou
+    non, et publier les 71 qui n'en ont pas mettrait en ligne les portraits
+    d'anciens députés sur des pages qui n'existent pas. Une image en ligne que
+    rien ne référence est exactement la page « Soutenir » restée chez
+    l'hébergeur, en 71 exemplaires.
+
+    Rend (nombre publié, poids total). Zéro si le dossier source est absent :
+    un clone frais n'a pas encore lancé `radar portraits`, et un site sans
+    portraits reste un site — la fiche est écrite pour s'en passer.
+
+    La republication est **entière à chaque fois**, comme le reste de
+    `sortie/` : `main()` efface `statique/` avant de le réécrire, et un cache
+    à invalider pour gagner trois secondes sur une génération de vingt est un
+    cache qui finira par servir le portrait d'hier.
+    """
+    if not PORTRAITS.exists():
+        return 0, 0
+    from PIL import Image
+
+    dossier = SORTIE / PORTRAITS_PUBLIES
+    dossier.mkdir(parents=True, exist_ok=True)
+    poids = 0
+    sources = sorted(p for p in PORTRAITS.glob("PA*.jpg") if p.stem in uids)
+    for src in sources:
+        # Taille native conservée : l'original fait déjà 150×192, soit la
+        # vignette telle qu'elle s'affiche. Ce qui est repris, c'est la
+        # compression — le site institutionnel sert ces 150×192 en 38 Ko.
+        with Image.open(src) as im:
+            cible = dossier / src.name
+            im.convert("RGB").save(
+                cible, "JPEG", quality=PORTRAIT_QUALITE, optimize=True, progressive=True
+            )
+        poids += cible.stat().st_size
+    return len(sources), poids
+
+
+def portrait_html(uid: str) -> str:
+    """La balise du portrait, ou rien du tout.
+
+    **Rien du tout, et pas une silhouette de remplacement.** Deux députés n'ont
+    pas de photographie sur le site de l'Assemblée ; leur en dessiner une, même
+    grise et anonyme, donnerait à lire « voici son visage » là où la source
+    n'a rien. C'est la même règle que pour les chiffres : une case vide vaut
+    mieux qu'un zéro.
+
+    L'alternative textuelle est vide à dessein : le nom est composé juste à
+    côté, en corps 4,6 rem, et le faire relire par la synthèse vocale sous
+    forme de « photographie de … » n'ajoute rien à qui n'y voit pas.
+
+    Ce qui est vérifié est le fichier **publié**, pas sa source dans
+    `data/raw/` : c'est lui que le navigateur ira chercher, et deux conditions
+    différentes pour la balise et pour l'image finiraient par diverger sur une
+    fiche vers un carré cassé.
+    """
+    if not (SORTIE / PORTRAITS_PUBLIES / f"{uid}.jpg").exists():
+        return ""
+    return (f'<img class="portrait" src="{PORTRAITS_PUBLIES}/{uid}.jpg" alt=""\n'
+            f'         width="150" height="192" decoding="async">')
 
 # Adresse canonique, pour le sitemap et les URL absolues des métadonnées de
 # partage. Une URL relative suffit à la navigation ; un moteur de recherche et
@@ -943,6 +1026,11 @@ class Site:
             "VOTES": num(self.apercu["votes"]),
             "DEPUTES": num(self.apercu["deputes"]),
             "EN_EXERCICE": num(self.apercu["en_exercice"]),
+            # Le nombre de sièges, disponible partout : c'est le repère contre
+            # lequel se lit tout effectif publié, et il ne s'écrit nulle part à
+            # la main. Il ne vient pas des données mais du droit — article 24
+            # de la Constitution — et `radar.config` le porte à ce titre.
+            "SIEGES": num(self.apercu["sieges"]),
             "PORTEE_TEXTE": num(self.portees.get("texte", 0)),
             "PORTEE_DETAIL": num(self.portees.get("detail", 0)),
             "PART_DETAIL_PCT": pct(self.portees.get("detail", 0) / self.apercu["scrutins"], 0),
@@ -1126,6 +1214,12 @@ class Site:
                 "PHRASE_PORTEE": p1,
                 "PHRASE_PORTEE_2": p2,
                 "ENTRES_EN_COURS": num(self.apercu["entres_en_cours"]),
+                "INTERROMPUS": num(self.apercu["mandats_interrompus"]),
+                # Le nombre d'invariants n'est pas écrit dans la page : il est
+                # celui du module qui les exécute. Une page qui promettrait
+                # plus de contrôles qu'il n'en existe serait exactement le
+                # genre d'affirmation invérifiable que ce site refuse.
+                "N_CONTROLES": num(len(CONTROLES)),
                 "BOOTSTRAP": num(self.apercu["bootstrap"]),
                 "BLOCS": num(self.apercu["blocs_bootstrap"]),
                 "MIN_COMMUNS": num(MIN_COMMUNS),
@@ -1256,8 +1350,7 @@ class Site:
             f"{i['age']} ans" if i.get("age") else "",
             profession[0].lower() + profession[1:] if profession else "",
         ] if x)
-        identite = (identite + ", " if identite else "") + \
-            f"député depuis le {jour(i['mandat_debut'])}."
+        identite = (identite + ", " if identite else "") + phrase_mandat(i) + "."
 
         # Le bloc des amendements disparaît si la table n'a pas été construite —
         # elle pèse 300 Mo au téléchargement, et un site généré sans elle reste
@@ -1275,6 +1368,7 @@ class Site:
                             f"{i['num_circo']}{ordinal(i['num_circo'])} circonscription"),
             "NOM": echapper(i["nom_complet"]),
             "NOM_COURT": echapper(i["nom"]),
+            "PORTRAIT": portrait_html(uid),
             "GROUPE": echapper(i["groupe"]),
             "GROUPE_LIBELLE": echapper(i["groupe_libelle"] or i["groupe"]),
             "GROUPE_AUTRES": num(max((groupe["effectif_actuel"] if groupe else 1) - 1, 0)),
@@ -1531,8 +1625,12 @@ class Site:
         # pas posée. Les inclure gonflait le compte de 69 sur un scrutin de
         # juillet 2026 et faisait un total de 648 sous une phrase qui annonçait
         # 577 sièges.
+        #
+        # L'effectif, lui, ne se calcule plus ici : `resume` porte `concernes`,
+        # `sieges` et `vacants`, tenus par `vues.scrutin()`. Une page qui déduit
+        # son propre effectif finit par en publier un que son relevé ne
+        # justifie pas — c'est très exactement ce qui s'est produit.
         absents = resume["absent"] + resume["empeche"]
-        concernes = resume["total"] - resume["hors_mandat"]
         jetons = {
             # `TITRE` est réservé par `page()` au titre du document : un jeton
             # de ce nom posé ici était écrasé, et le `h1` affichait le contenu
@@ -1555,12 +1653,10 @@ class Site:
             "VOTANTS": num(s["nb_votants"] or 0),
             "EXPRIMES": num(s["suffrages_exprimes"] or 0),
             "REQUIS": num(s["suffrages_requis"] or 0),
-            "CONCERNES": num(concernes),
-            "HORS_MANDAT_PHRASE": (
-                f" {num(resume['hors_mandat'])} des {num(resume['total'])} députés "
-                f"de la législature n'étaient pas en fonction à cette date."
-                if resume["hors_mandat"] else ""
-            ),
+            "EFFECTIF_PHRASE": phrase_effectif_scrutin(resume, jour(s["date"])),
+            "HORS_MANDAT_PHRASE": phrase_hors_mandat(resume),
+            "TOUS_DEPUTES": num(resume["total"]),
+            "INTERRUPTION_PHRASE": phrase_interruptions(self.apercu),
             "DELEGATION_PHRASE": phrase_delegation_scrutin(resume),
             "LOI_BLOC": f'<p class="enclair">{phrase_loi(liens, s, self.apercu)}</p>'
                         f'<p class="enclair">L\'analyse nominative publiée par '
@@ -1647,6 +1743,21 @@ def main() -> None:
 
     debut = time.monotonic()
     donnees = Donnees.construire(bootstrap=args.bootstrap, journal=lambda m: print(f"  · {m}"))
+
+    # Les invariants des données, avant d'écrire une seule page. Ils ne testent
+    # pas le code — les tests s'en chargent — mais les *chiffres publiables* :
+    # au plus 577 députés en fonction un jour donné, un siège par personne, un
+    # relevé qui s'additionne, des totaux égaux à ceux de l'Assemblée.
+    #
+    # Le site a publié pendant toute sa vie des pages annonçant « les 581
+    # députés dont le mandat courait », sous un régime qui en compte 577, sans
+    # qu'aucun des 230 tests ne s'en aperçoive : un effectif faux ne contredit
+    # aucune formule, il ne se voit qu'en comptant. D'où ce garde-fou, et d'où
+    # le fait qu'il **arrête** la génération au lieu d'avertir. Un site qui ne
+    # sait pas compter ses députés n'est pas discutable, il est réfuté.
+    controles.exiger(donnees.cube)
+    print(f"  · contrôles des données : {len(CONTROLES)} invariants vérifiés")
+
     site = Site(donnees)
 
     # La région n'est pas dans `liste_deputes` : on la prend à la source.
@@ -1685,6 +1796,18 @@ def main() -> None:
     for image in sorted(ASSETS.glob("*")):
         if image.is_file():
             shutil.copy2(image, SORTIE / "statique" / image.name)
+
+    publies, poids = publier_portraits(site.publiees)
+    if publies:
+        manquants = len(site.publiees) - publies
+        # Le nombre manquant se dit. Les portraits ne viennent d'aucun jeu de
+        # données : ils tiennent à une convention d'adresse du site
+        # institutionnel, et le jour où elle change, c'est ce compte qui le
+        # signalera — pas 577 fiches devenues muettes sans que rien ne parle.
+        print(f"  · {publies} portraits ({poids / 1e6:.1f} Mo)"
+              + (f", {manquants} sans photo à la source" if manquants else ""))
+    else:
+        print("  · aucun portrait publié — lancer `uv run radar portraits`")
 
     if NOTE_SOURCE.exists():
         (SORTIE / "methode").mkdir(exist_ok=True)

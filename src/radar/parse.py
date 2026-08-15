@@ -131,6 +131,19 @@ MANDAT_SCHEMA = {
     "organe_uid": pl.Utf8,
     "legislature": pl.Utf8,
     "date_debut": pl.Utf8,
+    #: **La date à laquelle le député est réellement entré en fonction**, et la
+    #: seule qui vaille pour dire s'il siégeait tel jour.
+    #:
+    #: `dateDebut` ne la donne pas : l'Assemblée y met la date d'ouverture de la
+    #: législature pour tous les mandats, y compris ceux des remplaçants entrés
+    #: deux ans plus tard. Sur les 677 mandats `ASSEMBLEE` de la 17ᵉ, 584
+    #: portent `dateDebut = 2024-07-07` — dont ceux de députées qui n'avaient
+    #: pas encore prêté serment. La date d'entrée est dans
+    #: `mandature/datePriseFonction`, et elle diffère de `dateDebut` sur les
+    #: 677 lignes.
+    #:
+    #: Ce champ n'était pas lu. Voir le registre des corrections.
+    "date_prise_fonction": pl.Utf8,
     "date_fin": pl.Utf8,
     "qualite": pl.Utf8,
     "departement": pl.Utf8,
@@ -151,6 +164,7 @@ def _mandat_rows(acteur: dict) -> Iterator[dict]:
                 "organe_uid": organe_uid,
                 "legislature": text(m.get("legislature")),
                 "date_debut": text(m.get("dateDebut")),
+                "date_prise_fonction": text(dig(m, "mandature", "datePriseFonction")),
                 "date_fin": text(m.get("dateFin")),
                 "qualite": text(dig(m, "infosQualite", "codeQualite")),
                 "departement": text(dig(m, "election", "lieu", "departement")),
@@ -205,26 +219,75 @@ def build_deputes(
 
     Le groupe retenu est celui du mandat GP le plus récent : un député qui change
     de groupe en cours de législature est rattaché à son groupe actuel.
+
+    **Un mandat n'est pas un intervalle.** C'est une *suite* d'intervalles, et
+    les deux ne se valent pas. Un député nommé au Gouvernement quitte son siège,
+    son suppléant l'occupe, puis le titulaire le reprend : la source publie deux
+    mandats séparés par un trou de plusieurs mois. Résumer cela par
+    `min(début), max(fin)` rend le siège occupé sans interruption — donc le
+    titulaire présent pendant qu'il était ministre, **et** son suppléant présent
+    en même temps que lui.
+
+    `periodes_mandat` porte donc la liste des périodes, bornes réelles
+    comprises, et c'est elle qui fonde l'éligibilité dans `analyze.build_cube`.
+    `mandat_debut` et `mandat_fin` restent la première entrée et la dernière
+    sortie : ils servent à l'affichage et à `en_exercice`, jamais à décider si
+    un député siégeait tel jour.
+
+    Ce défaut a été publié. Voir le registre des corrections.
     """
     leg = str(legislature)
-    seat = (
+    periodes = (
         mandats.filter(
             (pl.col("type_organe") == "ASSEMBLEE") & (pl.col("legislature") == leg)
         )
-        .sort("date_debut")
-        .group_by("acteur_uid")
-        .agg(
-            pl.col("date_debut").min().alias("mandat_debut"),
-            # Un `date_fin` nul l'emporte : le mandat court toujours.
-            pl.when(pl.col("date_fin").is_null().any())
-            .then(None)
-            .otherwise(pl.col("date_fin").max())
-            .alias("mandat_fin"),
-            pl.col("departement").drop_nulls().last().alias("departement"),
-            pl.col("num_departement").drop_nulls().last().alias("num_departement"),
-            pl.col("num_circo").drop_nulls().last().alias("num_circo"),
-            pl.col("region").drop_nulls().last().alias("region"),
+        .with_columns(
+            # La prise de fonction, jamais `date_debut` : cf. `MANDAT_SCHEMA`.
+            # Le repli ne sert que si la source omettait le champ — il n'arrive
+            # sur aucune des 677 lignes de la 17ᵉ, et le contrôle `controles`
+            # refuserait de publier une éligibilité assise dessus.
+            pl.coalesce("date_prise_fonction", "date_debut").alias("debut"),
+            pl.col("date_fin").alias("fin"),
         )
+        .sort(["acteur_uid", "debut"])
+    )
+    # Deux périodes ne font pas une interruption : elles peuvent se toucher. Le
+    # trou se constate, il ne se suppose pas — d'où la comparaison de dates.
+    #
+    # Ses bornes sont **le lendemain de la sortie et la veille du retour**, et
+    # non les dates de sortie et de retour elles-mêmes : ces deux jours-là, le
+    # député siégeait encore, ou siégeait déjà. Une fiche qui annonce « mandat
+    # interrompu du 5 novembre 2025 au 5 août 2026 » se trompe de deux jours
+    # dans le sens qui accuse, en revendiquant l'absence de deux journées où la
+    # députée était en fonction.
+    veille = pl.col("debut").str.to_date(strict=False) - pl.duration(days=1)
+    lendemain = pl.col("fin").shift(1).str.to_date(strict=False) + pl.duration(days=1)
+    periodes = periodes.with_columns(
+        (pl.col("debut").str.to_date(strict=False) > lendemain)
+        .over("acteur_uid")
+        .fill_null(False)
+        .alias("apres_interruption"),
+        lendemain.over("acteur_uid").dt.to_string("%Y-%m-%d").alias("trou_debut"),
+        veille.dt.to_string("%Y-%m-%d").alias("trou_fin"),
+    )
+    seat = periodes.group_by("acteur_uid").agg(
+        pl.struct(debut=pl.col("debut"), fin=pl.col("fin")).alias("periodes_mandat"),
+        pl.col("apres_interruption").any().alias("mandat_interrompu"),
+        # Les trous eux-mêmes, servis à la rédaction : c'est ce que la fiche
+        # doit écrire, et il ne se recalcule pas côté site.
+        pl.struct(debut=pl.col("trou_debut"), fin=pl.col("trou_fin"))
+        .filter(pl.col("apres_interruption"))
+        .alias("interruptions"),
+        pl.col("debut").min().alias("mandat_debut"),
+        # Un `fin` nul l'emporte : le mandat court toujours.
+        pl.when(pl.col("fin").is_null().any())
+        .then(None)
+        .otherwise(pl.col("fin").max())
+        .alias("mandat_fin"),
+        pl.col("departement").drop_nulls().last().alias("departement"),
+        pl.col("num_departement").drop_nulls().last().alias("num_departement"),
+        pl.col("num_circo").drop_nulls().last().alias("num_circo"),
+        pl.col("region").drop_nulls().last().alias("region"),
     )
 
     gp = (

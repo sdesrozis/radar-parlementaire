@@ -84,6 +84,14 @@ def paths() -> Paths:
     return Paths(project_root())
 
 
+#: Nombre de sièges à l'Assemblée nationale. Ce n'est pas un paramètre de
+#: mesure : l'article 24 de la Constitution plafonne l'effectif à 577 députés,
+#: et l'article LO 119 du code électoral le fixe à ce plafond. Un siège peut
+#: être vacant — décès, démission, annulation d'une élection en attente d'une
+#: partielle — donc l'effectif d'un jour donné est **au plus** 577, jamais
+#: plus. `controles.effectifs` refuse de publier si le compte le dépasse.
+SIEGES = 577
+
 #: Positions de vote normalisées.
 POSITIONS = ("pour", "contre", "abstention", "nonVotant")
 

@@ -425,17 +425,61 @@ soit réservée aux cartes descriptives et jamais employée à situer un déput�
 particulier.
 
 \subsection{L'éligibilité : ne pas pénaliser un mandat qui n'avait pas commencé}
+\label{sec:eligibilite}
 
-Le cube contient enfin $E_{ij}$, l'indicatrice que le mandat de $i$ couvre la
-date du scrutin $j$. Si $d_j$ est la date du scrutin, $d_i^{\text{début}}$ et
-$d_i^{\mathrm{fin}}$ les bornes du mandat, alors :
+Le cube contient enfin $E_{ij}$, l'indicatrice que le député $i$ \emph{occupait
+son siège} le jour du scrutin $j$. Cette matrice est essentielle pour les
+mesures de présence : un élu arrivé en cours de législature ne pouvait pas
+participer aux scrutins antérieurs, et le lui reprocher serait le principal
+biais possible du site.
+
+\paragraph{Un mandat est une suite de périodes, et non un intervalle.}
+Un député nommé au Gouvernement quitte son siège ; son suppléant l'occupe ;
+puis le titulaire le reprend. La source publie alors \emph{deux} mandats
+séparés par un trou de plusieurs mois. On note donc
+$\mathcal{P}_i=\{[a_{i1},b_{i1}],\dots,[a_{ik_i},b_{ik_i}]\}$ les périodes
+d'occupation du siège par $i$, et
 \[
- E_{ij}=\ind\left(d_i^{\text{début}}\leq d_j\leq
- d_i^{\mathrm{fin}}\right).
+ E_{ij}=\ind\!\left(\exists\,[a,b]\in\mathcal{P}_i \;:\;
+ a\leq d_j\leq b\right),
 \]
-Pour un mandat en cours, la borne de fin est considérée comme future. Cette
-matrice est essentielle pour les mesures de présence : un élu arrivé en cours
-de législature ne pouvait pas participer aux scrutins antérieurs.
+une \emph{union} d'intervalles. Pour une période encore ouverte, $b$ est
+considérée comme future. Les bornes sont closes des deux côtés : la source date
+la sortie du titulaire au jour $b$ et l'entrée de son suppléant au jour $b+1$,
+de sorte que deux périodes voisines ne se recouvrent jamais d'une journée.
+
+\paragraph{Les bornes viennent de la prise de fonction, jamais de
+\code{dateDebut}.} Le champ \code{dateDebut} de l'open data ne date pas
+l'entrée en fonction : l'Assemblée y inscrit l'ouverture de la législature pour
+tous les mandats, y compris ceux de remplaçants entrés deux ans plus tard --
+584 des 677 mandats de la 17\textsuperscript{e} législature portent la même
+valeur. La date d'entrée effective est \code{mandature/datePriseFonction}, et
+c'est elle qui borne $\mathcal{P}_i$.
+
+\paragraph{Ces deux points ont été publiés à tort.} Le site a longtemps
+reconstruit $E_{ij}$ comme un intervalle unique allant de la première entrée à
+la dernière sortie, assis sur \code{dateDebut}. Deux conséquences, toutes deux
+visibles : le trou d'un mandat interrompu était comblé, et un remplaçant était
+réputé siéger depuis le premier jour de la législature. 261\,214 couples
+député\,$\times$\,scrutin étaient déclarés éligibles à tort, 86 députés
+recevaient des absences qu'ils ne pouvaient pas commettre, et une page de
+scrutin de juin 2026 annonçait 581 députés en fonction là où l'Assemblée en
+compte 577. Le correctif et son ampleur figurent au registre des corrections du
+site.
+
+\paragraph{Un invariant, désormais vérifié avant publication.} L'article 24 de
+la Constitution plafonne l'effectif de l'Assemblée à 577 députés. Pour toute
+date de scrutin,
+\[
+ \sum_i E_{ij}\leq 577,
+\]
+et deux députés d'une même circonscription ne peuvent avoir de période commune.
+Ces deux contraintes, plus la concordance de nos totaux avec ceux publiés par
+l'Assemblée, sont contrôlées sur les 8\,434 scrutins avant la génération du
+site : un échec arrête la publication au lieu de l'assortir d'un avertissement.
+C'est le module \code{radar.controles}, et il ne vérifie pas des formules mais
+des effectifs -- aucun test de calcul n'aurait pu voir l'erreur ci-dessus, car
+un effectif faux ne contredit aucune formule.
 
 \subsection{Le parcours d'un texte, en quatre mots}
 \label{sec:parcours}
@@ -667,9 +711,12 @@ Le dénominateur et le taux sont alors
 avec une valeur manquante si $D_i=0$.
 
 Les deux retraits répondent à deux objections distinctes. Le premier ($E_{ij}$)
-écarte les scrutins antérieurs — ou postérieurs — au mandat : on ne reproche pas
-à un élu arrivé en cours de législature les votes tenus avant son arrivée. Le
-second ($R_i$) écarte les non-votes que l'institution impose. Le plancher à zéro
+écarte les scrutins antérieurs — ou postérieurs — au mandat, \emph{et ceux tenus
+pendant une interruption} : on ne reproche pas à un élu arrivé en cours de
+législature les votes tenus avant son arrivée, ni à un ancien ministre ceux
+tenus pendant que son suppléant occupait son siège (section~
+\ref{sec:eligibilite}). Le second ($R_i$) écarte les non-votes que
+l'institution impose. Le plancher à zéro
 n'a pas de rôle statistique : un non-vote structurel suppose un mandat en cours,
 donc $R_i\leq L_i$ par construction, et le \code{max} ne protège que d'une
 source incohérente.

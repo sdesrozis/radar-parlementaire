@@ -42,7 +42,7 @@ import polars as pl
 
 from . import analyze, cosign, ideal
 from .analyze import VoteCube
-from .config import EXPRESSED, STRUCTURAL_NONVOTE_CAUSES
+from .config import EXPRESSED, SIEGES, STRUCTURAL_NONVOTE_CAUSES
 from .parse import load
 
 #: Scrutins en commun exigés pour qu'un taux d'accord soit publié. En deçà, le
@@ -342,6 +342,16 @@ class Donnees:
                 "legislature": s["legislature"][0],
                 "deputes": self.deputes.height,
                 "en_exercice": int(self.deputes["en_exercice"].sum()),
+                # Le nombre de sièges, servi pour que les pages puissent
+                # l'écrire sans le coder en dur : c'est le seul chiffre du site
+                # qui ne vienne pas des données mais du droit, et il est la
+                # référence contre laquelle tout effectif publié se lit.
+                "sieges": SIEGES,
+                # Combien de mandats de la législature ont été interrompus —
+                # ministres partis puis revenus, et leurs suppléants. Le site le
+                # publie parce que c'est ce cas qui rend un dénominateur de
+                # présence incompréhensible tant qu'on ne le connaît pas.
+                "mandats_interrompus": int(self.deputes["mandat_interrompu"].sum()),
                 "scrutins": s.height,
                 "scrutins_par_portee": par_portee,
                 "votes": self.votes.height,
@@ -504,6 +514,13 @@ class Donnees:
                         "date_naissance", "age", "profession", "cat_socio_pro",
                         "uri_hatvp", "departement", "num_departement", "num_circo",
                         "region", "mandat_debut", "mandat_fin", "en_exercice",
+                        # Les périodes réelles d'occupation du siège, et non
+                        # les seules bornes extrêmes : 29 mandats de la 17ᵉ
+                        # sont interrompus, et une fiche qui écrit « députée
+                        # depuis le 8 juillet 2024 » sur un mandat troué de
+                        # treize mois se fait contredire par le premier lecteur
+                        # qui connaît la circonscription.
+                        "periodes_mandat", "interruptions", "mandat_interrompu",
                         "groupe", "groupe_libelle", "groupe_qualite",
                         "nb_groupes_legislature",
                     )
@@ -796,6 +813,19 @@ class Donnees:
         resume["exprimes"] = sum(resume[st] for st in EXPRESSED)
         resume["delegues"] = int(votes["par_delegation"].sum())
         resume["dissidents"] = int(votes["dissident"].fill_null(False).sum())
+
+        # L'effectif dont la page rend compte, et son écart aux 577 sièges.
+        # Ces trois nombres se calculent ici et non dans le générateur : une
+        # page qui déduit elle-même son effectif finit par en publier un que le
+        # relevé ne justifie pas — c'est exactement ce qui est arrivé.
+        #
+        # `vacants` est **toujours** positif ou nul : `controles.effectifs`
+        # refuse de publier au-delà de 577, et la Constitution ne connaît pas
+        # de 578ᵉ siège. Un écart tient à une vacance — décès, démission,
+        # élection annulée — entre le départ et la partielle qui le remplace.
+        resume["sieges"] = SIEGES
+        resume["concernes"] = resume["total"] - resume["hors_mandat"]
+        resume["vacants"] = SIEGES - resume["concernes"]
 
         r = s.to_dicts()[0]
         return _propre(
