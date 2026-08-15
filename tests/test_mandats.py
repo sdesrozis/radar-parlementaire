@@ -37,7 +37,7 @@ import pytest
 from radar import controles
 from radar.analyze import _eligibilite, build_cube
 from radar.config import SIEGES
-from radar.parse import MANDAT_SCHEMA, build_deputes, load
+from radar.parse import MANDAT_SCHEMA, build_deputes, load, paths
 
 
 def _scrutins(dates: list[str]) -> pl.DataFrame:
@@ -159,11 +159,27 @@ class TestBuildDeputes:
 # --------------------------------------------------------------------------
 
 
+#: Ces contrôles-ci portent sur les tables construites, pas sur un cube
+#: fabriqué : c'est leur raison d'être — ils comptent des députés réels, et
+#: c'est ainsi qu'ils ont attrapé les 581 sièges sur 577 qu'aucun test de
+#: formule ne voyait. Ils ne peuvent donc pas s'exécuter là où les tables
+#: n'existent pas : un clone frais, une archive du code, et la CI, qui ne
+#: télécharge jamais les 1,7 Go de l'open data.
+#:
+#: Ils **sautent** alors, ils n'échouent pas. La distinction est la même que
+#: pour la note méthodologique : une donnée absente n'est pas une donnée
+#: fausse, et transformer son absence en échec rend la CI rouge en permanence
+#: — c'est-à-dire illisible le jour où elle rougit pour une vraie raison.
+SANS_TABLES = not (paths().tables / "deputes.parquet").exists()
+MOTIF = "tables non construites dans cette copie (`radar build`)"
+
+
 @pytest.fixture(scope="module")
 def cube():
     return build_cube(en_exercice_seulement=False)
 
 
+@pytest.mark.skipif(SANS_TABLES, reason=MOTIF)
 class TestDonneesReelles:
     def test_aucune_anomalie(self, cube):
         # Le test qui aurait attrapé le défaut, et qu'aucun test de formule ne
@@ -199,6 +215,7 @@ class TestDonneesReelles:
         assert int(positions.max()) <= 1
 
 
+@pytest.mark.skipif(SANS_TABLES, reason=MOTIF)
 class TestLeGardeFouMord:
     """L'ancien calcul, réinjecté, doit faire échouer les contrôles.
 
