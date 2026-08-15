@@ -137,7 +137,7 @@ CORRECTIONS = ICI / "corrections.toml"
 # puisse pas laisser une page en arrière.
 EDITEUR = "Sylvain Desroziers"
 EDITEUR_BIB = "Desroziers, Sylvain"
-CONTACT = "contact@radar-parlementaire.fr"
+CONTACT = "sylvain.desroziers@protonmail.com"
 DEPOT = "https://github.com/sdesrozis/radar-parlementaire"
 DEPOT_COURT = "github.com/sdesrozis/radar-parlementaire"
 

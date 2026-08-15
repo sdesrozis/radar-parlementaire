@@ -43,7 +43,7 @@ pas diverger — il n'existe pas de chiffre qui vienne d'ailleurs.
 
 **Un chiffre vous paraît faux ?** C'est l'usage attendu de ce dépôt. Ouvrez une
 [issue](https://github.com/sdesrozis/radar-parlementaire/issues) ou écrivez à
-`contact@radar-parlementaire.fr` : toute contestation reçoit une réponse, et si
+`sylvain.desroziers@protonmail.com` : toute contestation reçoit une réponse, et si
 elle est fondée, une entrée au registre des corrections. La note méthodologique
 existe précisément pour que la discussion porte sur la méthode plutôt que sur la
 conclusion — c'est-à-dire pour qu'elle puisse être tranchée. En cas de

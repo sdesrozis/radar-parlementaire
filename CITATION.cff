@@ -27,7 +27,7 @@ type: software
 authors:
   - family-names: Desroziers
     given-names: Sylvain
-    email: contact@radar-parlementaire.fr
+    email: sylvain.desroziers@protonmail.com
 version: 0.1.0
 license: AGPL-3.0-or-later
 repository-code: https://github.com/sdesrozis/radar-parlementaire
