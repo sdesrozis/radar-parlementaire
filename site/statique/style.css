@@ -690,6 +690,40 @@ h1 {
 .pied p, .pied li { font-size: 14.5px; color: var(--encre-2); margin: 0 0 7px; line-height: 1.6; }
 .pied ul { list-style: none; padding: 0; margin: 0; }
 
+/* ── deux pictogrammes, dans la colonne « Le projet » ───────────────────────
+   Le code et l'adresse de contact sont les deux endroits où le lecteur sort du
+   site pour vérifier ou pour contester : ils se repèrent d'un coup d'œil dans
+   une liste de cinq lignes.
+   Le tracé est un masque appliqué à `currentColor`, pas une image : il suit
+   l'encre du pied dans les deux thèmes sans deuxième fichier — et il est écrit
+   une fois dans cette feuille, pas dans chacune des 581 pages.
+   Les deux marques viennent d'Octicons (MIT), même grille de 16 px : deux
+   pictogrammes d'origines différentes n'auraient pas la même graisse optique
+   côte à côte. La marque GitHub ne désigne ici que GitHub — l'hébergeur du
+   dépôt —, et c'est le seul emploi qu'on en fait.
+   C'est la seule paire pleine du site : les pictogrammes de la barre mobile
+   sont des tracés à 1,8 px. La marque GitHub est pleine par nature, on ne la
+   redessine pas en filaire ; l'enveloppe la suit donc, parce que ces deux-là
+   se lisent l'une sous l'autre et qu'un filaire à côté d'un plein, à 15 px,
+   se voit comme un défaut d'impression.
+   Sans `mask`, le fond plein s'afficherait en carré : la garde `@supports`
+   laisse alors les deux lignes en texte seul, qui se suffisent. */
+@supports ((mask-image: none) or (-webkit-mask-image: none)) {
+  .pied .pictogramme {
+    display: inline-block; width: 15px; height: 15px;
+    vertical-align: -2.5px; margin-right: 7px;
+    background: currentColor;
+  }
+  .pied .pictogramme.code {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27s-1.36.09-2 .27c-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27s-1.36.09-2 .27c-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .pied .pictogramme.courriel {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+}
+
 .filet-fin { height: 1px; background: var(--trait); }
 
 .saut { height: 0; }

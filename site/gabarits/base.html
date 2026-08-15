@@ -163,8 +163,13 @@
         <li><a href="mentions.html">Qui édite ce site</a></li>
         <li><a href="corrections.html">Registre des corrections</a></li>
         <li><a href="methode.html">Méthode et note méthodologique</a></li>
-        <li><a href="{{DEPOT}}">Code source</a> (AGPL-3.0)</li>
-        <li><a href="mailto:{{CONTACT}}">{{CONTACT}}</a></li>
+        <!-- Le pictogramme est posé hors du lien : dedans, il passerait sous le
+             soulignement. Son tracé est dans la feuille de style et non ici —
+             écrit dans le gabarit, il serait recopié 1160 fois. -->
+        <li><span class="pictogramme code" aria-hidden="true"></span><a
+            href="{{DEPOT}}">Code source</a> (AGPL-3.0)</li>
+        <li><span class="pictogramme courriel" aria-hidden="true"></span><a
+            href="mailto:{{CONTACT}}">{{CONTACT}}</a></li>
       </ul>
     </div>
   </div>
