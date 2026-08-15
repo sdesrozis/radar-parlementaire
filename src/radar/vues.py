@@ -127,6 +127,40 @@ SORTS_AMENDEMENT: dict[str, str] = {
 #: voter (ministre, perchoir), et n'être pas encore élu.
 STATUTS_VOTE = ("pour", "contre", "abstention", "absent", "empeche", "hors_mandat")
 
+#: Le site de l'Assemblée, où mène toute pièce justificative.
+#:
+#: Ce n'est pas `data.assemblee-nationale.fr` — celui-là sert les archives dont
+#: le projet tire ses tables, et un lecteur n'y trouverait qu'un zip. Un lien
+#: qui prétend prouver doit atterrir sur la page que le lecteur peut lire.
+AN = "https://www.assemblee-nationale.fr"
+
+
+def lien_scrutin(legislature: str | int, numero: int | None) -> str | None:
+    """L'adresse de l'analyse d'un scrutin sur le site de l'Assemblée.
+
+    Elle se construit à partir du numéro de scrutin, que la source publie sur
+    les 8 434 lignes. C'est donc le seul lien que le site peut garantir pour
+    tout scrutin, et c'est pour cela qu'il porte la preuve : le dossier
+    législatif, lui, manque avant mars 2026. Cf. `lien_dossier`.
+    """
+    if numero is None:
+        return None
+    return f"{AN}/dyn/{legislature}/scrutins/{numero}"
+
+
+def lien_dossier(legislature: str | int, dossier_uid: str | None) -> str | None:
+    """L'adresse du dossier législatif — le texte dont le scrutin est un épisode.
+
+    Rend `None` quand la source ne le renseigne pas, ce qui est le cas de tous
+    les scrutins antérieurs à mars 2026. **Ce `None` doit rester visible** : une
+    page qui masquerait l'absence de lien laisserait croire que ces scrutins ne
+    se rattachent à aucune loi, alors que c'est la source qui ne le dit pas.
+    """
+    if not dossier_uid:
+        return None
+    return f"{AN}/dyn/{legislature}/dossiers/{dossier_uid}"
+
+
 #: Types d'organes retenus pour la fiche, du plus au moins parlant.
 TYPES_ORGANES = {
     "COMPER": "Commission permanente",
@@ -239,7 +273,15 @@ class Donnees:
 
         journal("amendements")
         amendements = _amendements()
+        par_dossier = _amendements_par_dossier()
         reseau = _reseau_cosignatures() if amendements is not None else None
+
+        # Chaque scrutin porte le compte d'amendements de **son dossier**, pas
+        # le sien : un scrutin n'a pas d'amendements, une loi en a. Le nom des
+        # colonnes le dit, et la page qui les affiche doit le redire.
+        scrutins = cube.scrutins.drop("j")
+        if par_dossier is not None:
+            scrutins = scrutins.join(par_dossier, on="dossier_uid", how="left")
 
         deputes = (
             cube.deputes.drop("i")
@@ -260,7 +302,7 @@ class Donnees:
             cube=cube,
             cube_texte=cube_texte,
             deputes=deputes,
-            scrutins=cube.scrutins.drop("j"),
+            scrutins=scrutins,
             groupes=pl.DataFrame(),
             votes=load("votes"),
             positions_groupe=load("positions_groupe"),
@@ -321,9 +363,69 @@ class Donnees:
                 "delegation": {
                     "tous": self._part_delegation(s),
                     "engageants": self._part_delegation(self.cube_texte.scrutins),
+                    "solennels": self._part_delegation(
+                        s.filter(pl.col("type_vote_code") == "SPS")),
                 },
+                "solennels": self._solennels_apercu(),
+                "dossiers": self._dossiers_apercu(),
             }
         )
+
+    def _solennels_apercu(self) -> dict:
+        """Combien de scrutins solennels, sur combien de mois, et leur recoupement.
+
+        Ces trois nombres existent pour être écrits ensemble. Le premier seul
+        (« 72 scrutins solennels ») se lit comme une abondance ; rapporté à la
+        durée, il devient 3,4 par mois, et le poids d'une seule absence saute
+        aux yeux. Le troisième dit que cette assiette n'est pas une part des
+        autres mais un recoupement : on ne peut ni l'ajouter ni la soustraire.
+        """
+        s = self.scrutins
+        sol = s.filter(pl.col("type_vote_code") == "SPS")
+        debut, fin = s["date_d"].min(), s["date_d"].max()
+        mois = max(round((fin - debut).days / 30.44), 1)
+        return {
+            "total": sol.height,
+            "mois": mois,
+            "par_mois": sol.height / mois,
+            # Ce qu'une absence coûte en points de présence, sur l'assiette
+            # solennelle et sur celle des votes qui engagent. Les quatre
+            # nombres sont servis parce que c'est leur *rapport* qui porte la
+            # démonstration, et qu'aucun gabarit ne doit avoir à le calculer :
+            # une division dans un gabarit est un chiffre écrit à la main qui
+            # s'ignore, et il diverge le jour où l'assiette change.
+            "poids_d_une_absence": 1 / sol.height if sol.height else None,
+            "poids_de_dix_absences": 10 / sol.height if sol.height else None,
+            "poids_engageant": (
+                1 / self.cube_texte.n_scrutins if self.cube_texte.n_scrutins else None
+            ),
+            "poids_engageant_dix": (
+                10 / self.cube_texte.n_scrutins if self.cube_texte.n_scrutins else None
+            ),
+            "engageants": sol.filter(pl.col("portee") == "texte").height,
+            "hors_engageants": sol.filter(pl.col("portee") != "texte").height,
+        }
+
+    def _dossiers_apercu(self) -> dict:
+        """Ce que la source dit du texte de loi derrière chaque scrutin.
+
+        L'Assemblée ne remplit `dossierLegislatif` que depuis mars 2026. La
+        lacune n'est donc pas dispersée : elle est un avant et un après, et
+        c'est ainsi qu'elle se dit. Un scrutin sans dossier n'est pas un
+        scrutin sans loi — c'est un scrutin dont la source tait la loi.
+        """
+        s = self.scrutins
+        avec = s.filter(pl.col("dossier_uid").is_not_null())
+        return {
+            "scrutins_avec": avec.height,
+            "scrutins_sans": s.height - avec.height,
+            "distincts": avec["dossier_uid"].n_unique(),
+            "depuis": _depuis_quand_complet(s, "dossier_uid"),
+            "engageants_avec": avec.filter(pl.col("portee") == "texte").height,
+            "engageants_sans": s.filter(
+                (pl.col("portee") == "texte") & pl.col("dossier_uid").is_null()
+            ).height,
+        }
 
     def _part_delegation(self, scrutins: pl.DataFrame) -> dict:
         """Part des suffrages émis par délégation, sur une assiette de scrutins.
@@ -425,9 +527,17 @@ class Donnees:
                         # les numérateurs ci-dessus, servis à part pour être dits.
                         "votes_delegues", "part_delegation",
                         "engageants_delegues", "part_delegation_engageants",
+                        # Les scrutins solennels, servis parce qu'ils sont ce
+                        # que le public appelle « les grands votes » — et avec
+                        # leur dénominateur, qui est précisément ce qui les
+                        # disqualifie comme mesure d'activité. Cf. `_solennels`.
+                        "votes_solennels", "solennels_eligibles",
+                        "solennels_votables", "participation_solennels",
+                        "solennels_delegues", "part_delegation_solennels",
                     )
                 },
                 "bilan": _bilan(r),
+                "solennels": _solennels(r),
                 "position": {
                     "axe1": r["axe1"],
                     "borne_basse": r["borne_basse"],
@@ -612,7 +722,18 @@ class Donnees:
         )
 
     def scrutin(self, uid: str) -> dict:
-        """Le détail d'un scrutin : résultat, position de chaque groupe, dissidents."""
+        """Le détail d'un scrutin : résultat, position de chaque groupe, relevé nominatif.
+
+        **Le relevé part des députés, jamais des lignes de vote.** Un député
+        absent n'a pas de ligne dans la table des votes : une liste construite
+        à partir d'elle afficherait 480 noms sur 577 et tairait exactement ce
+        qu'un lecteur vient chercher — qui n'était pas là. C'est le même piège,
+        et la même parade, que dans `votes_engageants`.
+
+        Le statut vaut cinq valeurs, par `_statut_vote` : les trois suffrages,
+        l'empêchement (ministre, perchoir) et l'absence, plus le hors-mandat
+        pour qui n'était pas encore élu ou ne l'était plus ce jour-là.
+        """
         s = self.scrutins.filter(pl.col("scrutin_uid") == uid)
         if s.is_empty():
             raise KeyError(uid)
@@ -631,12 +752,19 @@ class Donnees:
             .sort("votants_groupe", descending=True)
         )
 
+        # La colonne du cube qui porte ce scrutin : elle donne, pour chacun des
+        # 648 députés, si son mandat courait ce jour-là.
+        j = self.cube.scrutins.filter(pl.col("scrutin_uid") == uid)["j"][0]
+        eligible = self.cube.eligible[:, j]
+
         votes = (
-            self.votes.filter(pl.col("scrutin_uid") == uid)
+            self.cube.deputes.select("acteur_uid", "nom_complet", "groupe", "en_exercice")
+            .with_columns(eligible=pl.Series("eligible", eligible))
             .join(
-                self.deputes.select("acteur_uid", "nom_complet", "groupe"),
+                self.votes.filter(pl.col("scrutin_uid") == uid).select(
+                    "acteur_uid", "groupe_uid", "position", "par_delegation", "cause"),
                 on="acteur_uid",
-                how="inner",
+                how="left",
             )
             .join(
                 groupes.select("groupe_uid", "majoritaire", "part_majoritaire"),
@@ -650,20 +778,97 @@ class Donnees:
                     & pl.col("position").is_in(list(EXPRESSED))
                 )
                 .then(pl.col("position") != pl.col("majoritaire"))
-                .otherwise(None)
+                .otherwise(None),
+                statut=_statut_vote(),
+                par_delegation=pl.col("par_delegation").fill_null(False),
             )
-            .select("acteur_uid", "nom_complet", "groupe", "position", "dissident",
-                    "par_delegation", "cause")
+            .select("acteur_uid", "nom_complet", "groupe", "position", "statut",
+                    "dissident", "par_delegation", "cause", "en_exercice")
             .sort("nom_complet")
         )
 
+        # Le résumé du relevé, et donc les effectifs des boutons de filtre. Il
+        # est calculé sur les lignes affichées, ce qui garantit qu'un bouton
+        # « 41 absents » découvre bien 41 lignes : deux comptes séparés
+        # divergeraient au premier changement de définition.
+        resume = {st: int((votes["statut"] == st).sum()) for st in STATUTS_VOTE}
+        resume["total"] = votes.height
+        resume["exprimes"] = sum(resume[st] for st in EXPRESSED)
+        resume["delegues"] = int(votes["par_delegation"].sum())
+        resume["dissidents"] = int(votes["dissident"].fill_null(False).sum())
+
+        r = s.to_dicts()[0]
         return _propre(
             {
-                "scrutin": s.to_dicts()[0],
+                "scrutin": r,
+                "liens": self._liens_scrutin(r),
                 "groupes": lignes(groupes.drop("scrutin_uid")),
+                "resume": resume,
                 "votes": lignes(votes),
             }
         )
+
+    def _liens_scrutin(self, r: dict) -> dict:
+        """Les pièces justificatives d'un scrutin, et ce qui manque à l'appel.
+
+        Deux liens, et ils ne se valent pas. Celui du scrutin existe toujours :
+        il se construit sur le numéro, que la source publie sur les 8 434
+        lignes, et il mène à l'analyse nominative de l'Assemblée — c'est-à-dire
+        à la pièce contre laquelle nos chiffres se vérifient.
+
+        Celui du dossier — la loi — manque avant mars 2026. Il est servi à
+        `None`, et la page a l'obligation de le dire : « la source ne rattache
+        pas ce scrutin à un dossier » n'est pas la même phrase que « ce scrutin
+        ne porte sur aucun texte », et c'est la seconde qu'un lien simplement
+        absent laisserait comprendre.
+        """
+        return {
+            "scrutin": lien_scrutin(r.get("legislature"), r.get("numero")),
+            "dossier": lien_dossier(r.get("legislature"), r.get("dossier_uid")),
+            "dossier_titre": r.get("dossier_titre"),
+            # Le compte est celui de la loi entière, pas de ce vote. Le nom de
+            # la clé le dit pour que la page ne puisse pas l'oublier.
+            "amendements_du_dossier": r.get("amendements"),
+            "amendements_adoptes": r.get("amendements_adoptes"),
+            "amendements_examines": r.get("amendements_examines"),
+        }
+
+    def index_votes(self) -> list[dict]:
+        """Les votes qui engagent, un par ligne, prêts pour l'onglet « Les votes ».
+
+        L'assiette est celle que le site mesure partout ailleurs : les scrutins
+        de portée « texte » — vote sur l'ensemble d'un texte, ou motion de
+        censure. C'est **le miroir de l'annuaire** : l'annuaire liste les
+        députés que les fiches détaillent, celui-ci liste les votes que les
+        pages de scrutin détaillent. Servir ici les 8 434 scrutins donnerait un
+        index de plusieurs mégaoctets dont 86 % de votes d'amendement, et une
+        liste où l'on ne trouverait plus les lois.
+
+        Comme pour l'annuaire, tout ce qui est affiché est **mis en forme ici**
+        et non dans le navigateur : le JavaScript de la recherche ne fabrique
+        ni pourcentage ni compte, et n'a pas à savoir qu'un dossier absent
+        n'est pas un dossier vide.
+        """
+        s = self.scrutins.filter(pl.col("portee") == "texte").sort(
+            "date_d", "numero", descending=[True, True]
+        )
+        return _propre([
+            {
+                "uid": r["scrutin_uid"],
+                "numero": r["numero"],
+                "date": r["date"],
+                "titre": r["titre"],
+                "categorie": r["categorie"],
+                "solennel": r["type_vote_code"] == "SPS",
+                "adopte": (r["sort_code"] or "").lower().startswith("adopt"),
+                "sort_libelle": r["sort_libelle"],
+                "n_pour": r["n_pour"],
+                "n_contre": r["n_contre"],
+                "n_abstention": r["n_abstention"],
+                "liens": self._liens_scrutin(r),
+            }
+            for r in s.to_dicts()
+        ])
 
     def liste_groupes(self) -> list[dict]:
         return lignes(self.groupes)
@@ -1131,6 +1336,51 @@ def _bilan(r: dict) -> list[dict]:
     return lignes
 
 
+def _solennels(r: dict) -> dict:
+    """L'assiette des scrutins solennels — et de quoi la relativiser.
+
+    Les scrutins solennels sont annoncés à l'avance par la présidence, et les
+    groupes y appellent leurs députés à voter en personne. C'est l'assiette que
+    tout le monde a en tête en disant « les grands votes », et c'est la seule
+    des trois sur laquelle une présence ne veut à peu près rien dire.
+
+    **Pourquoi elle ne mesure pas une activité.** Il y en a 72 en 21 mois, soit
+    3,4 par mois. Un seul scrutin manqué retire 1,4 point de présence ; dix
+    manqués en retirent 14. Sur les 245 votes qui engagent, dix absences en
+    retirent 4. Le même député, sur le même comportement, change de portrait
+    selon l'assiette — et l'assiette la plus étroite est celle qui produit
+    l'écart le plus spectaculaire, donc la plus citable et la moins solide.
+    Un accident de train, une hospitalisation, une naissance : trois semaines
+    d'absence tombent sur deux ou trois solennels, et sur trente scrutins qui
+    engagent. C'est pourquoi la présence publiée en tête de fiche se calcule
+    sur les 245, et pourquoi ce bloc-ci porte son dénominateur en toutes
+    lettres au lieu d'un pourcentage seul.
+
+    **Elle recoupe les autres, elle ne s'y ajoute pas.** 65 des 72 solennels
+    sont de portée « texte » et sont donc déjà comptés dans les votes qui
+    engagent ; les 7 restants sont ailleurs. Aucune addition ni soustraction
+    n'est possible entre cette ligne et les trois de `_bilan`, et rien de ce
+    qui l'affiche ne doit suggérer le contraire.
+
+    La délégation est servie ici comme partout : ces scrutins sont ceux où l'on
+    est censé venir en personne, et c'est justement là que la part de suffrages
+    émis par un collègue mandaté se lit le plus.
+    """
+    votables = r.get("solennels_votables") or 0
+    exprimes = r.get("votes_solennels") or 0
+    # Un député dont la source ne publie aucun suffrage n'a pas une présence de
+    # zéro, ici comme ailleurs : il a une présence inconnue.
+    muet = not (r.get("votes_exprimes") or 0)
+    return {
+        "exprimes": exprimes,
+        "votables": votables,
+        "eligibles": r.get("solennels_eligibles") or 0,
+        "delegues": r.get("solennels_delegues") or 0,
+        "taux": None if (muet or not votables) else r.get("participation_solennels"),
+        "part_delegation": r.get("part_delegation_solennels"),
+    }
+
+
 def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
     """Participation, répartition des positions, dissidence — une ligne par député.
 
@@ -1192,21 +1442,44 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
         pl.col("participation").alias("participation_engageants"),
     )
 
-    # Les suffrages émis par délégation, sur les deux mêmes assiettes. Ils sont
+    # La troisième assiette : les scrutins solennels, ceux que la présidence
+    # annonce à l'avance et que les groupes appellent leurs députés à venir
+    # voter en personne. C'est l'assiette que le public croit spontanément
+    # décisive, et c'est la plus fragile des trois : 72 scrutins en 21 mois.
+    #
+    # Elle **recoupe** les votes qui engagent, elle ne s'y ajoute pas : 65 des
+    # 72 solennels sont de portée « texte ». Aucune soustraction n'est donc
+    # possible entre elle et les autres, et rien de ce qui la sert ne doit
+    # laisser croire qu'on peut additionner les trois. Cf. `_bilan`, qui garde
+    # sa partition à trois lignes, et `_solennels`, qui sert celle-ci à part.
+    cube_solennel = analyze.build_cube(types_vote=["SPS"], en_exercice_seulement=False)
+    solennel = analyze.participation(cube_solennel).select(
+        "acteur_uid",
+        pl.col("votes_exprimes").alias("votes_solennels"),
+        pl.col("scrutins_eligibles").alias("solennels_eligibles"),
+        pl.col("denominateur").alias("solennels_votables"),
+        pl.col("participation").alias("participation_solennels"),
+    )
+
+    # Les suffrages émis par délégation, sur les trois mêmes assiettes. Ils sont
     # déjà comptés dans les numérateurs de présence — c'est le droit — et sont
     # servis à part pour que la fiche puisse dire ce que « présence » recouvre.
     delegation = _delegation(cube.scrutins, "votes")
     delegation_texte = _delegation(cube_texte.scrutins, "engageants")
+    delegation_solennel = _delegation(cube_solennel.scrutins, "solennels")
 
     return (
         part.join(diss, on="acteur_uid", how="left")
         .join(repartition, on="acteur_uid", how="left")
         .join(engagement, on="acteur_uid", how="left")
+        .join(solennel, on="acteur_uid", how="left")
         .join(delegation, on="acteur_uid", how="left")
         .join(delegation_texte, on="acteur_uid", how="left")
+        .join(delegation_solennel, on="acteur_uid", how="left")
         .with_columns(
             pl.col("votes_delegues").fill_null(0),
             pl.col("engageants_delegues").fill_null(0),
+            pl.col("solennels_delegues").fill_null(0),
             # Le taux est-il assez assis pour servir de repère aux autres ?
             # Cf. `MIN_VOTABLES` : en deçà, il reste publié mais sort de la
             # médiane, du maximum, des rangs et de la bande.
@@ -1225,6 +1498,10 @@ def _statistiques_deputes(cube: VoteCube) -> pl.DataFrame:
             .then(pl.col("engageants_delegues") / pl.col("votes_engageants"))
             .otherwise(None)
             .alias("part_delegation_engageants"),
+            pl.when(pl.col("votes_solennels") > 0)
+            .then(pl.col("solennels_delegues") / pl.col("votes_solennels"))
+            .otherwise(None)
+            .alias("part_delegation_solennels"),
         )
         # Un député sans aucun suffrage exprimé produit un NaN, que les moyennes
         # de groupe propageraient : c'est une absence de mesure, donc un `null`.
@@ -1289,6 +1566,59 @@ def _amendements() -> pl.DataFrame | None:
         .rename({"len": "cosignes"})
     )
     return deposes.join(cosignes, on="acteur_uid", how="full", coalesce=True)
+
+
+def _depuis_quand_complet(scrutins: pl.DataFrame, colonne: str) -> str | None:
+    """La date à partir de laquelle la source renseigne `colonne` sans exception.
+
+    Le premier scrutin renseigné ne répond pas à la question. Pour
+    `dossier_uid`, il date d'avril 2025 et il est isolé : dire « renseigné
+    depuis avril 2025 » ferait promettre au lecteur un rattachement que les
+    onze mois suivants n'ont pas. Ce qu'il veut savoir, c'est à partir de quand
+    il peut s'y fier — donc la date après laquelle plus rien ne manque.
+
+    `None` si la colonne manque encore sur le dernier scrutin : la source n'a
+    alors aucune date de bascule à annoncer.
+    """
+    s = scrutins.sort("date_d")
+    manquants = s.filter(pl.col(colonne).is_null())
+    if manquants.is_empty():
+        return s["date"].min()
+    apres = s.filter(pl.col("date_d") > manquants["date_d"].max())
+    return None if apres.is_empty() else apres["date"].min()
+
+
+def _amendements_par_dossier() -> pl.DataFrame | None:
+    """Combien d'amendements chaque loi a reçus, et ce qu'ils sont devenus.
+
+    C'est le chiffre qui dit le travail parlementaire qu'un vote solde. Deux
+    lois adoptées le même jour par le même score n'ont pas la même histoire si
+    l'une a été amendée neuf mille fois et l'autre douze.
+
+    **Le compte est celui du dossier, pas du scrutin.** Un amendement ne se
+    rattache à aucun scrutin en particulier : il porte sur un texte, et le
+    texte appartient à un dossier. Écrire « N amendements » à côté d'un scrutin
+    sans le dire ferait croire que ces N amendements ont été mis aux voix ce
+    jour-là, alors que l'immense majorité n'a jamais été appelée.
+
+    `None` si la table des amendements n'a pas été construite — le site tourne
+    sans elle, et alors il n'annonce rien plutôt qu'un zéro.
+    """
+    try:
+        amd = load("amendements")
+    except FileNotFoundError:
+        return None
+    if "dossier_uid" not in amd.columns:
+        return None
+    return (
+        amd.filter(pl.col("dossier_uid").is_not_null())
+        .group_by("dossier_uid")
+        .agg(
+            pl.len().alias("amendements"),
+            (pl.col("sort") == "Adopté").sum().alias("amendements_adoptes"),
+            analyze.EXAMINE.sum().alias("amendements_examines"),
+        )
+    )
 
 
 def _reseau_cosignatures() -> "cosign.ReseauCosignatures | None":

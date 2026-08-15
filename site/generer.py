@@ -58,11 +58,17 @@ from redaction import (
     phrase_ecart,
     phrase_ecart_groupe,
     phrase_incertitude,
+    phrase_delegation_scrutin,
+    phrase_groupes_scrutin,
     phrase_journal,
+    phrase_loi,
     phrase_participation,
     phrase_portee,
     phrase_position,
+    phrase_releve,
+    phrase_sort,
     phrase_these,
+    pluriel,
     provenance_amendements,
     provenance_delegation,
     reserve_denominateur,
@@ -89,6 +95,39 @@ def slug(*morceaux: str | int | None) -> str:
 # et rendu de travers en chasse fixe ; un `<sup>` se détache de son « n » dans
 # une ligne à fort interlettrage. Le caractère dédié règle les deux.
 ORDINAL_MASC = "º"
+
+
+def numero_scrutin(n: int | str) -> str:
+    """Le numéro d'un scrutin, sans séparateur de milliers.
+
+    `num()` compose les nombres à la française — « 8 434 » — et c'est juste
+    pour une quantité. Un numéro de scrutin n'en est pas une : c'est un
+    identifiant, l'Assemblée l'écrit « scrutin n° 8434 », et c'est sous cette
+    forme qu'on le recopie depuis un compte rendu. Il est de surcroît l'adresse
+    de la page — `scrutin-8434.html` — et les afficher différemment invitait à
+    douter que ce soit le même.
+    """
+    return str(n)
+
+#: Les catégories de scrutin, dites en français plutôt qu'en identifiant.
+#: `radar.parse.CATEGORIES` les nomme pour le code ; ici on les nomme pour un
+#: lecteur. Les deux listes doivent rester alignées — une catégorie ajoutée là
+#: sans être traduite ici s'afficherait telle quelle, en minuscules et sans
+#: accent, au milieu d'une phrase.
+#: Les jetons que `page()` remplit elle-même, après ceux de la page. Une page
+#: qui en propose un du même nom le voit écrasé en silence — d'où la garde.
+RESERVES = ("TITRE", "DESCRIPTION", "CANONIQUE", "NAV_ACCUEIL", "NAV_DEPUTES",
+            "NAV_VOTES", "NAV_CARTE", "NAV_METHODE")
+
+CATEGORIES_DITES = {
+    "ensemble": "vote sur l'ensemble d'un texte",
+    "motion_censure": "motion de censure",
+    "motion_procedure": "motion de procédure",
+    "article": "vote sur un article",
+    "amendement": "vote sur un amendement",
+    "declaration": "déclaration du gouvernement",
+    "autre": "scrutin public",
+}
 
 ICI = Path(__file__).parent
 GABARITS = ICI / "gabarits"
@@ -228,6 +267,13 @@ def journal_html(votes: list[dict]) -> str:
     Ce n'est pas de la coquetterie : la liste pèse 245 lignes sur chacune des
     577 fiches, et chaque attribut économisé vaut une centaine de kilo-octets
     à l'échelle du site.
+
+    **Chaque titre mène à la page du scrutin.** Le relevé disait « il a voté
+    contre » sans qu'on puisse voir contre quoi d'autre, ni qui d'autre : le
+    lecteur qui voulait vérifier un vote devait sortir du site. Le lien est
+    posé sur le titre, et sur lui seul — l'ajouter aussi sur le numéro de
+    scrutin en dessous ferait deux liens vers la même page sur chacune des
+    141 365 lignes du site, et un lecteur d'écran les annoncerait deux fois.
     """
     libelles = dict(STATUTS)
     lignes = []
@@ -244,8 +290,8 @@ def journal_html(votes: list[dict]) -> str:
         lignes.append(
             f'<li class="{" ".join(classes)}">'
             f'<time datetime="{v["date"]}">{jour(v["date"])}</time>'
-            f'<p>{echapper(v["titre"])}'
-            f'<small>Scrutin n{ORDINAL_MASC}&nbsp;{num(v["numero"])}'
+            f'<p><a href="{adresse_scrutin(v)}">{echapper(v["titre"])}</a>'
+            f'<small>Scrutin n{ORDINAL_MASC}&nbsp;{numero_scrutin(v["numero"])}'
             f' · {echapper(resultat)} par {num(v["n_pour"])} voix contre '
             f'{num(v["n_contre"])}{"".join(marques)}</small></p>'
             f'<b>{libelles[v["statut"]]}</b>'
@@ -290,6 +336,195 @@ def bilan_html(bilan: list[dict]) -> str:
             f"</tr>"
         )
     return "\n          ".join(lignes)
+
+
+def solennels_html(sol: dict, apercu: dict) -> str:
+    """La ligne des scrutins solennels, sous le trait des trois assiettes.
+
+    Elle est **sous un trait** et non dans la suite du tableau, parce qu'elle
+    n'est pas une quatrième assiette : les scrutins solennels recoupent les
+    votes qui engagent au lieu de s'y ajouter. Une quatrième ligne alignée sur
+    les trois autres serait lue comme une part du total, et le lecteur ferait
+    l'addition que le tableau lui aurait tendue.
+
+    Cf. `vues._solennels`, qui porte la définition, et le repli qui suit dans
+    le gabarit, qui porte l'arithmétique.
+    """
+    s = apercu["solennels"]
+    taux = f"{pct(sol['taux'])}{NBSP}%" if sol["taux"] is not None else "—"
+    return (
+        '<tr class="recoupe">'
+        "<td><b>Dont scrutins solennels</b>"
+        f'<span class="plein">{num(s["engageants"])} de ces {num(s["total"])} '
+        "scrutins sont déjà comptés ligne 1</span></td>"
+        f'<td class="mono">{num(sol["votables"])}</td>'
+        f'<td class="mono">{num(sol["exprimes"])}</td>'
+        f'<td class="mono">{num(sol["delegues"])}</td>'
+        f'<td class="mono">{taux}</td>'
+        "</tr>"
+    )
+
+
+def adresse_scrutin(v: dict) -> str:
+    """`scrutin-8434.html`.
+
+    Le numéro et rien d'autre, contrairement aux fiches de députés qui portent
+    un nom lisible. Ce n'est pas une inconséquence : le numéro de scrutin **est**
+    la façon dont l'Assemblée cite ses propres votes, celle qu'on recopie depuis
+    un compte rendu ou un article de presse, et elle est stable. Un slug tiré du
+    titre — « l-ensemble-de-la-proposition-de-loi-visant-a-… » — ferait des
+    adresses de deux cents caractères qui changeraient au moindre changement de
+    formulation de la source.
+    """
+    return f"scrutin-{v['numero']}.html"
+
+
+def titre_scrutin(titre: str) -> str:
+    """Le titre d'un scrutin, composé comme un titre et non comme une phrase.
+
+    La source publie une phrase minuscule et ponctuée — « l'ensemble de la
+    proposition de loi visant à… ». Elle est parfaite en ligne de relevé, où
+    elle est effectivement une phrase, et fautive en titre : une capitale
+    manque, et le point final traîne sous un `h1` ou derrière les points de
+    suspension d'un titre tronqué à trois lignes, ce qui donne « …. ».
+
+    Le texte n'est pas résumé pour autant. Il désigne le texte **tel qu'il
+    ressort des débats**, amendements compris, et le raccourcir reviendrait à
+    publier notre résumé sous l'autorité de la source.
+    """
+    t = (titre or "").strip()
+    if not t:
+        return ""
+    return (t[0].upper() + t[1:]).rstrip(".")
+
+
+def index_votes_html(votes: list[dict]) -> str:
+    """L'index des votes qui engagent, par année, en HTML nu.
+
+    Même rôle que l'index des députés par département : la recherche au-dessus
+    fabrique ses résultats en JavaScript, donc elle n'existe pas pour un lecteur
+    sans script, pour un lecteur d'écran qui parcourt les liens, ni pour un
+    moteur. Sans cet index, les 245 pages de vote ne seraient atteignables que
+    par le plan du site.
+
+    Il ne filtre rien et ne calcule rien. Il n'affiche que ce qui identifie un
+    vote — la date, le titre, le sort — et surtout pas les comptes de voix : ce
+    serait refaire la liste du dessus, en moins bien.
+    """
+    annees: dict[str, list[dict]] = {}
+    for v in votes:
+        annees.setdefault(v["date"][:4], []).append(v)
+
+    blocs = []
+    for annee, groupe in sorted(annees.items(), reverse=True):
+        lignes = "\n        ".join(
+            f'<li><a href="{adresse_scrutin(v)}">'
+            f'<time datetime="{v["date"]}">{jour(v["date"])}</time>'
+            f'{echapper(titre_scrutin(v["titre"]))}</a></li>'
+            for v in groupe
+        )
+        blocs.append(
+            f'<div class="index-annee"><h3>{annee}<span class="mono">'
+            f'{num(len(groupe))} vote{pluriel(len(groupe))}</span></h3>'
+            f"<ul>\n        {lignes}\n      </ul></div>"
+        )
+    return "\n      ".join(blocs)
+
+
+def votes_json(votes: list[dict]) -> str:
+    """L'index servi à la recherche des votes.
+
+    Les clés sont courtes parce qu'elles sont répétées 245 fois, et les valeurs
+    sont **déjà mises en forme** : la date en français, les comptes avec leur
+    espace insécable. Le JavaScript n'en fabrique aucune — c'est la même règle
+    que pour l'annuaire, et pour la même raison : deux mises en forme du même
+    nombre finissent par ne plus dire la même chose.
+    """
+    index = [{
+        "u": adresse_scrutin(v),
+        "n": str(v["numero"]),
+        "d": jour(v["date"]),
+        "t": titre_scrutin(v["titre"]),
+        "loi": v["liens"]["dossier_titre"] or "",
+        "a": v["adopte"],
+        "s": "Adopté" if v["adopte"] else "Rejeté",
+        "p": num(v["n_pour"] or 0),
+        "c": num(v["n_contre"] or 0),
+        "ab": num(v["n_abstention"] or 0),
+    } for v in votes]
+    return json.dumps(index, ensure_ascii=False, separators=(",", ":"))
+
+
+def groupes_scrutin_html(groupes: list[dict]) -> str:
+    """Le tableau des positions de groupe sur un scrutin.
+
+    Un groupe partagé à égalité n'a **pas** de position majoritaire : la case
+    porte un tiret cadratin et non « 50 % », parce qu'il n'y a rien à mesurer.
+    C'est la même règle que partout ailleurs sur le site — une absence de
+    mesure ne s'affiche pas comme une mesure basse.
+    """
+    lignes = []
+    for g in groupes:
+        if g.get("partage") or not g.get("majoritaire"):
+            position, suivie = "<i>groupe partagé</i>", "—"
+        else:
+            position = echapper(g["majoritaire"])
+            suivie = f'{pct(g["part_majoritaire"], 0)}{NBSP}%'
+        lignes.append(
+            f"<tr>"
+            f'<td><b>{echapper(g.get("groupe") or "—")}</b>'
+            f'<span class="plein">{echapper(g.get("groupe_libelle") or "")}</span></td>'
+            f'<td class="mono">{num(g["n_pour"])}</td>'
+            f'<td class="mono">{num(g["n_contre"])}</td>'
+            f'<td class="mono">{num(g["n_abstention"])}</td>'
+            f"<td>{position}</td>"
+            f'<td class="mono">{suivie}</td>'
+            f"</tr>"
+        )
+    return "\n          ".join(lignes)
+
+
+def releve_html(votes: list[dict], adresse: dict[str, str], publiees: set[str]) -> str:
+    """Le relevé nominatif d'un scrutin : 648 lignes, une par député.
+
+    C'est la pièce justificative de la page, et elle obéit aux mêmes contraintes
+    que le relevé des fiches : écrite dans le document, lisible sans JavaScript,
+    indexable, copiable dans un tableur. Le filtre au-dessus ne fabrique rien —
+    il masque des lignes déjà là, par un sélecteur CSS sur la classe de statut.
+
+    **Le balisage est nu, et il doit le rester.** 648 lignes multipliées par 245
+    pages font 158 760 lignes : le relevé pèse 87 Ko sur une page de 110, et
+    chaque attribut ajouté ici coûte trois mégaoctets au site. Le nom, le groupe
+    et le statut se stylent par sélecteur d'élément.
+
+    Un député dont la fiche n'est pas publiée — mandat achevé — garde son nom et
+    perd son lien. Lier vers une page absente est une promesse cassée&nbsp;; le
+    retirer du relevé serait bien pire : c'est lui qui a voté.
+    """
+    libelles = dict(STATUTS)
+    lignes = []
+    for v in votes:
+        classes = [v["statut"]]
+        marques = []
+        if v.get("par_delegation"):
+            classes.append("delegue")
+            marques.append("<i>par délégation</i>")
+        if v.get("dissident"):
+            classes.append("ecart")
+            marques.append('<i class="hors">écart à la ligne</i>')
+        nom = echapper(v["nom_complet"])
+        uid = v["acteur_uid"]
+        if uid in publiees:
+            nom = f'<a href="{adresse[uid]}">{nom}</a>'
+        lignes.append(
+            f'<li class="{" ".join(classes)}">'
+            f"<p>{nom}"
+            f'<small>{echapper(v.get("groupe") or "sans groupe")}'
+            f'{"".join(marques)}</small></p>'
+            f'<b>{libelles[v["statut"]]}</b>'
+            f"</li>"
+        )
+    return "\n      ".join(lignes)
 
 
 def filtres_html(resume: dict) -> str:
@@ -605,6 +840,11 @@ class Site:
         self.groupes = {g["groupe"]: g for g in self.apercu["groupes"]}
         self.portees = self.apercu["scrutins_par_portee"]
         self.n_texte = self.portees.get("texte", 0)
+        # Les votes qui engagent, dans l'ordre où l'onglet les montre. Calculés
+        # une fois : l'index de la recherche, l'index HTML et les 245 pages en
+        # sortent, et trois listes construites séparément finiraient par ne plus
+        # contenir les mêmes scrutins.
+        self.votes_index = donnees.index_votes()
 
         # L'adresse d'une fiche, calculée une fois et lue partout. Cinq endroits
         # fabriquaient auparavant `{uid}.html` chacun de leur côté ; une table
@@ -683,6 +923,8 @@ class Site:
         self.citation_courte, self.citation_bibtex = citations(self.genere_le)
 
         self.base = (GABARITS / "base.html").read_text()
+        sol = self.apercu["solennels"]
+        dos = self.apercu["dossiers"]
         self.commun = {
             "BASE_URL": BASE,
             "EDITEUR": echapper(EDITEUR),
@@ -704,6 +946,28 @@ class Site:
             "PORTEE_TEXTE": num(self.portees.get("texte", 0)),
             "PORTEE_DETAIL": num(self.portees.get("detail", 0)),
             "PART_DETAIL_PCT": pct(self.portees.get("detail", 0) / self.apercu["scrutins"], 0),
+            # Les scrutins solennels, et de quoi les remettre à leur place. Ces
+            # jetons sont communs parce que la démonstration se refait à
+            # l'identique sur la fiche, sur l'onglet des votes et sur chaque
+            # page de scrutin solennel : trois copies d'un même calcul auraient
+            # divergé au premier changement d'assiette.
+            "SOL_TOTAL": num(sol["total"]),
+            "SOL_MOIS": num(sol["mois"]),
+            "SOL_PAR_MOIS": dec(sol["par_mois"], 1),
+            "SOL_POIDS": pct(sol["poids_d_une_absence"]),
+            "SOL_POIDS_10": pct(sol["poids_de_dix_absences"], 0),
+            "SOL_POIDS_ENG_10": pct(sol["poids_engageant_dix"], 0),
+            "SOL_ENGAGEANTS": num(sol["engageants"]),
+            "SOL_HORS": num(sol["hors_engageants"]),
+            "SOL_DELEG_PCT": pct(self.apercu["delegation"]["solennels"]["part"], 0),
+            "DELEG_ENG_PCT": pct(self.apercu["delegation"]["engageants"]["part"], 0),
+            # Le rattachement d'un scrutin à sa loi, tel que la source le donne.
+            "DOSSIERS_AVEC": num(dos["scrutins_avec"]),
+            "DOSSIERS_SANS": num(dos["scrutins_sans"]),
+            "DOSSIERS_DISTINCTS": num(dos["distincts"]),
+            "DOSSIERS_DEPUIS": jour(dos["depuis"]) if dos["depuis"] else "—",
+            "DOSSIERS_ENG_AVEC": num(dos["engageants_avec"]),
+            "DOSSIERS_ENG_SANS": num(dos["engageants_sans"]),
             "GENERE_LE": self.genere_le,
         }
 
@@ -727,12 +991,24 @@ class Site:
             "CANONIQUE": f"{BASE}/{chemin}",
             "NAV_ACCUEIL": ' aria-current="page"' if onglet == "accueil" else "",
             "NAV_DEPUTES": ' aria-current="page"' if onglet == "deputes" else "",
+            "NAV_VOTES": ' aria-current="page"' if onglet == "votes" else "",
             "NAV_CARTE": ' aria-current="page"' if onglet == "carte" else "",
             "NAV_METHODE": ' aria-current="page"' if onglet == "methode" else "",
         }
         manquants = set(re.findall(r"\{\{(\w+)\}\}", html)) - set(tout)
         if manquants:
             raise SystemExit(f"jetons absents du générateur : {sorted(manquants)}")
+        # Un jeton de page qui porte le nom d'un jeton réservé est écrasé sans
+        # bruit, et la page affiche autre chose que ce que son gabarit demande.
+        # C'est arrivé avec `TITRE` : le `h1` d'une page de scrutin affichait le
+        # titre de l'onglet du navigateur, « — Radar parlementaire » compris.
+        # La garde existante ne voyait rien — le jeton *avait* une valeur.
+        ecrases = set(jetons) & set(RESERVES)
+        if ecrases:
+            raise SystemExit(
+                f"jetons réservés par page() : {sorted(ecrases)}. "
+                f"Les renommer dans le gabarit et dans le générateur."
+            )
         for cle, valeur in tout.items():
             html = html.replace("{{" + cle + "}}", str(valeur))
         return html
@@ -1010,6 +1286,7 @@ class Site:
             "THESE": these,
             "THESE_SUITE": these_suite,
             "BILAN": bilan_html(f["bilan"]),
+            "SOLENNELS": solennels_html(f["solennels"], self.apercu),
             "HATVP": i.get("uri_hatvp") or "https://www.hatvp.fr",
             "BOOTSTRAP": num(self.apercu.get("bootstrap") or BOOTSTRAP),
 
@@ -1207,8 +1484,105 @@ class Site:
                          "parlementaire, et lisez ses chiffres avec leur dénominateur."),
             chemin="deputes.html", onglet="deputes")
 
+    # -- les votes ---------------------------------------------------------
 
-def ecrire_index_moteurs(uids: list[str]) -> None:
+    def votes(self) -> str:
+        """L'onglet « Les votes » : le miroir de l'annuaire, côté scrutins.
+
+        L'annuaire liste les députés que les fiches détaillent&nbsp;; celui-ci
+        liste les votes que les pages de scrutin détaillent. Même recherche,
+        même index HTML de repli, mêmes règles sur les chiffres.
+        """
+        corps = (GABARITS / "votes.html").read_text()
+        adoptes = sum(1 for v in self.votes_index if v["adopte"])
+        return self.page(
+            corps,
+            {
+                "VOTES_JSON": votes_json(self.votes_index),
+                "INDEX_VOTES": index_votes_html(self.votes_index),
+                "VOTES_ADOPTES": num(adoptes),
+                "VOTES_REJETES": num(len(self.votes_index) - adoptes),
+            },
+            titre="Les votes qui engagent — Radar parlementaire",
+            description=("Les votes sur l'ensemble d'un texte et les motions de censure "
+                         "de la législature : qui a voté quoi, groupe par groupe et député "
+                         "par député, avec le lien vers l'analyse de l'Assemblée."),
+            chemin="votes.html", onglet="votes")
+
+    def scrutin_page(self, v: dict) -> str:
+        """La page d'un vote : le résultat, les groupes, et les 648 positions.
+
+        Le titre du scrutin sert de `h1` tel que l'Assemblée le publie, sans
+        raccourci ni résumé. « L'ensemble de la proposition de loi visant à… »
+        est long et c'est très bien&nbsp;: il désigne le texte **tel qu'il
+        ressort des débats**, amendements compris, et le raccourcir reviendrait
+        à publier un résumé du texte sous l'autorité de la source.
+        """
+        corps = (GABARITS / "scrutin.html").read_text()
+        d = self.donnees.scrutin(v["uid"])
+        s, liens, resume = d["scrutin"], d["liens"], d["resume"]
+
+        # Le relevé des fiches, lui, garde la phrase telle quelle : elle y
+        # est une ligne de liste, pas un titre. Cf. `titre_scrutin`.
+        titre = titre_scrutin(s["titre"])
+
+        # « N'ont pas pris part » ne compte pas les hors-mandat : un député élu
+        # trois mois plus tard n'a pas manqué ce vote, la question ne lui était
+        # pas posée. Les inclure gonflait le compte de 69 sur un scrutin de
+        # juillet 2026 et faisait un total de 648 sous une phrase qui annonçait
+        # 577 sièges.
+        absents = resume["absent"] + resume["empeche"]
+        concernes = resume["total"] - resume["hors_mandat"]
+        jetons = {
+            # `TITRE` est réservé par `page()` au titre du document : un jeton
+            # de ce nom posé ici était écrasé, et le `h1` affichait le contenu
+            # de l'onglet du navigateur, « — Radar parlementaire » compris.
+            "TITRE_SCRUTIN": echapper(titre),
+            "DATE": jour(s["date"]),
+            "NUMERO": numero_scrutin(s["numero"]),
+            "CATEGORIE": CATEGORIES_DITES.get(s["categorie"], s["categorie"] or ""),
+            # Le mot « solennel » n'apparaît que là où il est vrai. Il est un
+            # fait sur ce scrutin, pas une mesure : le site le signale et ne
+            # s'en sert nulle part comme dénominateur. Cf. l'onglet des votes.
+            "SOLENNEL_MARQUE": (
+                " · <b>scrutin solennel</b>" if s["type_vote_code"] == "SPS" else ""),
+            "SORT_PHRASE": phrase_sort(s),
+            "N_POUR": num(s["n_pour"] or 0),
+            "N_CONTRE": num(s["n_contre"] or 0),
+            "N_ABSTENTION": num(s["n_abstention"] or 0),
+            "S_ABSTENTION": pluriel(s["n_abstention"] or 0),
+            "N_ABSENTS": num(absents),
+            "VOTANTS": num(s["nb_votants"] or 0),
+            "EXPRIMES": num(s["suffrages_exprimes"] or 0),
+            "REQUIS": num(s["suffrages_requis"] or 0),
+            "CONCERNES": num(concernes),
+            "HORS_MANDAT_PHRASE": (
+                f" {num(resume['hors_mandat'])} des {num(resume['total'])} députés "
+                f"de la législature n'étaient pas en fonction à cette date."
+                if resume["hors_mandat"] else ""
+            ),
+            "DELEGATION_PHRASE": phrase_delegation_scrutin(resume),
+            "LOI_BLOC": f'<p class="enclair">{phrase_loi(liens, s, self.apercu)}</p>'
+                        f'<p class="enclair">L\'analyse nominative publiée par '
+                        f'l\'Assemblée&nbsp;: <a href="{liens["scrutin"]}">'
+                        f'scrutin n{ORDINAL_MASC}&nbsp;{numero_scrutin(s["numero"])}</a>.</p>',
+            "GROUPES": groupes_scrutin_html(d["groupes"]),
+            "GROUPES_PHRASE": phrase_groupes_scrutin(d["groupes"], resume),
+            "RELEVE": releve_html(d["votes"], self.adresse, self.publiees),
+            "RELEVE_FILTRES": filtres_html(resume),
+            "RELEVE_PHRASE": phrase_releve(resume, self.apercu),
+        }
+        loi = liens["dossier_titre"] or titre
+        return self.page(
+            corps, jetons,
+            titre=f"Scrutin n{ORDINAL_MASC} {s['numero']} — {loi} — Radar parlementaire",
+            description=(f"{jour(s['date'])} : {titre[:120]}. "
+                         f"{s['n_pour'] or 0} pour, {s['n_contre'] or 0} contre. "
+                         f"Qui a voté quoi, groupe par groupe et député par député."),
+            chemin=adresse_scrutin(v), onglet="votes")
+
+
+def ecrire_index_moteurs(uids: list[str], scrutins: list[str] = ()) -> None:
     """`sitemap.xml` et `robots.txt`.
 
     Sans sitemap, un moteur découvre les fiches en suivant les liens de
@@ -1217,8 +1591,9 @@ def ecrire_index_moteurs(uids: list[str]) -> None:
     trouvable quand quelqu'un cherche comment un chiffre a été obtenu.
     """
     aujourdhui = date.today().isoformat()
-    urls = ["", "deputes.html", "carte.html", "methode.html",
+    urls = ["", "deputes.html", "votes.html", "carte.html", "methode.html",
             "corrections.html", "mentions.html"]
+    urls += list(scrutins)
     if NOTE_SOURCE.exists():
         urls.append(NOTE_CHEMIN)
     urls += list(uids)   # déjà des adresses complètes, cf. Site.adresse
@@ -1320,12 +1695,22 @@ def main() -> None:
 
     (SORTIE / "index.html").write_text(site.accueil())
     (SORTIE / "deputes.html").write_text(site.annuaire())
+    (SORTIE / "votes.html").write_text(site.votes())
     (SORTIE / "carte.html").write_text(site.carte())
     (SORTIE / "methode.html").write_text(site.methode())
     (SORTIE / "mentions.html").write_text(site.mentions())
     (SORTIE / "corrections.html").write_text(site.corrections_page())
-    print(f"  · accueil, annuaire, carte, méthode, mentions et corrections "
+    print(f"  · accueil, annuaire, votes, carte, méthode, mentions et corrections "
           f"({len(site.corrections)} entrées au registre)")
+
+    # Les pages de vote. Elles sont écrites avant les fiches parce que
+    # `--limite` ne les concerne pas : la mise au point d'une fiche n'a aucune
+    # raison de faire disparaître l'onglet des votes qu'elle référence.
+    votes_cibles = site.votes_index[: args.limite] if args.limite else site.votes_index
+    for n, v in enumerate(votes_cibles, 1):
+        (SORTIE / adresse_scrutin(v)).write_text(site.scrutin_page(v))
+        if n % 50 == 0 or n == len(votes_cibles):
+            print(f"  · votes {n}/{len(votes_cibles)}")
 
     cibles = site.deputes[: args.limite] if args.limite else site.deputes
     for n, d in enumerate(cibles, 1):
@@ -1339,7 +1724,10 @@ def main() -> None:
         if n % 100 == 0 or n == len(cibles):
             print(f"  · fiches {n}/{len(cibles)}")
 
-    ecrire_index_moteurs([site.adresse[d["acteur_uid"]] for d in cibles])
+    ecrire_index_moteurs(
+        [site.adresse[d["acteur_uid"]] for d in cibles],
+        [adresse_scrutin(v) for v in votes_cibles],
+    )
 
     poids = sum(f.stat().st_size for f in SORTIE.rglob("*") if f.is_file())
     pages = len(list(SORTIE.glob("*.html")))

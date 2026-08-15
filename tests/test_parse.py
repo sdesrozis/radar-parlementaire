@@ -3,7 +3,16 @@
 import polars as pl
 import pytest
 
-from radar.parse import as_list, build_positions_groupe, dig, text
+from pathlib import Path
+
+from radar.parse import (
+    _dossier_du_chemin,
+    _scrutin_row,
+    as_list,
+    build_positions_groupe,
+    dig,
+    text,
+)
 
 
 class TestAplatissement:
@@ -91,3 +100,62 @@ class TestPositionsGroupe:
         r = build_positions_groupe(v)
         assert r["majoritaire"][0] == "pour"
         assert r["votants_groupe"][0] == 1
+
+
+class TestDossierLegislatif:
+    """Le rattachement d'un scrutin à sa loi.
+
+    Ce champ a été nul sur les 8 434 scrutins pendant toute la vie du dépôt, et
+    le code en avait conclu par écrit que « la source ne le remplit jamais ».
+    Ces tests verrouillent la forme réelle de la source.
+    """
+
+    def test_dossier_legislatif_est_un_objet_pas_une_chaine(self):
+        # La forme exacte que publie l'Assemblée. `text()` appliqué à cet objet
+        # rend None : c'était le bug, et c'est pourquoi on descend d'un cran.
+        objet = {
+            "libelle": "Projet de loi sur la justice criminelle",
+            "dossierRef": "DLR5L17N53940",
+        }
+        assert text(objet) is None
+        assert text(dig(objet, "dossierRef")) == "DLR5L17N53940"
+
+    def test_scrutin_row_extrait_le_dossier_et_son_titre(self):
+        s = {
+            "uid": "VTANR5L17V7946",
+            "numero": "7946",
+            "dateScrutin": "2026-07-02",
+            "legislature": "17",
+            "titre": "l'amendement nº 80",
+            "objet": {
+                "libelle": "l'amendement nº 80",
+                "dossierLegislatif": {
+                    "libelle": "Projet de loi sur la justice criminelle",
+                    "dossierRef": "DLR5L17N53940",
+                },
+            },
+        }
+        r = _scrutin_row(s)
+        assert r["dossier_uid"] == "DLR5L17N53940"
+        assert r["dossier_titre"] == "Projet de loi sur la justice criminelle"
+
+    def test_scrutin_sans_dossier_rend_none_pas_une_chaine_vide(self):
+        # 5 826 scrutins sont dans ce cas. Une chaîne vide se joindrait à une
+        # autre chaîne vide et fabriquerait un dossier fantôme partagé.
+        r = _scrutin_row({"uid": "VTANR5L17V1", "numero": "1",
+                          "objet": {"libelle": "la motion de censure"}})
+        assert r["dossier_uid"] is None
+        assert r["dossier_titre"] is None
+
+    def test_dossier_lu_dans_le_chemin_de_l_amendement(self):
+        # Le JSON d'un amendement ne porte que son texte législatif : le
+        # dossier n'existe que dans l'arborescence de l'archive.
+        f = Path("data/raw/amendements/json/DLR5L16N48701/PIONANR5L17B0132/AM1.json")
+        assert _dossier_du_chemin(f) == "DLR5L16N48701"
+
+    def test_amendement_hors_dossier_reste_sans_dossier(self):
+        # `incorrect_data/` est le répertoire où l'Assemblée gare ce qu'elle
+        # sait erroné : 149 amendements. Leur rattachement n'est pas inconnu,
+        # il est démenti — ils ne doivent entrer dans aucun compte par loi.
+        f = Path("data/raw/amendements/json/incorrect_data/PIONANR5L17BTC2202/AM1.json")
+        assert _dossier_du_chemin(f) is None

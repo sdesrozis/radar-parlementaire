@@ -1,0 +1,150 @@
+  <section class="cadre chercher" data-votes data-limite="40" data-vide="masquer">
+    <p class="fil">Les votes · {{LEGISLATURE}}<sup>e</sup> législature</p>
+    <h1 style="font-size:clamp(2.2rem,5vw,3.4rem);max-width:22ch">Trouver une loi, et qui l'a votée</h1>
+    <p class="section-intro" style="margin:18px 0 30px">
+      Les {{PORTEE_TEXTE}} votes qui engagent&nbsp;: le vote sur l'ensemble d'un texte,
+      et les motions de censure. Par titre de loi, par mot, par numéro de scrutin
+      ou par date. La recherche se fait dans la page&nbsp;: aucune requête n'est
+      envoyée nulle part.
+    </p>
+
+    <div class="champ">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path>
+      </svg>
+      <input type="search" id="q" placeholder="fin de vie, budget, censure, 8434…"
+             autocomplete="off" spellcheck="false" aria-label="Chercher un vote ou une loi">
+      <button class="effacer" id="effacer" hidden>effacer</button>
+    </div>
+
+    <div class="exemples">
+      <span>Essayez&nbsp;:</span>
+      <button data-exemple="censure">Motions de censure</button>
+      <button data-exemple="budget">Budget</button>
+      <button data-exemple="agricole">Agriculture</button>
+      <button data-exemple="constitutionnelle">Constitution</button>
+    </div>
+
+    <p class="compteur" id="compteur"></p>
+    <ul class="votes" id="resultats"></ul>
+
+    <div class="rien" id="rien" hidden>
+      <p>Aucun vote ne correspond à «&nbsp;<b id="rien-q"></b>&nbsp;».</p>
+      <p style="font-size:15px">La recherche porte sur le titre du scrutin, le nom
+        du dossier législatif quand la source le donne, la date et le numéro de
+        scrutin. <b>Elle ne couvre que les {{PORTEE_TEXTE}} votes qui engagent</b>&nbsp;:
+        les {{PORTEE_DETAIL}} votes d'amendement ne sont pas dans cette liste, pour
+        la raison expliquée plus bas.</p>
+    </div>
+
+    <p class="fraicheur">{{PORTEE_TEXTE}} votes qui engagent · {{VOTES_ADOPTES}} adoptés,
+      {{VOTES_REJETES}} rejetés · chiffres calculés le {{GENERE_LE}}</p>
+  </section>
+
+  <!-- ══ POURQUOI CETTE LISTE EST COURTE ═══════════════════════════════
+       C'est la première question qu'un lecteur se pose en arrivant : il a
+       entendu parler de « huit mille votes » et il en trouve deux cent
+       quarante-cinq. Y répondre avant qu'il la pose, et avec le chiffre, est
+       le seul moyen que la liste ne passe pas pour incomplète.
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="cadre" style="padding-block: 40px 8px">
+    <div class="lecture">
+      <p class="jalon">Ce que cette liste retient</p>
+      <h2 class="section-titre">{{PORTEE_TEXTE}} votes sur {{SCRUTINS}}</h2>
+      <p class="section-intro">L'Assemblée a tenu {{SCRUTINS}} scrutins publics depuis
+        {{DEBUT}}. <b>{{PART_DETAIL_PCT}}&nbsp;% d'entre eux portent sur un
+        amendement</b>&nbsp;: une virgule déplacée, un mot substitué, un article
+        supprimé. Ils se tiennent à toute heure, souvent devant quelques dizaines
+        de députés, et ce ne sont pas eux qui font la loi — c'est le vote sur
+        l'ensemble du texte, à la fin.</p>
+      <p>Cette page liste donc les <b>{{PORTEE_TEXTE}} votes qui engagent</b>&nbsp;:
+        le vote sur l'ensemble d'un texte, et les motions de censure. Ce sont ceux
+        sur lesquels le site mesure la présence des députés, et ceux dont le résultat
+        se raconte en une phrase. Les {{PORTEE_DETAIL}} autres existent, sont publics,
+        et se consultent un par un sur le site de l'Assemblée — chaque page de vote
+        ci-dessous y renvoie.</p>
+    </div>
+  </section>
+
+  <!-- ══ LES SCRUTINS SOLENNELS ════════════════════════════════════════
+       L'avertissement le plus important de la page, et il est écrit en
+       clair plutôt que rangé dans un repli : « les grands votes » est la
+       notion que tout le monde a en tête, et c'est celle sur laquelle une
+       mesure d'activité tient le moins. Un lecteur qui repart d'ici avec
+       « il a manqué la moitié des grands votes » sans avoir vu le
+       dénominateur aura été mal servi par ce site.
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="cadre socle">
+    <div class="lecture">
+      <p class="jalon">Une mise en garde, avant de compter</p>
+      <h2>Les {{SOL_TOTAL}} scrutins solennels ne mesurent pas une activité</h2>
+      <p class="section-intro">Un <b>scrutin solennel</b> est annoncé plusieurs
+        jours à l'avance, se tient le mardi après les questions au gouvernement, et
+        les groupes y appellent leurs députés à voter en personne. C'est ce que la
+        presse appelle «&nbsp;les grands votes&nbsp;». {{SOL_ENGAGEANTS}} des
+        {{SOL_TOTAL}} sont des votes sur l'ensemble d'un texte et figurent dans la
+        liste ci-dessus&nbsp;; les {{SOL_HORS}} autres sont ailleurs.</p>
+      <p><b>Il y en a beaucoup trop peu pour juger un parlementaire</b>&nbsp;:
+        {{SOL_TOTAL}} en {{SOL_MOIS}} mois, où dix absences retirent
+        {{SOL_POIDS_10}}&nbsp;points de présence contre {{SOL_POIDS_ENG_10}} sur les
+        {{PORTEE_TEXTE}} votes qui engagent. <b>Aucune mesure de ce site ne se
+        calcule sur les scrutins solennels seuls.</b> Ils sont signalés comme tels
+        sur la page de chaque vote concerné, parce que les taire serait laisser
+        croire qu'on les cache, et ils ne servent nulle part de dénominateur.
+        <a href="index.html#solennels">Le calcul complet, et pourquoi cette assiette
+        flatte ou accable selon le député</a>.</p>
+    </div>
+  </section>
+
+  <!-- ══ LE LIEN VERS LA LOI ═══════════════════════════════════════════
+       Une lacune de la source, écrite avec ses deux nombres. Sans cette
+       section, un lecteur qui trouve un lien « la loi » sur un vote de juin
+       2026 et pas sur un vote de juin 2025 conclurait que le second ne porte
+       sur aucun texte, ce qui est faux.
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="cadre" style="padding-block: 40px 8px">
+    <div class="lecture">
+      <p class="jalon">Ce que la source ne dit pas toujours</p>
+      <h2 class="section-titre">Le lien vers la loi manque avant {{DOSSIERS_DEPUIS}}</h2>
+      <p class="section-intro">L'open data de l'Assemblée rattache chaque scrutin à
+        son <b>dossier législatif</b> — la loi dont ce vote est un épisode. Ce
+        rattachement n'est renseigné que depuis le {{DOSSIERS_DEPUIS}}&nbsp;:
+        {{DOSSIERS_AVEC}} scrutins l'ont, {{DOSSIERS_SANS}} ne l'ont pas, et la
+        coupure est une date, pas un hasard. Sur les {{PORTEE_TEXTE}} votes qui
+        engagent, {{DOSSIERS_ENG_AVEC}} portent le nom de leur loi et
+        {{DOSSIERS_ENG_SANS}} ne le portent pas.</p>
+      <p>Un vote sans lien vers sa loi <b>n'est pas un vote sans loi</b>&nbsp;: c'est
+        un vote dont la source tait la loi. Le titre du scrutin la nomme de toute
+        façon en toutes lettres — «&nbsp;l'ensemble du projet de loi de finances
+        pour 2026&nbsp;» —, et le lien vers l'analyse du scrutin sur le site de
+        l'Assemblée existe pour les {{SCRUTINS}}, sans exception. C'est celui-là
+        qui porte la preuve&nbsp;; celui vers le dossier porte le contexte.</p>
+      <p>Le nombre d'amendements affiché sur une page de vote est celui de
+        <b>la loi entière</b>, pas de ce vote-là&nbsp;: un amendement porte sur un
+        texte, pas sur un scrutin, et l'immense majorité n'est jamais mise aux voix.
+        Il n'est donc affiché que lorsque le dossier est connu — {{DOSSIERS_DISTINCTS}}
+        lois à ce jour.</p>
+    </div>
+  </section>
+
+  <!-- ══ L'INDEX COMPLET, EN HTML ══════════════════════════════════════
+       Même raison que pour l'annuaire des députés : la recherche ci-dessus
+       fabrique ses résultats en JavaScript, et elle est invisible pour un
+       lecteur sans JavaScript, pour un lecteur d'écran qui parcourt les liens
+       et pour un moteur de recherche. Sans cet index, les 245 pages de vote
+       ne seraient atteignables que par le plan du site.
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="cadre socle" id="index">
+    <div class="lecture">
+      <p class="jalon">Sans passer par la recherche</p>
+      <h2>Les {{PORTEE_TEXTE}} votes, du plus récent au plus ancien</h2>
+      <p>La liste complète, par année. Utile pour parcourir plutôt que pour
+        chercher — et c'est par ces liens qu'un moteur de recherche atteint les
+        pages de vote.</p>
+    </div>
+    <div class="index-votes">
+      {{INDEX_VOTES}}
+    </div>
+  </section>
+
+  <script>const VOTES = {{VOTES_JSON}};</script>

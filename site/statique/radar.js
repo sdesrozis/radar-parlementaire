@@ -139,15 +139,24 @@ document.querySelectorAll(".bande").forEach((b) => oeil.observe(b));
 const pliage = (s) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-/* Un seul code de recherche pour l'accueil et l'annuaire. Deux implémentations
-   divergeraient : le même mot cherché à deux endroits ne doit pas donner deux
-   réponses. Les pages ne diffèrent que par deux attributs posés sur l'hôte —
+/* Un seul code de recherche pour l'accueil, l'annuaire et les votes. Deux
+   implémentations divergeraient : le même mot cherché à deux endroits ne doit
+   pas donner deux réponses, et la troisième page l'aurait prouvé — chercher
+   « Marne » dans une liste de lois n'a pas à se comporter autrement que dans
+   une liste de députés.
+
+   Ce qui varie tient en trois fonctions passées en argument : de quoi est
+   faite la clé de recherche, comment se dessine une ligne, comment se dit le
+   compte. Ce qui ne varie pas — le pliage des accents, la conjonction des
+   mots, la limite, le clavier — n'existe qu'ici.
+
+   Les pages diffèrent en outre par deux attributs posés sur l'hôte :
    `data-limite`, combien de résultats afficher, et `data-vide="masquer"`, qui
    attend une frappe au lieu de dérouler les 574 sous le manifeste. */
 
-function recherche() {
-  const hote = document.querySelector("[data-annuaire]");
-  if (!hote || typeof ANNUAIRE === "undefined") return;
+function recherche(sujet) {
+  const hote = document.querySelector(sujet.hote);
+  if (!hote || !sujet.donnees) return;
 
   const champ = document.querySelector("#q");
   const effacer = document.querySelector("#effacer");
@@ -159,19 +168,7 @@ function recherche() {
   const masquerAVide = hote.dataset.vide === "masquer";
 
   // L'index est plié une fois pour toutes, pas à chaque frappe.
-  const index = ANNUAIRE.map((d) => ({ ...d, cle: pliage([d.n, d.d, d.dn, d.r, d.g, d.gl].join(" ")) }));
-
-  /* Les trois signaux d'un député, chacun avec ce qu'il mesure. Un nombre nu
-     dans une liste se lit comme une note ; le libellé en dit la nature, et la
-     fiche en donne le dénominateur. Une mesure absente affiche « — » et non
-     zéro — la règle vaut ici comme ailleurs. */
-  const mesures = (d) => [
-    ["présence", d.pres],
-    ["écart au groupe", d.ecart],
-    ["position", d.pos],
-  ].map(([libelle, valeur]) =>
-    `<span class="an-mesure"><b>${valeur || "—"}</b><i>${libelle}</i></span>`
-  ).join("");
+  const index = sujet.donnees.map((d) => ({ ...d, cle: pliage(sujet.cle(d)) }));
 
   const dessiner = (q) => {
     const mots = pliage(q).split(" ").filter(Boolean);
@@ -189,16 +186,9 @@ function recherche() {
     const montres = trouves.slice(0, limite);
 
     compteur.hidden = false;
-    compteur.innerHTML = vide
-      ? `<b>${index.length}</b> députés en exercice`
-      : `<b>${trouves.length}</b> député${trouves.length > 1 ? "s" : ""} sur ${index.length}`;
+    compteur.innerHTML = sujet.compte(trouves.length, index.length, vide);
 
-    liste.innerHTML = montres.map((d) => `<li><a href="${d.u}.html">
-          <span class="an-nom">${d.n}</span>
-          <span class="an-lieu">${d.d} · ${d.c}${d.c === "1" ? "re" : "e"}</span>
-          <span class="an-grp">${d.g}</span>
-          <span class="an-chiffres">${mesures(d)}</span>
-        </a></li>`).join("");
+    liste.innerHTML = montres.map(sujet.ligne).join("");
 
     document.querySelector("#rien").hidden = trouves.length > 0;
     if (!trouves.length) document.querySelector("#rien-q").textContent = q;
@@ -235,7 +225,61 @@ function recherche() {
   dessiner(champ.value || "");
 }
 
-recherche();
+/* L'annuaire des députés. Les trois signaux, chacun avec ce qu'il mesure : un
+   nombre nu dans une liste se lit comme une note, le libellé en dit la nature,
+   et la fiche en donne le dénominateur. Une mesure absente affiche « — » et
+   non zéro — la règle vaut ici comme ailleurs. Les valeurs arrivent déjà mises
+   en forme par Python : pas de pourcentage fabriqué dans le navigateur. */
+recherche({
+  hote: "[data-annuaire]",
+  donnees: typeof ANNUAIRE === "undefined" ? null : ANNUAIRE,
+  cle: (d) => [d.n, d.d, d.dn, d.r, d.g, d.gl].join(" "),
+  compte: (n, total, vide) =>
+    vide ? `<b>${total}</b> députés en exercice`
+         : `<b>${n}</b> député${n > 1 ? "s" : ""} sur ${total}`,
+  ligne: (d) => `<li><a href="${d.u}.html">
+          <span class="an-nom">${d.n}</span>
+          <span class="an-lieu">${d.d} · ${d.c}${d.c === "1" ? "re" : "e"}</span>
+          <span class="an-grp">${d.g}</span>
+          <span class="an-chiffres">${[
+            ["présence", d.pres],
+            ["écart au groupe", d.ecart],
+            ["position", d.pos],
+          ].map(([libelle, valeur]) =>
+            `<span class="an-mesure"><b>${valeur || "—"}</b><i>${libelle}</i></span>`
+          ).join("")}</span>
+        </a></li>`,
+});
+
+/* Les votes qui engagent. On cherche dans le titre du scrutin *et* dans le
+   titre du dossier législatif : l'un est la formule de séance — « l'ensemble
+   de la proposition de loi visant à… » —, l'autre le nom sous lequel la presse
+   et le public désignent la loi. Un lecteur qui tape « fin de vie » cherche le
+   second et ne connaît pas le premier.
+
+   Le numéro de scrutin est dans la clé parce qu'il est l'identifiant par
+   lequel l'Assemblée cite ses propres votes, et donc celui qu'on recopie
+   depuis un article de presse. */
+recherche({
+  hote: "[data-votes]",
+  donnees: typeof VOTES === "undefined" ? null : VOTES,
+  cle: (v) => [v.t, v.loi, v.n, v.d].join(" "),
+  compte: (n, total, vide) =>
+    vide ? `<b>${total}</b> votes qui engagent`
+         : `<b>${n}</b> vote${n > 1 ? "s" : ""} sur ${total}`,
+  ligne: (v) => `<li><a href="${v.u}">
+          <span class="vo-date">${v.d}</span>
+          <span class="vo-titre">${v.t}${v.loi ? `<i>${v.loi}</i>` : ""}</span>
+          <span class="vo-sort ${v.a ? "adopte" : "rejete"}">${v.s}</span>
+          <span class="vo-chiffres">${[
+            ["pour", v.p],
+            ["contre", v.c],
+            ["abstentions", v.ab],
+          ].map(([libelle, valeur]) =>
+            `<span class="an-mesure"><b>${valeur}</b><i>${libelle}</i></span>`
+          ).join("")}</span>
+        </a></li>`,
+});
 
 /* ═══════════════════════════════════════════════════════════════════════
    Le filtre du relevé des votes.
@@ -247,31 +291,53 @@ recherche();
    justificative, qui doit rester lisible et indexable telle quelle.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function filtreJournal() {
-  const barre = document.querySelector(".filtres[data-cible='journal']");
-  const journal = document.querySelector("#journal");
-  if (!barre || !journal) return;
+/* Le filtre sert les deux relevés — les 245 scrutins d'un député, et les 648
+   députés d'un scrutin. C'est le même geste sur les deux axes du même tableau,
+   donc le même code : `data-cible` désigne la liste à filtrer. */
+
+function filtreReleve(cible) {
+  const barre = document.querySelector(`.filtres[data-cible='${cible}']`);
+  const liste = document.getElementById(cible);
+  if (!barre || !liste) return;
   const vide = document.querySelector(".journal-vide");
 
-  barre.addEventListener("click", (e) => {
-    const bouton = e.target.closest("button");
-    if (!bouton) return;
+  const appliquer = (bouton) => {
     const filtre = bouton.dataset.filtre;
     for (const b of barre.querySelectorAll("button")) {
       b.setAttribute("aria-pressed", String(b === bouton));
     }
-    if (filtre === "tous") delete journal.dataset.filtre;
-    else journal.dataset.filtre = filtre;
+    if (filtre === "tous") delete liste.dataset.filtre;
+    else liste.dataset.filtre = filtre;
     /* Le message d'impasse ne devrait jamais paraître — un bouton n'existe
        qu'au-dessus de zéro — mais il coûte une ligne et évite qu'une liste
        vide passe pour une page cassée. On compte les classes, pas les pixels. */
     if (vide) {
       const restants = filtre === "tous"
-        ? journal.children.length
-        : journal.querySelectorAll("li." + filtre).length;
+        ? liste.children.length
+        : liste.querySelectorAll("li." + filtre).length;
       vide.hidden = restants > 0;
     }
+  };
+
+  barre.addEventListener("click", (e) => {
+    const bouton = e.target.closest("button");
+    if (bouton) appliquer(bouton);
   });
+
+  /* Le relevé s'ouvre sur « Pour ». C'est la question que le lecteur se pose
+     en arrivant — qui a voté cette loi — et la liste complète, à 648 lignes,
+     ne la lui répond qu'après un long défilement.
+
+     **Ce choix est posé ici et non dans le HTML**, et la nuance n'est pas
+     technique. Écrit dans le document, `data-filtre="pour"` masquerait les
+     « contre » pour un lecteur sans JavaScript, pour un moteur de recherche et
+     dans une page enregistrée : le site publierait une pièce justificative
+     amputée de la moitié de son contenu. Posé au chargement, le document reste
+     entier — le filtre redevient ce qu'il doit être, un confort d'affichage
+     qui ne retire rien à la preuve. Un clic sur « Tous » rend la liste. */
+  const defaut = barre.querySelector("button[data-filtre='pour']");
+  if (defaut) appliquer(defaut);
 }
 
-filtreJournal();
+filtreReleve("journal");
+filtreReleve("nominatif-liste");

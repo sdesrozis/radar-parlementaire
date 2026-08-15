@@ -275,11 +275,24 @@ SCRUTIN_SCHEMA = {
     "sort_libelle": pl.Utf8,
     "titre": pl.Utf8,
     "demandeur": pl.Utf8,
+    #: Le dossier législatif — le *texte* dont ce scrutin est un épisode. C'est
+    #: ce qui permet de dire de quelle loi il s'agit, et d'y renvoyer.
+    #:
+    #: La source ne le remplit qu'à partir de mars 2026 : 2 sur les 5 824
+    #: scrutins antérieurs, 100 % des 2 606 postérieurs. Cette lacune est celle
+    #: de l'Assemblée, elle n'est pas rattrapable, et elle se dit — un scrutin
+    #: sans dossier n'est pas un scrutin sans loi.
+    #:
+    #: Ce champ a été nul sur les 8 434 lignes pendant toute la vie du dépôt :
+    #: `dossierLegislatif` est un objet `{libelle, dossierRef}`, et on lui
+    #: appliquait `text()`, qui rend `None` sur un dict sans `#text`. On avait
+    #: écrit ici même que « la source ne le remplit jamais » — la conclusion
+    #: était tirée de notre propre bug. Voir le registre des corrections.
     "dossier_uid": pl.Utf8,
-    #: Séance où le scrutin a été tenu. La source ne remplit jamais
-    #: `dossierLegislatif` — ce champ est le seul regroupement disponible pour
-    #: dire que deux scrutins ne sont pas des observations indépendantes.
-    #: Cf. `ideal.intervalles`, qui rééchantillonne par bloc.
+    "dossier_titre": pl.Utf8,
+    #: Séance où le scrutin a été tenu. Regroupement de repli quand le dossier
+    #: manque, pour dire que deux scrutins ne sont pas des observations
+    #: indépendantes. Cf. `ideal.intervalles`, qui rééchantillonne par bloc.
     "seance_uid": pl.Utf8,
     "mode_publication": pl.Utf8,
     "nb_votants": pl.Int64,
@@ -375,7 +388,8 @@ def _scrutin_row(s: dict) -> dict:
         "sort_libelle": text(dig(s, "sort", "libelle")),
         "titre": text(s.get("titre")) or text(dig(s, "objet", "libelle")),
         "demandeur": text(dig(s, "demandeur", "texte")),
-        "dossier_uid": text(dig(s, "objet", "dossierLegislatif")),
+        "dossier_uid": text(dig(s, "objet", "dossierLegislatif", "dossierRef")),
+        "dossier_titre": text(dig(s, "objet", "dossierLegislatif", "libelle")),
         "seance_uid": text(s.get("seanceRef")),
         "mode_publication": text(s.get("modePublicationDesVotes")),
         "nb_votants": _int(dig(s, "syntheseVote", "nombreVotants")),
@@ -446,6 +460,9 @@ AMENDEMENT_SCHEMA = {
     "amendement_uid": pl.Utf8,
     "numero": pl.Utf8,
     "texte_legislatif_uid": pl.Utf8,
+    #: Le dossier législatif — la loi. Il n'est pas dans le JSON de
+    #: l'amendement, seulement dans son chemin. Cf. `_dossier_du_chemin`.
+    "dossier_uid": pl.Utf8,
     "legislature": pl.Utf8,
     "date_depot": pl.Utf8,
     "date_sort": pl.Utf8,
@@ -578,12 +595,45 @@ def build_positions_groupe(votes: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+#: Un dossier législatif dans un chemin de fichier : `DLR5L17N53940`.
+_DOSSIER_DANS_CHEMIN = re.compile(r"^DLR\w+$")
+
+
+def _dossier_du_chemin(f: Path) -> str | None:
+    """Le dossier législatif d'un amendement, lu dans son chemin.
+
+    L'archive est rangée `amendements/json/{dossier}/{texte}/{amendement}.json`.
+    Le JSON de l'amendement, lui, ne porte que `texteLegislatifRef` : il dit à
+    quel texte il s'applique, jamais à quel dossier ce texte appartient. Le
+    rattachement n'existe donc **que** dans l'arborescence, et le jeter revenait
+    à ne pas pouvoir compter les amendements d'une loi.
+
+    Il vaut pour 123 075 des 123 224 amendements. Les 149 autres sont rangés
+    par l'Assemblée sous `incorrect_data/`, un répertoire où elle gare ce
+    qu'elle sait erroné : ils gardent un dossier nul, et c'est la bonne
+    réponse — leur rattachement n'est pas inconnu de nous, il est démenti par
+    la source. Un compte d'amendements par loi les laisse donc dehors.
+
+    On remonte les parents plutôt que de compter deux niveaux : la profondeur
+    des archives de l'AN change d'un jeu à l'autre, et `json_files` en tient
+    déjà compte.
+    """
+    for parent in f.parents:
+        if _DOSSIER_DANS_CHEMIN.match(parent.name):
+            return parent.name
+    return None
+
+
 def build_amendements() -> pl.DataFrame:
     files = json_files("amendements", "json")
     rows = []
-    for doc in _iter_json(files):
+    for f in files:
+        try:
+            doc = json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
         a = doc.get("amendement", doc)
-        rows.append(_amendement_row(a))
+        rows.append({**_amendement_row(a), "dossier_uid": _dossier_du_chemin(f)})
     return (
         pl.DataFrame(rows, schema=AMENDEMENT_SCHEMA)
         .unique(subset="amendement_uid")

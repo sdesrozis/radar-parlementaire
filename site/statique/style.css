@@ -193,8 +193,14 @@ a:hover { text-decoration-color: var(--accent); }
 
 /* ── navigation mobile ─────────────────────────────────────────────────
    Le menu de l'en-tête disparaît sous 720 px : cette barre le remplace, au
-   lieu de laisser le lecteur sans chemin. Quatre destinations, quatre verbes —
+   lieu de laisser le lecteur sans chemin. Cinq destinations, cinq verbes —
    ce que la page permet de faire, pas comment elle s'appelle.
+
+   Cinq et non quatre depuis l'onglet des votes. La cinquième colonne coûte
+   les quelques pixels qui séparaient les libellés : ils passent de 10 à 9,5 px
+   et perdent un peu d'interlettrage sous 380 px, où « Qui vote avec qui »
+   n'aurait sinon plus tenu sur une ligne. Une barre à cinq colonnes qui se
+   replie sur deux rangées mange le sixième de l'écran d'un téléphone.
    ──────────────────────────────────────────────────────────────────────── */
 
 .menu-mobile { display: none; }
@@ -202,7 +208,7 @@ a:hover { text-decoration-color: var(--accent); }
 @media (max-width: 720px) {
   .menu-mobile {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     position: fixed; inset: auto 0 0 0; z-index: 60;
     background: color-mix(in srgb, var(--papier) 92%, transparent);
     backdrop-filter: saturate(140%) blur(12px);
@@ -213,12 +219,18 @@ a:hover { text-decoration-color: var(--accent); }
   }
   .menu-mobile a {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 9px 4px 8px; text-decoration: none; color: var(--encre-2);
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.07em;
-    text-transform: uppercase;
+    padding: 9px 2px 8px; text-decoration: none; color: var(--encre-2);
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.05em;
+    text-transform: uppercase; text-align: center;
     border-top: 2px solid transparent;
   }
   .menu-mobile a svg { width: 21px; height: 21px; }
+  /* Sur les écrans les plus étroits, l'interlettrage part avant le corps :
+     c'est lui qui fait déborder « Qui vote avec qui », et le supprimer se voit
+     moins qu'un libellé passé à 8 px. */
+  @media (max-width: 380px) {
+    .menu-mobile a { font-size: 9px; letter-spacing: 0; }
+  }
   .menu-mobile a[aria-current] { color: var(--accent); border-top-color: var(--accent); }
 
   /* Le pied de page doit pouvoir être atteint : sans cette réserve, ses
@@ -490,6 +502,13 @@ h1 {
   letter-spacing: 0.03em; white-space: nowrap;
 }
 .journal > li > p { margin: 0; font-size: 15.5px; line-height: 1.5; }
+/* Le titre mène à la page du scrutin. Il n'est pas souligné au repos : 245
+   liens soulignés d'affilée font un mur bleu où plus rien ne se distingue. */
+.journal > li > p > a { text-decoration: none; color: var(--encre); }
+.journal > li > p > a:hover {
+  text-decoration: underline; text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+}
 .journal small {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 5px;
   font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--encre-3);
@@ -1232,6 +1251,197 @@ h1 {
 }
 .index-dep a:hover { color: var(--accent-vif); }
 .index-dep .circo { color: var(--encre-3); font-size: 11px; flex: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LES VOTES
+
+   L'onglet des scrutins, miroir de l'annuaire des députés. Il reprend
+   volontairement ses formes — la liste de résultats, l'index de repli, les
+   mesures avec leur libellé — parce que ce sont les mêmes gestes de lecture :
+   un lecteur qui a appris à parcourir l'un ne réapprend rien sur l'autre.
+
+   Aucune couleur ne distingue « adopté » de « rejeté », ni « pour » de
+   « contre ». La tentation était grande — un vert et un rouge se lisent d'un
+   coup d'œil — et c'est précisément le problème : ils diraient au lecteur
+   qu'une adoption est un succès et un rejet un échec, ce que ce site n'a pas à
+   juger. La distinction est portée par le mot et par la hiérarchie d'encre,
+   comme dans le relevé des fiches : un suffrage exprimé s'affiche en pleine
+   encre, une absence de suffrage s'efface d'un cran.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.votes { list-style: none; padding: 0; margin: 0; }
+.votes li { border-bottom: 1px solid var(--trait); }
+.votes a {
+  display: grid; gap: 4px 20px; align-items: baseline;
+  padding: 16px 4px 16px 0; text-decoration: none;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 860px) {
+  .votes a { grid-template-columns: 128px minmax(0, 1fr) 96px 210px; }
+}
+.votes a:hover { background: var(--papier-creux); }
+.votes a:hover .vo-titre { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+
+.vo-date {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.04em;
+  color: var(--encre-3); white-space: nowrap;
+}
+/* Le titre d'un scrutin fait couramment deux cents caractères, et il n'est pas
+   raccourci : il désigne le texte tel qu'il ressort des débats. Trois lignes
+   suffisent à le rendre reconnaissable, la page du vote le donne en entier. */
+.vo-titre {
+  font-family: var(--serif); font-size: 1.05rem; line-height: 1.4;
+  letter-spacing: -0.008em; color: var(--encre);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Le nom du dossier législatif, quand la source le donne : c'est celui sous
+   lequel la loi est connue, et souvent le seul que le lecteur reconnaîtra. */
+.vo-titre i {
+  display: block; margin-top: 3px; font-style: normal;
+  font-family: var(--sans); font-size: 13px; color: var(--encre-2);
+}
+.vo-sort {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.vo-sort.adopte { color: var(--encre); font-weight: 600; }
+.vo-sort.rejete { color: var(--encre-2); font-weight: 400; }
+.vo-chiffres { display: flex; gap: 18px; justify-content: flex-end; }
+@media (max-width: 859px) {
+  .vo-chiffres { justify-content: flex-start; gap: 22px; }
+}
+
+/* L'index de repli, par année. Même rôle et même forme que celui des
+   départements : il existe pour les lecteurs et les moteurs que le JavaScript
+   n'atteint pas. */
+.index-votes { margin-top: 30px; columns: 340px 2; column-gap: 40px; }
+.index-annee { break-inside: avoid; margin: 0 0 28px; }
+.index-annee h3 {
+  font-family: var(--sans); font-size: 12.5px; font-weight: 600;
+  letter-spacing: 0.04em; margin: 0 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--trait);
+  display: flex; justify-content: space-between; gap: 10px;
+}
+.index-annee h3 .mono { color: var(--encre-3); font-size: 11.5px; font-weight: 400; }
+.index-annee ul { list-style: none; padding: 0; margin: 0; }
+.index-annee li { margin: 0 0 5px; }
+.index-annee a {
+  display: block; text-decoration: none; color: var(--encre-2);
+  font-size: 14px; line-height: 1.45; padding: 2px 0;
+}
+.index-annee a:hover { color: var(--accent-vif); }
+.index-annee time {
+  display: block; font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: 0.04em; color: var(--encre-3);
+}
+
+/* ── la page d'un vote ─────────────────────────────────────────────────── */
+
+/* Le titre du scrutin est une phrase entière, pas un intitulé. Il est composé
+   plus petit qu'un nom de député pour cette raison, et sa mesure est bornée :
+   au-delà d'une soixantaine de signes par ligne, une phrase de deux cents
+   caractères cesse d'être lisible. */
+.titre-scrutin {
+  font-size: clamp(1.5rem, 3.2vw, 2.15rem); line-height: 1.24;
+  max-width: 30ch; letter-spacing: -0.015em;
+}
+
+/* Les quatre comptes du résultat. « N'ont pas pris part » est là parce que
+   c'est le nombre que personne ne publie : un texte adopté par 276 voix sur
+   577 sièges n'a pas la même portée selon que 86 ou 300 députés se sont
+   prononcés contre. */
+.resultat {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px;
+  margin: 24px 0 18px; border: 1px solid var(--trait); border-radius: 3px;
+  overflow: hidden; background: var(--trait);
+}
+@media (min-width: 700px) { .resultat { grid-template-columns: repeat(4, 1fr); } }
+.resultat-part {
+  background: var(--papier); padding: 18px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.resultat-part b {
+  font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 500; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.resultat-part span {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--encre-3);
+}
+/* Pour et contre sont deux suffrages exprimés : ils ont la même autorité et
+   donc la même encre. Ce qui recule, c'est ce qui n'a pas été exprimé. */
+.resultat-part.pour b,
+.resultat-part.contre b { color: var(--encre); }
+.resultat-part.abstention b { color: var(--encre-2); }
+.resultat-part.absent b { color: var(--encre-3); }
+
+/* Le relevé nominatif. Mêmes règles que le relevé des fiches — balisage nu,
+   statut porté par la classe, filtre en simple sélecteur — appliquées à
+   l'autre axe du même tableau : là 245 scrutins pour un député, ici 648
+   députés pour un scrutin. */
+.nominatif { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--trait); }
+.nominatif > li {
+  display: grid; grid-template-columns: minmax(0, 1fr) 128px;
+  gap: 2px 18px; align-items: baseline;
+  padding: 9px 2px; border-bottom: 1px solid var(--trait);
+}
+.nominatif > li > b { text-align: right; }
+.nominatif > li > p { margin: 0; font-size: 15.5px; line-height: 1.45; }
+.nominatif a { text-decoration: none; color: var(--encre); }
+.nominatif a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.nominatif small {
+  display: block; font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.05em; color: var(--encre-3); margin-top: 2px;
+}
+.nominatif > li > b {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--encre);
+}
+/* Ne pas avoir voté n'est pas une position : ces trois états s'effacent d'un
+   cran plutôt que de s'afficher avec la même autorité qu'un suffrage. Même
+   règle, mêmes valeurs que `.journal`. */
+.nominatif > li.absent > b,
+.nominatif > li.empeche > b,
+.nominatif > li.hors_mandat > b { color: var(--encre-3); font-weight: 400; }
+.nominatif small i {
+  display: inline-block; margin-left: 8px; font-style: normal;
+  padding: 1px 6px; border-radius: 2px; font-size: 10px;
+  background: var(--papier-creux); color: var(--encre-2);
+}
+.nominatif small i.hors { background: none; border: 1px solid var(--trait-fort); color: var(--encre-2); }
+
+/* Le filtre ne masque que des lignes déjà écrites dans la page. Sans
+   JavaScript, le relevé reste entier — c'est la seule façon acceptable de
+   filtrer une pièce justificative. */
+.nominatif[data-filtre] > li { display: none; }
+.nominatif[data-filtre="pour"] > li.pour,
+.nominatif[data-filtre="contre"] > li.contre,
+.nominatif[data-filtre="abstention"] > li.abstention,
+.nominatif[data-filtre="absent"] > li.absent,
+.nominatif[data-filtre="empeche"] > li.empeche,
+.nominatif[data-filtre="hors_mandat"] > li.hors_mandat,
+.nominatif[data-filtre="delegue"] > li.delegue,
+.nominatif[data-filtre="ecart"] > li.ecart { display: grid; }
+
+/* La ligne des scrutins solennels, dans le bilan d'une fiche. Elle est sous un
+   trait plein et en retrait : c'est un recoupement des trois lignes du dessus,
+   pas une quatrième part, et rien ne doit inviter à l'additionner. */
+.tableau-groupes tr.recoupe td {
+  border-top: 2px solid var(--trait-fort); color: var(--encre-2);
+  padding-top: 14px;
+}
+.tableau-groupes tr.recoupe td b { color: var(--encre-2); font-weight: 500; }
+
+/* Le rappel sur les scrutins solennels, sous le bilan d'une fiche. Un filet et
+   rien de plus : la démonstration complète est sur l'accueil, une fois, et ce
+   qui reste ici tient en trois lignes — dire à l'endroit du chiffre que cette
+   ligne ne se compare pas aux autres. Un encadré aurait rendu à ce rappel le
+   poids visuel de ce qu'il remplace, sur 577 pages. */
+.rappel-solennel {
+  margin-top: 18px; padding-left: 14px;
+  border-left: 2px solid var(--trait-fort);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    CITER

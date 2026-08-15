@@ -256,3 +256,87 @@ class TestTauxAdoption:
     def test_rien_d_examine_ne_donne_pas_zero(self):
         """Un texte encore en navette n'est pas un échec : c'est une attente."""
         assert self.table()["taux_adoption"].to_list()[2] is None
+
+
+class TestSolennels:
+    """L'assiette des scrutins solennels : servie, mais jamais additionnable."""
+
+    def depute(self, **surcharges) -> dict:
+        base = {
+            "votes_exprimes": 1508, "votes_solennels": 62,
+            "solennels_votables": 72, "solennels_eligibles": 72,
+            "solennels_delegues": 20, "participation_solennels": 62 / 72,
+            "part_delegation_solennels": 20 / 62,
+        }
+        return {**base, **surcharges}
+
+    def test_le_taux_est_celui_calcule_en_amont(self):
+        """Le site ne refait aucune division : un seul chiffre par mesure."""
+        assert vues._solennels(self.depute())["taux"] == pytest.approx(62 / 72)
+
+    def test_un_depute_sans_aucun_suffrage_n_a_pas_un_taux_de_zero(self):
+        # Même règle que partout : une absence de donnée n'est pas un zéro, et
+        # elle se juge sur l'ensemble des scrutins, pas sur cette assiette-ci.
+        muet = self.depute(votes_exprimes=0, votes_solennels=0,
+                           participation_solennels=None)
+        assert vues._solennels(muet)["taux"] is None
+
+    def test_un_denominateur_nul_ne_divise_pas(self):
+        assert vues._solennels(self.depute(solennels_votables=0))["taux"] is None
+
+    def test_les_colonnes_absentes_valent_zero_et_non_none(self):
+        vide = {k: None for k in self.depute()}
+        r = vues._solennels(vide)
+        assert (r["exprimes"], r["votables"], r["delegues"]) == (0, 0, 0)
+
+    def test_la_delegation_est_servie_avec_l_assiette(self):
+        """C'est sur ces votes-là qu'elle se lit le mieux : on est censé venir."""
+        assert vues._solennels(self.depute())["part_delegation"] == pytest.approx(20 / 62)
+
+
+class TestLiensAssemblee:
+    """Les pièces justificatives : celle qui existe toujours, celle qui manque."""
+
+    def test_le_lien_du_scrutin_se_construit_sur_le_numero(self):
+        assert vues.lien_scrutin("17", 7946) == (
+            "https://www.assemblee-nationale.fr/dyn/17/scrutins/7946")
+
+    def test_le_lien_du_dossier_se_construit_sur_sa_reference(self):
+        assert vues.lien_dossier(17, "DLR5L17N53940") == (
+            "https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53940")
+
+    def test_un_dossier_absent_rend_none_et_non_une_adresse_tronquee(self):
+        """Une adresse en `/dossiers/None` serait un lien mort publié 172 fois."""
+        assert vues.lien_dossier("17", None) is None
+        assert vues.lien_dossier("17", "") is None
+
+    def test_un_numero_absent_rend_none(self):
+        assert vues.lien_scrutin("17", None) is None
+
+
+class TestDepuisQuandComplet:
+    """La date de bascule d'un champ, et pas la date de sa première valeur."""
+
+    def table(self, dates, valeurs) -> pl.DataFrame:
+        return pl.DataFrame({
+            "date": dates,
+            "date_d": [pl.Series([d]).str.to_date()[0] for d in dates],
+            "dossier_uid": valeurs,
+        })
+
+    def test_le_premier_renseigne_ne_fait_pas_la_bascule(self):
+        """Une valeur isolée en avril 2025 ne promet rien pour les onze mois qui suivent."""
+        t = self.table(
+            ["2025-04-07", "2025-06-01", "2026-03-26", "2026-04-01"],
+            ["DLR1", None, "DLR2", "DLR3"],
+        )
+        assert vues._depuis_quand_complet(t, "dossier_uid") == "2026-03-26"
+
+    def test_une_colonne_entierement_remplie_bascule_a_sa_premiere_ligne(self):
+        t = self.table(["2025-01-01", "2025-02-01"], ["DLR1", "DLR2"])
+        assert vues._depuis_quand_complet(t, "dossier_uid") == "2025-01-01"
+
+    def test_une_lacune_sur_la_derniere_ligne_n_annonce_aucune_date(self):
+        """La source n'a pas basculé : promettre une date serait mentir."""
+        t = self.table(["2025-01-01", "2026-07-01"], ["DLR1", None])
+        assert vues._depuis_quand_complet(t, "dossier_uid") is None

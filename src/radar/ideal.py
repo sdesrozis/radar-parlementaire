@@ -415,10 +415,20 @@ def _ajustement(Y: np.ndarray, M: np.ndarray, p: np.ndarray) -> tuple[float, flo
 
 
 #: Colonnes de la table des scrutins pouvant servir de bloc de rééchantillonnage,
-#: de la plus fine à la plus grossière. La première réellement remplie gagne.
-#: `dossier_uid` serait le bon niveau — les scrutins d'un même texte sont
-#: fortement corrélés — mais l'open data de l'Assemblée ne le renseigne jamais ;
-#: `seance_uid` est le regroupement le plus fin qui existe dans la source.
+#: de la plus fine à la plus grossière. La première **entièrement** remplie gagne.
+#:
+#: `dossier_uid` est le bon niveau — les scrutins d'un même texte sont fortement
+#: corrélés. L'Assemblée ne le renseigne que depuis mars 2026 : il couvre 2 606
+#: des 2 608 scrutins postérieurs et 2 des 5 824 antérieurs. Une colonne
+#: partiellement remplie est écartée, et non complétée au petit bonheur —
+#: mélanger des blocs « dossier » et des blocs « un scrutin isolé » donnerait
+#: des blocs de tailles incomparables, donc des intervalles faussés dans un
+#: sens qu'on ne saurait pas nommer. `seance_uid` reste donc le regroupement
+#: employé tant que la lacune n'est pas résorbée.
+#:
+#: Ce commentaire a dit pendant toute la vie du dépôt que la source ne
+#: renseignait *jamais* ce champ. C'était faux : le parseur le perdait. Cf. la
+#: note de `parse.SCRUTIN_SCHEMA` et le registre des corrections.
 BLOCS_CANDIDATS = ("dossier_uid", "seance_uid", "date")
 
 

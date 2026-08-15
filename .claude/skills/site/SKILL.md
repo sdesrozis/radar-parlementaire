@@ -149,17 +149,35 @@ délégation à l'échelle de l'Assemblée et des groupes**), **page Méthode** 
 **maxime**), **registre des corrections**, **barre de navigation mobile**, **verrou
 complet en tête et en pied** en deux versions dessinées.
 
-**Le relevé coûte 95 Ko par fiche** — 245 lignes de titres de scrutins, 79 Mo pour le
-site contre 22 Mo avant lui. C'est le prix de la pièce justificative, et il se paie en
-balisage nu : les lignes du relevé n'ont qu'une classe, tout le reste se style par
-sélecteur d'élément. Y ajouter un attribut coûte une centaine de kilo-octets.
+Fait aussi : l'onglet **« Les votes »** — miroir de l'annuaire côté scrutins. Recherche
+sur les 245 votes qui engagent par titre, nom de loi, date ou numéro, index HTML de
+repli par année, et **une page par vote** (`scrutin-8434.html`) avec le résultat, le
+tableau des positions de groupe et **le relevé nominatif des 648 députés**. Le titre du
+relevé des fiches mène désormais à ces pages.
+
+**Le mot « solennel » n'est jamais un dénominateur.** 72 scrutins solennels en 21 mois :
+une absence en retire 1,4 point de présence, dix en retirent 14, contre 4 sur les 245
+votes qui engagent. La présence + la délégation sur cette assiette **sont publiées** —
+les taire ferait croire qu'on les cache — mais toujours avec ce calcul écrit **en clair
+et non dans un repli**, sur la fiche comme sur l'onglet. L'assiette **recoupe** les
+autres (65 des 72 sont de portée « texte ») : elle est servie hors du tableau des trois
+assiettes, sous un trait, pour qu'aucune addition ne soit suggérée. Cf. `vues._solennels`.
+
+**Le relevé coûte 95 Ko par fiche** — 245 lignes de titres de scrutins — et le relevé
+nominatif 87 Ko par page de vote, sur 648 lignes. Le site pèse 120 Mo contre 79 avant
+l'onglet des votes, et 22 avant tout relevé. C'est le prix de la pièce justificative, et
+il se paie en balisage nu : les lignes n'ont qu'une classe, tout le reste se style par
+sélecteur d'élément. Un attribut ajouté au relevé nominatif coûte trois mégaoctets.
+
+**Le filtre par défaut se pose en JavaScript, jamais dans le HTML.** Les deux relevés
+s'ouvrent sur « Pour ». Écrit `data-filtre="pour"` dans le document, ce défaut
+amputerait la pièce justificative pour un lecteur sans script, pour un moteur et dans
+une page enregistrée. Posé au chargement par `filtreReleve()`, le document reste entier.
 
 À faire, dans cet ordre : la recherche par **commune** (l'open data ne publie pas la
 composition des circonscriptions — il faut une table externe), la page « cette semaine »
-branchée sur `radar/alerts.py`, les pages scrutin et groupe, le glossaire, l'image
-OpenGraph dédiée (le logo y sert de solution d'attente), puis les adresses lisibles
-(`/deputes/prenom-nom-departement-n` plutôt que `PA1008.html`, avec la table de
-redirections que ça impose).
+branchée sur `radar/alerts.py`, la page groupe, le glossaire, l'image OpenGraph dédiée
+(le logo y sert de solution d'attente), puis les adresses lisibles des fiches.
 
 ## Le registre des corrections
 
@@ -233,13 +251,42 @@ les autres pages comptent.
 et cantonnés : un lecteur qui verrait ces deux couleurs sur une mesure aurait raison de
 croire qu'elles désignent des camps. Le pied de page le dit explicitement.
 
+## Les liens vers l'Assemblée, et la lacune datée
+
+`vues.lien_scrutin()` se construit sur le numéro, que la source publie sur les 8 434
+lignes : **c'est le seul lien garanti**, et c'est lui qui porte la preuve.
+`vues.lien_dossier()` rend `None` avant le 26 mars 2026 — l'Assemblée ne renseignait pas
+`dossierLegislatif` avant cette date (2 scrutins sur 5 824, puis 100 %).
+
+**Ce `None` se dit, il ne se masque pas.** Un lien simplement absent laisse comprendre
+« ce vote ne porte sur aucune loi » ; la phrase dit « la source ne rattache pas ce
+scrutin à un dossier », avec le nombre de scrutins concernés. La date de bascule vient
+de `_depuis_quand_complet()` : c'est la date après laquelle plus rien ne manque, et non
+celle du premier scrutin renseigné — ce dernier date d'avril 2025 et ne promet rien.
+
+Le champ a été nul pendant toute la vie du dépôt parce que `dossierLegislatif` est un
+objet `{libelle, dossierRef}` auquel on appliquait `text()`. Le code en avait conclu par
+écrit que « la source ne le remplit jamais », et `ideal.py` s'en servait pour justifier
+un choix de méthode. Entrée au registre du 15 août 2026.
+
+**Le nombre d'amendements est celui du dossier, jamais du scrutin.** Un amendement porte
+sur un texte ; l'immense majorité n'est jamais mise aux voix. Le rattachement n'existe
+que dans l'arborescence de l'archive (`amendements/json/{dossier}/{texte}/`), pas dans
+le JSON de l'amendement — cf. `parse._dossier_du_chemin`.
+
 ## Une seule recherche
 
-`recherche()` dans `radar.js` sert l'accueil **et** l'annuaire : deux implémentations
-donneraient deux réponses au même mot. Les pages ne diffèrent que par `data-limite` et
-`data-vide="masquer"`. Les trois signaux (présence, écart au groupe, position) sont mis
-en forme **côté Python** dans `Site.index_annuaire()` — le JavaScript ne fabrique ni
-pourcentage ni virgule décimale, et n'a pas à savoir qu'un taux manquant n'est pas zéro.
+`recherche(sujet)` dans `radar.js` sert l'accueil, l'annuaire **et** l'onglet des votes :
+deux implémentations donneraient deux réponses au même mot. Ce qui varie tient en trois
+fonctions passées en argument — de quoi est faite la clé, comment se dessine une ligne,
+comment se dit le compte —, plus `data-limite` et `data-vide="masquer"` sur l'hôte.
+
+Tout ce qui s'affiche est mis en forme **côté Python**, dans `Site.index_annuaire()` et
+`generer.votes_json()` : le JavaScript ne fabrique ni pourcentage ni virgule décimale, et
+n'a pas à savoir qu'un taux manquant n'est pas zéro. La recherche des votes porte sur le
+titre du scrutin **et** sur le nom du dossier : « fin de vie » est le nom sous lequel la
+loi est connue, « l'ensemble de la proposition de loi relative au droit à l'aide à
+mourir » celui sous lequel elle est votée, et personne ne cherche le second.
 
 ## La carte des accords
 

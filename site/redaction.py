@@ -814,3 +814,153 @@ def phrase_portee(apercu: dict) -> tuple[str, str]:
           "seulement — plutôt qu'une moyenne unique qui aurait l'air plus simple et "
           "dirait moins.")
     return p1, p2
+
+
+# ── les phrases d'un scrutin ───────────────────────────────────────────────
+
+def phrase_sort(s: dict) -> str:
+    """Ce que l'Assemblée a décidé, dite avec l'écart qui l'a décidé.
+
+    « Adopté » seul ne dit pas si le texte a traversé l'hémicycle sans bruit ou
+    s'il est passé à quatre voix. L'écart est donc dans la même phrase que le
+    verdict, et il est calculé sur les suffrages exprimés — pas sur les 577
+    sièges, dont la plupart n'ont rien exprimé.
+    """
+    pour, contre = s["n_pour"] or 0, s["n_contre"] or 0
+    ecart = abs(pour - contre)
+    verdict = (s["sort_libelle"] or "").strip().rstrip(".")
+    verdict = verdict[0].upper() + verdict[1:] if verdict else "Résultat inconnu"
+    if not (pour or contre):
+        return f"{echapper(verdict)}."
+    return (f"{echapper(verdict)}, par <b>{num(pour)} voix contre {num(contre)}</b> — "
+            f"un écart de {num(ecart)} voix.")
+
+
+def phrase_delegation_scrutin(resume: dict) -> str:
+    """La part déléguée de ce scrutin, quand elle est mesurable.
+
+    Elle n'a pas de sens sans son dénominateur — « 169 délégations » se lit
+    comme beaucoup ou comme peu selon qu'on les rapporte à 364 suffrages ou à
+    577 sièges — donc les deux nombres sont dans la phrase, ou la phrase
+    n'existe pas.
+    """
+    exprimes, delegues = resume.get("exprimes", 0), resume.get("delegues", 0)
+    if not exprimes or not delegues:
+        return ""
+    # On dit « émis » et non « exprimés ». « Suffrages exprimés » a un sens
+    # réglementaire précis, écrit deux lignes plus haut — pour et contre, sans
+    # les abstentions — et le dénominateur de la délégation, lui, comprend les
+    # abstentions. Deux nombres différents sous le même mot, dans le même bloc,
+    # auraient donné une page qui semble se contredire.
+    return (f"<b>{num(delegues)} des {num(exprimes)} suffrages émis</b>, "
+            f"abstentions comprises ({pct(delegues / exprimes, 0)}{NBSP}%), l'ont "
+            f"été par un collègue mandaté&nbsp;: le règlement les impute au "
+            f"député, ce site aussi, et le relevé ci-dessous les signale un par un.")
+
+
+def phrase_groupes_scrutin(groupes: list[dict], resume: dict) -> str:
+    """Comment les groupes se sont partagés, sans nommer de camp.
+
+    On compte les groupes de chaque côté et ceux qui se sont divisés. Aucune
+    étiquette politique n'entre ici : « la gauche a voté contre » serait une
+    lecture, pas une mesure, et ce site n'en publie pas.
+    """
+    pour = [g for g in groupes if g.get("majoritaire") == "pour"]
+    contre = [g for g in groupes if g.get("majoritaire") == "contre"]
+    partages = [g for g in groupes if g.get("partage")]
+
+    def dire(gs: list[dict], sens: str) -> str:
+        noms = ", ".join(echapper(g["groupe"]) for g in gs if g.get("groupe"))
+        return f"<b>{num(len(gs))} groupe{pluriel(len(gs))}</b> {sens} ({noms})"
+
+    morceaux = []
+    if pour:
+        morceaux.append(dire(pour, "ont majoritairement voté pour"
+                             if len(pour) >= 2 else "a majoritairement voté pour"))
+    if contre:
+        morceaux.append(dire(contre, "contre"))
+    if not morceaux:
+        return ("Aucun groupe n'a dégagé de position majoritaire sur ce scrutin.")
+
+    phrase = " et ".join(morceaux) + "."
+    phrase = phrase[0].upper() + phrase[1:]
+    if partages:
+        noms = ", ".join(echapper(g["groupe"]) for g in partages if g.get("groupe"))
+        phrase += (f" {num(len(partages))} groupe{pluriel(len(partages))} "
+                   f"{'se sont partagés' if len(partages) >= 2 else 's est partagé'} "
+                   f"à égalité ({noms})&nbsp;: pas de position, donc pas d'écart à "
+                   f"la ligne possible ce jour-là.")
+    dissidents = resume.get("dissidents", 0)
+    if dissidents:
+        phrase += (f" <b>{num(dissidents)} député{pluriel(dissidents)}</b> "
+                   f"{'se sont séparés' if dissidents >= 2 else 's est séparé'} "
+                   f"de la position de son groupe.")
+    return phrase
+
+
+def phrase_releve(resume: dict, apercu: dict) -> str:
+    """L'introduction du relevé nominatif : ce qu'on va y compter.
+
+    Le nombre d'absents est le chiffre le plus explosif de la page, et c'est
+    celui qui se prête le plus à une lecture fausse. Il est donc donné avec ce
+    qui le relativise dans la même phrase : les empêchés, les hors-mandat, et
+    le rappel que la source ne publie aucun motif.
+    """
+    total = resume.get("total", 0)
+    hors = resume.get("hors_mandat", 0)
+    concernes = total - hors
+    exprimes = resume.get("exprimes", 0)
+    absents = resume.get("absent", 0)
+    empeches = resume.get("empeche", 0)
+
+    p = (f"<b>{num(exprimes)} suffrages exprimés</b> sur "
+         f"{num(concernes)} députés dont le mandat courait ce jour-là.")
+    if absents:
+        p += (f" {num(absents)} n'{'ont' if absents >= 2 else 'a'} pas pris part au "
+              f"vote&nbsp;: la source ne publie aucun motif, et ce site n'en "
+              f"invente pas.")
+    if empeches:
+        p += (f" {num(empeches)} ne pouvai{'en' if empeches >= 2 else ''}t pas voter "
+              f"— ministre, présidence de séance.")
+    if hors:
+        p += (f" {num(hors)} des {num(total)} députés de la législature n'étaient "
+              f"pas en fonction à cette date&nbsp;; ils sont signalés comme tels "
+              f"plutôt que comptés absents.")
+    return p
+
+
+def phrase_loi(liens: dict, s: dict, apercu: dict) -> str:
+    """Le rattachement du scrutin à sa loi — ou l'aveu qu'il manque.
+
+    Les deux cas produisent une phrase, et c'est le point. Un lien simplement
+    absent laisserait croire que le vote ne porte sur aucun texte&nbsp;; la
+    lacune est donc nommée, datée, et rapportée au nombre de scrutins qu'elle
+    touche.
+    """
+    dos = apercu["dossiers"]
+    if liens.get("dossier"):
+        p = (f"Ce vote est un épisode du dossier législatif "
+             f"<b>«&nbsp;{echapper(liens['dossier_titre'])}&nbsp;»</b>, "
+             f"que l'Assemblée publie <a href=\"{liens['dossier']}\">ici</a> "
+             f"avec l'ensemble de ses étapes.")
+        n = liens.get("amendements_du_dossier")
+        if n:
+            adoptes = liens.get("amendements_adoptes") or 0
+            examines = liens.get("amendements_examines") or 0
+            p += (f" <b>{num(n)} amendement{pluriel(n)}</b> ont été déposés sur "
+                  f"cette loi")
+            if examines:
+                p += (f" — {num(examines)} ont vu leur sort tranché, "
+                      f"{num(adoptes)} {'ont' if adoptes >= 2 else 'a'} été "
+                      f"adopté{pluriel(adoptes)}")
+            p += (". Ce compte est celui de la loi entière et non de ce scrutin&nbsp;: "
+                  "un amendement porte sur un texte, et l'immense majorité n'est "
+                  "jamais mise aux voix.")
+        return p
+    return (f"<b>La source ne rattache pas ce scrutin à un dossier législatif.</b> "
+            f"L'Assemblée ne renseigne ce champ que depuis le {jour(dos['depuis'])}&nbsp;: "
+            f"{num(dos['scrutins_sans'])} des {num(dos['scrutins_avec'] + dos['scrutins_sans'])} "
+            f"scrutins de la législature n'en portent aucun. Ce n'est pas un vote "
+            f"sans loi — le titre du scrutin la nomme en toutes lettres ci-dessus — "
+            f"c'est un vote dont la source tait la loi, et nous ne fabriquons pas "
+            f"le rattachement à sa place.")

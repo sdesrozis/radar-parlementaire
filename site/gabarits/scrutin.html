@@ -1,0 +1,167 @@
+  <!-- ══ CHAPEAU ═══════════════════════════════════════════════════ -->
+  <section class="cadre chapeau">
+    <p class="fil"><a href="votes.html">Les votes</a> · {{DATE}} · scrutin nº&nbsp;{{NUMERO}}{{SOLENNEL_MARQUE}}</p>
+    <h1 class="titre-scrutin">{{TITRE_SCRUTIN}}</h1>
+    <p class="sous-titre-fiche">
+      {{SORT_PHRASE}}
+      <span class="etat">{{CATEGORIE}}</span>
+    </p>
+  </section>
+
+  <!-- ══ LE RÉSULTAT ═══════════════════════════════════════════════
+       Les trois comptes et leur total, dans le même bloc. Un « adopté par
+       276 voix » sans les 86 contre ni les 364 votants ne dit pas si le
+       texte a divisé l'Assemblée ou s'il l'a traversée sans bruit.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre bilan">
+    <p class="jalon">Le résultat</p>
+    <div class="resultat">
+      <div class="resultat-part pour">
+        <b class="mono">{{N_POUR}}</b><span>pour</span>
+      </div>
+      <div class="resultat-part contre">
+        <b class="mono">{{N_CONTRE}}</b><span>contre</span>
+      </div>
+      <div class="resultat-part abstention">
+        <b class="mono">{{N_ABSTENTION}}</b><span>abstention{{S_ABSTENTION}}</span>
+      </div>
+      <div class="resultat-part absent">
+        <b class="mono">{{N_ABSENTS}}</b><span>n'ont pas pris part</span>
+      </div>
+    </div>
+    <p class="provenance">{{VOTANTS}} votants et <b>{{EXPRIMES}} suffrages
+      exprimés</b> au sens du règlement — celui-ci ne compte que les «&nbsp;pour&nbsp;»
+      et les «&nbsp;contre&nbsp;», l'abstention n'étant pas un suffrage exprimé —
+      d'où une majorité absolue à {{REQUIS}}. Les quatre nombres ci-dessus se
+      rapportent aux {{CONCERNES}} députés dont le mandat courait le
+      {{DATE}}.{{HORS_MANDAT_PHRASE}} {{DELEGATION_PHRASE}}</p>
+  </section>
+
+  <!-- ══ LA LOI, ET LES PIÈCES ═════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Le texte, et où le vérifier</p>
+    <div class="lecture" style="margin-top:22px">
+      {{LOI_BLOC}}
+    </div>
+    <p class="provenance">Le lien vers l'analyse du scrutin existe pour les
+      {{SCRUTINS}} scrutins de la législature&nbsp;: il mène au dépouillement
+      nominatif publié par l'Assemblée, celui-là même dont les chiffres de cette
+      page sont recalculés. Si les deux divergent, c'est cette page qui a tort.</p>
+  </section>
+
+  <!-- ══ PAR GROUPE ════════════════════════════════════════════════ -->
+  <section class="cadre mesure">
+    <p class="jalon">Groupe par groupe</p>
+    <div class="lecture" style="margin-top:22px">
+      <p class="enclair">{{GROUPES_PHRASE}}</p>
+    </div>
+    <div class="tableau-defile">
+      <table class="tableau-groupes">
+        <thead>
+          <tr>
+            <th scope="col">Groupe</th>
+            <th scope="col">Pour</th>
+            <th scope="col">Contre</th>
+            <th scope="col">Abstention</th>
+            <th scope="col">Position du groupe</th>
+            <th scope="col">Suivie par</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{GROUPES}}
+        </tbody>
+      </table>
+    </div>
+    <p class="provenance">«&nbsp;Position du groupe&nbsp;» est la position
+      majoritaire <b>constatée</b> au dépouillement, recalculée ici et non reprise
+      du champ que publie l'Assemblée — les deux divergent dans environ 8&nbsp;%
+      des cas, la source publiant parfois la consigne plutôt que le vote.
+      «&nbsp;Suivie par&nbsp;» est la part des votants du groupe qui l'ont émise.
+      Un groupe partagé n'a pas de position&nbsp;: la case est vide, pas à zéro.</p>
+
+    <details class="piege">
+      <summary>Ce qu'une position de groupe n'est pas</summary>
+      <div class="dedans">
+        <p>Elle n'est pas une consigne dont on pourrait prouver l'existence. Ce
+          site ne lit aucune réunion de groupe&nbsp;: il constate qu'une majorité
+          des votants d'un groupe a voté dans un sens, et appelle cela la position
+          du groupe. Un député qui vote autrement n'a pas forcément désobéi à
+          quoi que ce soit.</p>
+        <p>Elle ne dit rien du nombre d'absents. Un groupe dont trois députés
+          seulement ont voté, tous dans le même sens, affiche une position suivie
+          à 100&nbsp;%&nbsp;: c'est le compte des votants, dans les colonnes à
+          gauche, qui le nuance — et c'est pour cela qu'il est affiché à côté.</p>
+        <p>Les écarts individuels sont signalés dans le relevé ci-dessous, où
+          chaque député qui s'est séparé de la position de son groupe porte la
+          mention «&nbsp;écart à la ligne&nbsp;».</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ══ LE RELEVÉ NOMINATIF ═══════════════════════════════════════
+       La pièce justificative de la page, écrite dans le document et non
+       chargée par un script : elle doit rester lisible sans JavaScript,
+       indexable et copiable dans un tableur. Le filtre ne fabrique rien,
+       il masque des lignes déjà présentes.
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="cadre mesure" id="nominatif">
+    <p class="jalon">Le relevé — qui a voté quoi</p>
+    <div class="lecture" style="margin-top:22px">
+      <p class="enclair">{{RELEVE_PHRASE}}</p>
+    </div>
+
+    <div class="filtres" role="group" aria-label="Filtrer le relevé" data-cible="nominatif-liste">
+      {{RELEVE_FILTRES}}
+    </div>
+
+    <ol class="nominatif" id="nominatif-liste">
+      {{RELEVE}}
+    </ol>
+    <p class="provenance journal-vide" hidden>Aucun député ne correspond à ce filtre.</p>
+
+    <details class="piege">
+      <summary>Ce que «&nbsp;n'a pas pris part&nbsp;» recouvre</summary>
+      <div class="dedans">
+        <p><b>Ce n'est pas une absence de l'Assemblée.</b> Un député en commission,
+          en mission à l'étranger ou en circonscription au moment du scrutin
+          apparaît ici sans suffrage. La source ne publie aucun motif, et ce site
+          n'en invente pas.</p>
+        <p>Certains <b>ne pouvaient pas voter</b> : un ministre, le président de
+          séance, le président de l'Assemblée tant qu'il préside. Ce sont des
+          non-votants structurels, distingués comme tels — les compter en absences
+          reviendrait à reprocher à quelqu'un d'occuper sa fonction.</p>
+        <p><b>«&nbsp;Par délégation&nbsp;»</b> signifie que le suffrage a été émis
+          par un collègue mandaté. Le règlement l'impute au député, et ce site fait
+          de même&nbsp;; il le signale parce que «&nbsp;a voté pour&nbsp;» et
+          «&nbsp;était là&nbsp;» ne sont pas la même phrase.</p>
+        <p>Le relevé porte les {{EN_EXERCICE}} députés en exercice. Un député dont
+          le mandat n'avait pas commencé, ou s'était achevé, à la date de ce
+          scrutin est signalé comme tel plutôt que compté absent.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ══ REPARTIR ══════════════════════════════════════════════════ -->
+  <section class="cadre" style="padding-block: 48px 8px">
+    <p class="jalon">Continuer</p>
+    <div class="duo" style="margin-top:26px">
+      <div class="colonne">
+        <h3>Les autres votes</h3>
+        <p class="assiette">{{PORTEE_TEXTE}} votes qui engagent</p>
+        <p style="margin:0;font-size:15.5px;color:var(--encre-2);line-height:1.6">
+          La liste complète des votes sur l'ensemble d'un texte et des motions de
+          censure, cherchable par nom de loi.
+          <a href="votes.html">Les votes</a>.
+        </p>
+      </div>
+      <div class="colonne">
+        <h3>Le député de votre circonscription</h3>
+        <p class="assiette">{{EN_EXERCICE}} fiches</p>
+        <p style="margin:0;font-size:15.5px;color:var(--encre-2);line-height:1.6">
+          Chaque fiche porte le relevé des {{PORTEE_TEXTE}} votes qui engagent, sa
+          présence avec son dénominateur, et son écart à la ligne de son groupe.
+          <a href="deputes.html">Trouver un député</a>.
+        </p>
+      </div>
+    </div>
+  </section>
