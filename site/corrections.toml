@@ -350,3 +350,71 @@ ce choix dit désormais pourquoi, au lieu d'invoquer un champ prétendument vide
 """
 pages = "Les 245 pages de vote, l'onglet « Les votes »"
 commit = "bbcdbea"
+
+[[correction]]
+date = "2026-08-15"
+titre = "Qui siégeait le jour du scrutin"
+portee = "chiffre"
+erreur = """
+Les pages de vote annonçaient un nombre de députés en fonction supérieur au
+nombre de sièges de l'Assemblée : 581 sur la page du scrutin du 2 juin 2026, et
+jusqu'à 636 sur les scrutins d'octobre 2024, là où l'article 24 de la
+Constitution en plafonne l'effectif à 577. Les députés en trop étaient publiés
+comme absents de votes auxquels ils ne pouvaient pas prendre part.
+
+261 214 couples député × scrutin étaient déclarés dans le mandat à tort, soit
+6,8 % de toutes les absences publiées par le site, réparties sur 86 députés. Les
+taux de présence de ces 86 députés étaient calculés sur un dénominateur qui
+comptait des scrutins tenus avant leur entrée en fonction, ou pendant une
+interruption de leur mandat."""
+cause = """
+Deux défauts empilés, tous deux dans la reconstruction des dates de mandat.
+
+Le premier est une lecture de la source. Le champ `dateDebut` d'un mandat ne
+date pas l'entrée en fonction du député : l'Assemblée y inscrit la date
+d'ouverture de la législature pour tous les mandats, y compris ceux de
+remplaçants entrés deux ans plus tard — 584 des 677 mandats de la 17ᵉ portent la
+même valeur. La date d'entrée effective est publiée à côté, dans
+`mandature/datePriseFonction`, et ce champ n'était pas lu. Une suppléante entrée
+en fonction le 5 août 2026 était donc réputée siéger depuis le 7 juillet 2024.
+
+Le second est une simplification de modèle. Un mandat était résumé par un
+intervalle unique, de la première entrée à la dernière sortie. Or un mandat peut
+être interrompu : un député nommé au Gouvernement rend son siège à son
+suppléant, puis le reprend, et la source publie alors deux mandats séparés par
+un trou de plusieurs mois. 29 mandats de cette législature sont dans ce cas.
+L'intervalle unique comblait le trou, plaçant le titulaire en fonction pendant
+qu'il était ministre — et son suppléant en fonction en même temps que lui.
+
+Les deux défauts se rejoignent au même endroit : deux personnes occupaient la
+même circonscription à la même date. C'est la forme sous laquelle l'erreur était
+visible, et personne ne la regardait — aucun des 230 tests du dépôt ne comptait
+de députés. Un effectif faux ne contredit aucune formule."""
+effet = """
+L'éligibilité est désormais une union d'intervalles, bornée par la prise de
+fonction réelle. Sur la page du scrutin du 2 juin 2026, l'effectif passe de 581
+à 577 et le relevé s'additionne : 212 pour, 364 absents, 1 empêché. Sur les
+8 434 pages de vote, l'effectif publié ne dépasse plus jamais 577 ; il lui est
+parfois inférieur, et la page dit alors combien de sièges étaient vacants.
+
+Les taux de présence des 86 députés concernés changent, parfois du tout au tout,
+tous à la hausse — aucun n'était surestimé. Quelques exemples, sur l'ensemble
+des scrutins : Pauline Cestrières 10,2 % → 40,0 % ; Emmanuelle Hoffman
+11,4 % → 27,9 % ; Astrid Panosyan-Bouvet 21,0 % → 35,4 % ; Stéphanie Rist
+13,7 % → 18,3 % ; Marie-Christine Dalloz 17,4 % → 18,4 %. Une députée entrée en
+fonction après le dernier scrutin publié affichait 0 % de présence sur 8 434
+scrutins ; sa fiche dit maintenant qu'aucun scrutin ne relève de son mandat.
+
+Six invariants sont désormais vérifiés sur l'intégralité des données avant que
+la moindre page ne soit écrite, et leur échec arrête la publication au lieu de
+l'assortir d'un avertissement : au plus 577 députés en fonction à chaque date,
+une seule personne par circonscription, aucun suffrage attribué hors mandat, un
+relevé dont les six statuts partitionnent l'effectif, et des totaux identiques à
+ceux que publie l'Assemblée sur les 8 434 scrutins. Un test de régression
+réinjecte l'ancien calcul et vérifie que les contrôles le refusent.
+
+Les pages de vote et la page Méthode expliquent désormais l'écart aux 577 sièges
+quand il existe, ce que « hors mandat » recouvre, et le cas du mandat
+interrompu. La note méthodologique porte la définition corrigée."""
+pages = "Les 245 pages de vote, les fiches des 86 députés concernés, la page Méthode"
+commit = "743c002"
