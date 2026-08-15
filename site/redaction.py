@@ -32,7 +32,17 @@ def pct(x: float, dec_: int = 1) -> str:
 
 
 def dec(x: float, n: int = 2) -> str:
-    return f"{x:.{n}f}".replace(".", ",")
+    """Un décimal à la française — et jamais « -0,00 ».
+
+    L'axe des positions est centré : ses bornes passent par zéro, et un
+    arrondi rendait « de -0,00 à 0,31 ». Un zéro signé n'existe pas pour un
+    lecteur ; il se lit comme une coquille, sur la seule page où le site
+    demande qu'on lui fasse confiance sur des décimales.
+    """
+    s = f"{x:.{n}f}"
+    if s.startswith("-") and float(s) == 0:
+        s = s[1:]
+    return s.replace(".", ",")
 
 
 def num(n: float) -> str:
@@ -368,7 +378,17 @@ def phrase_these(f: dict, d_diss: dict, d_part: dict, rang_diss: int, rang_part:
     # sur aucun scrutin où le député a voté. Il n'y a alors pas d'angle à tirer
     # de la dissidence : ce n'est pas une discipline parfaite, c'est une absence
     # de mesure. On bascule sur la présence.
-    diss_mesurable = a["taux_dissidence"] is not None and bool(a["votes_avec_ligne"])
+    # Mesurable ne suffit pas : encore faut-il que le taux soit comparable à
+    # ceux des autres. Un « il suit sa ligne dans 100 % des cas » tiré de quatre
+    # scrutins est exact et ne dit rien — c'est la même raison qui neutralise
+    # l'angle de présence quelques lignes plus bas. Sans cette condition, les
+    # députés entrés en fin de législature recevaient tous la même thèse
+    # flatteuse, assise sur le plus petit dénominateur de l'Assemblée.
+    diss_mesurable = (
+        a["taux_dissidence"] is not None
+        and bool(a["votes_avec_ligne"])
+        and a.get("dissidence_comparable", True)
+    )
     ecart_diss = (a["taux_dissidence"] / d_diss["mediane"]
                   if diss_mesurable and d_diss["mediane"] else 1.0)
     # Un taux de présence hors distribution ne peut pas fournir l'angle : il
@@ -431,6 +451,24 @@ def phrase_these(f: dict, d_diss: dict, d_part: dict, rang_diss: int, rang_part:
         t2 = (f"C'est peu, mais ce n'est pas rare{NBSP}: {rarete}{coh}. "
               f"<b>La discipline est la règle à l'Assemblée, pas l'exception</b> — c'est le "
               f"contexte qui manque à la plupart des chiffres qu'on lit ailleurs.")
+        return t1, t2
+
+    # ── angle « son taux n'est comparable à rien » ────────────────────────
+    # Un dénominateur trop petit ne fournit pas d'angle, ni flatteur ni sévère.
+    # Sans cette branche, un député entré en juin avec 8 votes sur 10 recevait
+    # « aucun autre député ne fait mieux » suivi, dans la phrase d'après, de
+    # « personne ne dépasse 78,2 % » — les deux tirés de la même page, parce que
+    # son taux est hors de la distribution qui produit ce maximum.
+    if not a.get("participation_comparable", True):
+        t1 = (f"{nom} a exprimé <em>{num(a['votes_engageants'])} des "
+              f"{num(a['engageants_votables'])} votes qui engagent</em> tenus pendant "
+              f"son mandat, soit {pct(a['participation_engageants'])}{NBSP}%.")
+        t2 = (f"Ce taux est exact, et il ne se compare à rien{NBSP}: il porte sur "
+              f"{num(a['engageants_votables'])} scrutins, quand les autres députés sont "
+              f"mesurés sur plusieurs dizaines. Un vote de plus ou de moins le déplacerait "
+              f"de plusieurs points. Il est donc publié avec son effectif, et tenu hors "
+              f"de la médiane, des rangs et de la bande de comparaison — non parce qu'il "
+              f"serait douteux, mais parce qu'il ne répond pas à la même question.")
         return t1, t2
 
     # ── angle « présence aux votes qui engagent » ─────────────────────────
