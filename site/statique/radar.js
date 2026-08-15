@@ -293,9 +293,12 @@ recherche({
 
 /* Le filtre sert les deux relevés — les 245 scrutins d'un député, et les 648
    députés d'un scrutin. C'est le même geste sur les deux axes du même tableau,
-   donc le même code : `data-cible` désigne la liste à filtrer. */
+   donc le même code : `data-cible` désigne la liste à filtrer.
 
-function filtreReleve(cible) {
+   Ce qui diffère, c'est le filtre d'ouverture, parce que les deux pages ne
+   répondent pas à la même question. Cf. l'appel, en bas de ce bloc. */
+
+function filtreReleve(cible, defaut) {
   const barre = document.querySelector(`.filtres[data-cible='${cible}']`);
   const liste = document.getElementById(cible);
   if (!barre || !liste) return;
@@ -324,20 +327,27 @@ function filtreReleve(cible) {
     if (bouton) appliquer(bouton);
   });
 
-  /* Le relevé s'ouvre sur « Pour ». C'est la question que le lecteur se pose
-     en arrivant — qui a voté cette loi — et la liste complète, à 648 lignes,
-     ne la lui répond qu'après un long défilement.
-
-     **Ce choix est posé ici et non dans le HTML**, et la nuance n'est pas
-     technique. Écrit dans le document, `data-filtre="pour"` masquerait les
-     « contre » pour un lecteur sans JavaScript, pour un moteur de recherche et
-     dans une page enregistrée : le site publierait une pièce justificative
-     amputée de la moitié de son contenu. Posé au chargement, le document reste
-     entier — le filtre redevient ce qu'il doit être, un confort d'affichage
-     qui ne retire rien à la preuve. Un clic sur « Tous » rend la liste. */
-  const defaut = barre.querySelector("button[data-filtre='pour']");
-  if (defaut) appliquer(defaut);
+  /* **Le filtre d'ouverture est posé ici et non dans le HTML**, et la nuance
+     n'est pas technique. Écrit dans le document, `data-filtre="pour"`
+     masquerait les autres lignes pour un lecteur sans JavaScript, pour un
+     moteur de recherche et dans une page enregistrée : le site publierait une
+     pièce justificative amputée. Posé au chargement, le document reste entier
+     — le filtre redevient ce qu'il doit être, un confort d'affichage qui ne
+     retire rien à la preuve. */
+  const bouton = barre.querySelector(`button[data-filtre='${defaut}']`);
+  if (bouton) appliquer(bouton);
 }
 
-filtreReleve("journal");
-filtreReleve("nominatif-liste");
+/* Les deux relevés ne s'ouvrent pas sur le même filtre, parce qu'on n'arrive
+   pas sur les deux pages avec la même question.
+
+   Sur une page de scrutin, la question est « qui a voté cette loi », et 648
+   lignes n'y répondent qu'après un long défilement : on ouvre sur « Pour ».
+
+   Sur une fiche de député, la question est « où était-il », et la réponse est
+   dans les absences. Ouvrir sur « Pour » y montrerait le sous-ensemble le plus
+   flatteur du relevé — 45 lignes sur 245 pour un député dont 143 sont des
+   absences — juste sous un taux de présence de 41,6 % que ces 143 lignes sont
+   précisément là pour justifier. Une pièce justificative s'ouvre entière. */
+filtreReleve("journal", "tous");
+filtreReleve("nominatif-liste", "pour");

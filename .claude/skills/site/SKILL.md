@@ -169,10 +169,17 @@ l'onglet des votes, et 22 avant tout relevé. C'est le prix de la pièce justifi
 il se paie en balisage nu : les lignes n'ont qu'une classe, tout le reste se style par
 sélecteur d'élément. Un attribut ajouté au relevé nominatif coûte trois mégaoctets.
 
-**Le filtre par défaut se pose en JavaScript, jamais dans le HTML.** Les deux relevés
-s'ouvrent sur « Pour ». Écrit `data-filtre="pour"` dans le document, ce défaut
-amputerait la pièce justificative pour un lecteur sans script, pour un moteur et dans
-une page enregistrée. Posé au chargement par `filtreReleve()`, le document reste entier.
+**Le filtre par défaut se pose en JavaScript, jamais dans le HTML.** Écrit
+`data-filtre="pour"` dans le document, il amputerait la pièce justificative pour un
+lecteur sans script, pour un moteur et dans une page enregistrée. Posé au chargement par
+`filtreReleve()`, le document reste entier.
+
+**Et il n'est pas le même des deux côtés.** Une page de scrutin s'ouvre sur « Pour » —
+la question y est « qui a voté cette loi », et 648 lignes n'y répondent qu'après un long
+défilement. Une fiche de député s'ouvre sur « Tous » : la question y est « où était-il »,
+et la réponse est dans les absences. Ouvrir une fiche sur « Pour » y montrerait 45 lignes
+sur 245 pour un député dont 143 sont des absences, juste sous le taux de présence de
+41,6 % que ces 143 lignes sont là pour justifier.
 
 À faire, dans cet ordre : la recherche par **commune** (l'open data ne publie pas la
 composition des circonscriptions — il faut une table externe), la page « cette semaine »
