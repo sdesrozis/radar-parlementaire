@@ -18,6 +18,7 @@ c'est ce que ces tests verrouillent.
 """
 
 import importlib.util
+import re
 import os
 import sys
 from pathlib import Path
@@ -109,3 +110,71 @@ def test_la_note_du_depot_est_a_jour(generer):
     assert not generer.note_perimee(), (
         "docs/note-methodologique.pdf est plus ancien que son .tex — "
         "recompiler avant de publier")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Les seuils que la note énonce doivent être ceux que le code applique
+# ══════════════════════════════════════════════════════════════════════════
+
+#: Le source LaTeX, replié sur une seule ligne. Sans cette normalisation, le
+#: contrôle dépendrait de l'endroit où l'éditeur a coupé la phrase : « minimum
+#: de 50 » cesse d'être trouvable dès qu'un retour à la ligne tombe entre les
+#: deux mots, et le test échouerait sur une mise en forme au lieu d'un chiffre.
+SOURCE_NOTE = re.sub(
+    r"\s+", " ", (RACINE / "docs" / "note-methodologique.tex").read_text(encoding="utf-8")
+)
+
+
+class TestLesSeuilsDeLaNoteSontCeuxDuCode:
+    """La note est la spécification ; un seuil qui y dort n'engage personne.
+
+    Ce contrôle est né d'une divergence réelle et durable : la note annonçait
+    un minimum de 50 votes comparables pour entrer au classement de dissidence,
+    le site n'en appliquait aucun, et personne ne pouvait le voir sans lire les
+    deux côte à côte. Le résultat était qu'un taux de 0 % mesuré sur quatre
+    scrutins fixait l'extrémité de la distribution publiée.
+
+    On vérifie donc que chaque seuil cité dans le document apparaît **avec la
+    valeur de la constante**. Le test échoue dans les deux sens : changer le
+    code sans rouvrir le `.tex` casse la construction, et c'est le but. Il ne
+    prétend pas lire le sens des phrases — seulement empêcher qu'un nombre
+    figure d'un côté et pas de l'autre.
+    """
+
+    def test_le_seuil_de_dissidence(self):
+        from radar.analyze import MIN_VOTES_LIGNE
+
+        assert f"minimum de {MIN_VOTES_LIGNE} par défaut" in SOURCE_NOTE
+
+    def test_les_seuils_d_accord(self):
+        from radar.vues import MIN_COMMUNS, MIN_COMMUNS_TEXTE
+
+        assert f"à {MIN_COMMUNS} scrutins communs" in SOURCE_NOTE
+        assert f"et à {MIN_COMMUNS_TEXTE} pour les seuls votes" in SOURCE_NOTE
+
+    def test_le_seuil_de_comparabilite_de_la_presence(self):
+        from radar.vues import MIN_VOTABLES
+
+        assert f"inférieur à un seuil $D_{{\\min}}$ — fixé à {MIN_VOTABLES}" in SOURCE_NOTE
+
+    def test_le_niveau_des_intervalles(self):
+        """Un seul niveau sur tout le site, et la note doit le porter."""
+        from radar.vues import NIVEAU
+
+        assert f"{int(NIVEAU * 100)}~\\%" in SOURCE_NOTE or "1-\\gamma" in SOURCE_NOTE
+
+    def test_le_filtre_de_contestation_du_modele(self):
+        import inspect
+
+        from radar.ideal import estimer
+
+        seuil = inspect.signature(estimer).parameters["contestation_min"].default
+        # Le `.tex` écrit les décimaux à la française, virgule protégée.
+        assert f"{seuil:.3f}".replace(".", "{,}") in SOURCE_NOTE
+
+    def test_le_groupe_d_ancrage_est_nomme(self):
+        """La note doit pouvoir citer le seul groupe qui touche le calcul."""
+        from radar.ideal import GROUPE_ANCRAGE
+
+        assert "ancrage" in SOURCE_NOTE.lower()
+        assert GROUPE_ANCRAGE.split("-")[0] in SOURCE_NOTE
