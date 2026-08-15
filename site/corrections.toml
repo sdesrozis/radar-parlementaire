@@ -418,3 +418,206 @@ quand il existe, ce que « hors mandat » recouvre, et le cas du mandat
 interrompu. La note méthodologique porte la définition corrigée."""
 pages = "Les 245 pages de vote, les fiches des 86 députés concernés, la page Méthode"
 commit = "743c002"
+
+[[correction]]
+date = "2026-08-15"
+titre = "La composition des « votes qui engagent », sur la page Méthode"
+portee = "site"
+erreur = """
+La page Méthode définissait les votes qui engagent comme « les scrutins sur
+l'ensemble d'un texte, les motions de censure et les déclarations de politique
+générale ». La phrase de l'accueil disait la même chose. Les déclarations de
+politique générale n'en font pas partie : les 245 votes qui engagent sont 222
+votes sur l'ensemble et 23 motions de censure, et les 19 déclarations sont
+comptées parmi les autres scrutins."""
+cause = """
+La définition avait été écrite à la main dans le gabarit, de mémoire, et jamais
+confrontée à `parse.PORTEES`, qui range la catégorie `declaration` en portée
+intermédiaire. Le calcul n'a jamais inclus les déclarations : c'est la
+description qui était fausse, pas le chiffre.
+
+C'est la forme la plus discrète de l'erreur que ce site prétend combattre — un
+dénominateur juste, décrit par une phrase qui ne le décrit pas. N'importe quel
+lecteur recomptant le chiffre phare du site à partir de la définition publiée
+trouvait 264 et non 245."""
+effet = """
+Aucun chiffre ne change : 245 votes qui engagent, avant comme après. La page
+énonce désormais la composition exacte de l'assiette, et les trois nombres qui
+la composent sont des jetons remplis par le comptage, non plus une phrase
+écrite à la main. La note méthodologique donnait déjà la bonne définition."""
+pages = "La page Méthode et l'accueil"
+commit = "fbff49d"
+
+[[correction]]
+date = "2026-08-15"
+titre = "Le rang et la bande de dissidence, fixés par quatre votes"
+portee = "chiffre"
+erreur = """
+La distribution de dissidence de l'Assemblée — sa médiane, son minimum, les
+rangs et la bande des 577 — retenait tous les taux publiés, quel que soit le
+nombre de scrutins sur lesquels ils étaient mesurés. Les trois seuls députés en
+exercice à 0,0 % de dissidence étaient précisément ceux dont le groupe n'avait
+eu de ligne que sur 4, 8 et 25 scrutins. Ils occupaient à eux seuls l'extrémité
+« discipline » de la population, et leurs fiches s'annonçaient mutuellement
+« 2 députés sur 576 sont encore plus disciplinés » — alors que personne ne fait
+mieux que zéro écart et qu'ils étaient à égalité.
+
+Une députée dont le mandat a commencé après le dernier scrutin couvert, et dont
+la fiche dit correctement qu'il n'y a rien à compter, recevait par ailleurs un
+losange à 0,0 % sur cette même bande, avec une description sonore qui énonçait
+« 0,0 % » sous une phrase disant que la mesure n'existe pas."""
+cause = """
+La règle existait déjà, écrite et appliquée, mais à une seule mesure. La
+présence aux votes qui engagent écarte de la distribution de comparaison les
+taux assis sur moins de 20 scrutins — c'est ce qui a été fait le 14 août quand
+la présidente de l'Assemblée, à 100 % sur 19 votes, devenait « la députée la
+plus assidue de la législature ». La dissidence, mesure voisine servie par la
+même page, n'avait aucun seuil. La note méthodologique en annonçait pourtant un
+depuis l'origine — un minimum de 50 votes comparables — que le site
+n'appliquait pas.
+
+Le losange à zéro vient du même défaut, une ligne plus loin : le grand chiffre
+avait sa garde et rendait un tiret cadratin, la bande d'à côté recevait
+`taux ou 0`."""
+effet = """
+La distribution de dissidence passe de 576 à 573 députés. Son minimum passe de
+0,0 % — mesuré sur quatre votes — à 0,3 %. Les rangs et la position des losanges
+se décalent en conséquence sur les 577 fiches ; la médiane de l'Assemblée est
+inchangée à 2,6 %. Les taux des trois députés concernés restent publiés, avec
+leur dénominateur et leur intervalle : ils sortent de la comparaison, pas du
+site.
+
+La phrase « N députés sont encore plus disciplinés » compte désormais les taux
+strictement inférieurs, et dit « personne ne s'écarte moins souvent » quand
+c'est le cas, au lieu de compter les ex æquo comme des supérieurs. Une bande
+sans mesure n'est plus dessinée du tout. Le seuil est nommé
+(`analyze.MIN_VOTES_LIGNE`), il est celui de la note, et un test vérifie que les
+deux ne peuvent plus diverger."""
+pages = "Les 577 fiches de député"
+commit = "fbff49d"
+
+[[correction]]
+date = "2026-08-15"
+titre = "L'assiette réelle de la position estimée"
+portee = "site"
+erreur = """
+Chaque fiche annonçait une position « estimée à partir de ses N votes sur les
+textes qui engagent », N étant le nombre de suffrages du député sur les 245
+votes qui engagent. Le modèle n'en utilise pas autant : il est estimé sur 127
+de ces 245 scrutins, et il ne lit que les « pour » et les « contre ». Les 23
+motions de censure en sortent toutes. La largeur de l'intervalle était expliquée
+par la même quantité surestimée."""
+cause = """
+Le modèle de points idéaux applique trois filtres avant d'estimer : il ignore
+les abstentions, parce qu'il est binaire ; il écarte les scrutins quasi
+unanimes, qui n'ordonnent personne ; il écarte ceux qui ont trop peu de votants.
+Les motions de censure tombent sous le deuxième : la source n'y publie ni
+« contre » ni abstention — seuls les soutiens de la motion votent — de sorte que
+la position minoritaire y est nulle par construction.
+
+Ces filtres étaient documentés dans le code et dans la note. Ce qui manquait,
+c'est leur conséquence chiffrée servie jusqu'à la fiche : le site parlait de
+l'assiette qu'il avait offerte au modèle, pas de celle que le modèle avait
+retenue."""
+effet = """
+Aucune position ni aucun intervalle ne change. La fiche annonce désormais le
+nombre de « pour » et de « contre » de ce député que le modèle a effectivement
+lus, et le nombre de scrutins retenus ; les deux viennent du modèle lui-même et
+non d'un recomptage. La page Méthode publie l'écart entre 245 et 127 et dit
+pourquoi les motions de censure en sortent. La note méthodologique porte la
+même précision."""
+pages = "Les 577 fiches de député et la page Méthode"
+commit = "fbff49d"
+
+[[correction]]
+date = "2026-08-15"
+titre = "Une seule dimension, présentée comme un résultat de test"
+portee = "site"
+erreur = """
+La page Méthode écrivait : « Nous ne retenons qu'une seule dimension. Un second
+axe n'est ajouté que s'il prédit mieux des votes que le modèle n'a pas vus, ce
+qui se teste — et ne se suppose pas », puis que la seconde dimension « serait
+décorative ». Le test dit l'inverse. Sur les données de référence, la qualité de
+prédiction hors échantillon passe de 0,81 à une dimension à 0,93 à deux. Le
+second axe n'est pas décoratif : il prédit nettement mieux des votes que le
+modèle n'a pas vus."""
+cause = """
+La page énonçait une règle de sélection sans jamais publier le résultat de son
+application, et la règle plaidait contre ce que le site fait. Le README et le
+notebook du dépôt concluaient depuis longtemps que deux dimensions se
+justifient — l'axe 1 oppose LFI au reste, l'axe 2 le RN au reste. La page
+Méthode n'avait pas suivi.
+
+La vraie raison de n'en publier qu'une est éditoriale et n'avait jamais été
+écrite : tout ce qu'une fiche affirme d'une position se lit sur une ligne, et
+deux axes affichés ensemble forment un plan — c'est-à-dire une carte politique,
+que ce site refuse de publier."""
+effet = """
+Aucune position ne change : le site publiait déjà une seule dimension et
+continue. La page dit maintenant que c'est un choix de publication et non un
+résultat de test, publie les deux valeurs d'ajustement — mesurées à chaque
+génération, non écrites à la main — et énonce la conséquence : la position
+affichée résume par une seule coordonnée une Assemblée qui en demande au moins
+deux, et deux députés que le second axe sépare peuvent apparaître au même
+endroit. La note méthodologique porte la même section."""
+pages = "La page Méthode"
+commit = "fbff49d"
+
+[[correction]]
+date = "2026-08-15"
+titre = "Le rattachement au dossier législatif, déclaré absent de la source"
+portee = "site"
+erreur = """
+La page Méthode écrivait, à propos du regroupement des scrutins pour le
+bootstrap : « Le dossier législatif serait un meilleur niveau de regroupement
+encore ; l'open data ne le renseigne pas. » Le README affirmait de même que le
+champ « est nul dans les 8 434 fichiers source : ce n'est pas un défaut de
+parsing, la donnée n'y est pas ». La source le renseigne depuis le 26 mars 2026,
+sur 73 des 245 votes qui engagent, répartis sur 61 dossiers distincts."""
+cause = """
+C'était bien un défaut de parsing, corrigé la veille : `dossierLegislatif` est
+un objet `{libelle, dossierRef}` auquel le code appliquait une fonction qui
+n'extrait que du texte, et qui rendait donc `None` sur les 8 434 lignes. Le
+commentaire du code en avait conclu par écrit que la source ne remplissait
+jamais ce champ, et cette conclusion avait été recopiée dans le README puis sur
+le site, où elle servait à justifier un choix de méthode.
+
+Le champ corrigé, les pages de scrutin disaient déjà correctement « la source ne
+rattache pas ce scrutin à un dossier » avec la date de bascule, pendant que la
+page Méthode continuait d'affirmer que la source ne le fait jamais. Le site se
+contredisait d'une page à l'autre."""
+effet = """
+Le regroupement du bootstrap ne change pas : il reste la séance, 173 paquets
+pour 245 votes. C'est le comportement correct — `blocs_de_scrutins` écarte toute
+colonne comportant une valeur nulle, et le dossier manque sur la première moitié
+de la législature. Seule la justification était fausse. La page dit maintenant
+depuis quelle date et sur combien de scrutins la source renseigne le dossier, et
+que le regroupement changera quand la lacune sera résorbée."""
+pages = "La page Méthode et le README du dépôt"
+commit = "fbff49d"
+
+[[correction]]
+date = "2026-08-15"
+titre = "La provenance des totaux d'un scrutin"
+portee = "site"
+erreur = """
+Le pied de page de chaque page et la page Méthode affirmaient qu'« aucun chiffre
+publié par l'Assemblée n'est repris tel quel » et que « les totaux affichés ici
+sont recalculés depuis les votes individuels ». Les totaux d'un scrutin — les
+« pour », les « contre », les abstentions — sont ceux que l'Assemblée publie
+dans la synthèse de son fichier. Ils sont recomptés depuis le dépouillement
+nominatif et confrontés aux siens, mais ce sont bien les siens qui sont
+affichés."""
+cause = """
+La phrase était vraie des indicateurs — présence, dissidence, accord, position :
+aucun n'existe dans la source, tous sont calculés ici — et elle a été étendue
+sans précaution aux totaux bruts, qui sont lus tels quels. La confusion est
+d'autant plus regrettable que le contrôle qui les vérifie existe et qu'il est
+plus fort que ce que la phrase promettait : un écart, un seul, sur l'un des
+8 434 scrutins, arrête la publication entière."""
+effet = """
+Aucun chiffre ne change. Les pages distinguent maintenant ce qui est calculé de
+ce qui est repris puis recompté, et nomment le contrôle qui l'atteste. Une
+affirmation exacte et vérifiable remplace une affirmation flatteuse et fausse."""
+pages = "Toutes les pages du site, par le pied de page, et la page Méthode"
+commit = "fbff49d"
